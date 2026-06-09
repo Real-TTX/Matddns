@@ -1,0 +1,49 @@
+@page
+@model LogModel
+@{
+    ViewData["Title"] = "Log – Matddns";
+    var f = Model.MinFilter;
+}
+
+<div class="page-header">
+    <div>
+        <h1>Log</h1>
+        <p>Jüngste Einträge. Persistent in <span class="mono">/data/log.txt</span> (Level & Aufbewahrung unter <a href="/System">System</a>).</p>
+    </div>
+</div>
+
+<form method="get" class="log-toolbar">
+    <label for="lvl">Filter</label>
+    <select id="lvl" name="Level" onchange="this.form.submit()">
+        <option value="Debug" selected="@(f == Matddns.Services.LogLevel.Debug)">Alle</option>
+        <option value="Info" selected="@(f == Matddns.Services.LogLevel.Info)">Info+</option>
+        <option value="Update" selected="@(f == Matddns.Services.LogLevel.Update)">Update+</option>
+        <option value="Warn" selected="@(f == Matddns.Services.LogLevel.Warn)">Warn+</option>
+        <option value="Error" selected="@(f == Matddns.Services.LogLevel.Error)">Nur Error</option>
+    </select>
+    <button type="submit" class="ghost">Aktualisieren</button>
+</form>
+
+<div class="log-view">
+@if (!Model.Entries.Any())
+{
+    <div class="muted">Keine Einträge für diesen Filter.</div>
+}
+@foreach (var e in Model.Entries)
+{
+    var cls = e.Level switch
+    {
+        Matddns.Services.LogLevel.Error => "level-error",
+        Matddns.Services.LogLevel.Warn => "level-warn",
+        Matddns.Services.LogLevel.Update => "level-update",
+        Matddns.Services.LogLevel.Debug => "level-debug",
+        _ => ""
+    };
+    <div class="log-line @cls">
+        <span class="ts">@e.Timestamp.ToString("yyyy-MM-dd HH:mm:ss") UTC</span>
+        <span>@e.Level</span>
+        <span class="src">@e.Source</span>
+        <span>@e.Message</span>
+    </div>
+}
+</div>

@@ -1,0 +1,186 @@
+@page
+@model Matddns.Pages.Sources.EditModel
+@{
+    var g = Model.Group;
+    var isNew = Model.IsNew;
+    var kind = g?.Kind ?? SourceKind.PublicIp;
+    ViewData["Title"] = (isNew ? "Neue Source" : g!.Name) + " – Matddns";
+}
+
+<a class="back-link" href="/Sources">‹ zurück zu Sources</a>
+
+<div class="page-header">
+    <div>
+        <h1>@(isNew ? "Neue Source‑Gruppe" : g!.Name)</h1>
+        <p>@(isNew ? "Typ wählen – die passenden Felder erscheinen automatisch." : "Konfiguration und Einträge dieser Quelle.")</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
+@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert err">@Model.Error</div> }
+
+@if (!string.IsNullOrEmpty(Model.TestResult))
+{
+    <div class="test-result @(Model.TestOk ? "ok" : "err")">
+        <strong>@(Model.TestOk ? "✓ Test erfolgreich" : "✗ Test fehlgeschlagen")</strong>
+        <span class="mono">@Model.TestResult</span>
+    </div>
+}
+
+<div class="card">
+    <form method="post" asp-page-handler="@(isNew ? "Create" : "Save")">
+        @if (!isNew) { <input type="hidden" name="Id" value="@g!.Id" /> }
+
+        <div class="form-grid">
+            <div class="field">
+                <label>Name</label>
+                <input type="text" name="Name" value="@(g?.Name ?? "")" required placeholder="z.B. Heimnetz Unifi" />
+            </div>
+
+            <div class="field">
+                <label>Typ</label>
+                @if (isNew)
+                {
+                    <select name="Kind" id="kindSelect">
+                        <option value="PublicIp">Public IP (vom Container)</option>
+                        <option value="Unifi">Unifi (UDM / UGW)</option>
+                    </select>
+                }
+                else
+                {
+                    <input type="text" value="@(kind == SourceKind.Unifi ? "Unifi (UDM / UGW)" : "Public IP (vom Container)")" disabled />
+                    <div class="hint">Typ kann nach dem Anlegen nicht geändert werden.</div>
+                }
+            </div>
+
+            <div class="field full">
+                <label>Intervall (Sekunden)</label>
+                <input type="number" name="IntervalSeconds" value="@(g?.IntervalSeconds ?? 60)" min="15" />
+            </div>
+        </div>
+
+        <!-- Unifi Felder -->
+        <div class="type-fields @(kind == SourceKind.Unifi ? "active" : "")" data-kind="Unifi">
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="field">
+                    <label>Base URL</label>
+                    <input type="text" name="UniUrl" value="@(g?.Unifi?.BaseUrl ?? "")" placeholder="https://10.10.0.1" />
+                    <div class="hint">Ohne Schema wird automatisch https:// ergänzt.</div>
+                </div>
+                <div class="field">
+                    <label>Site</label>
+                    <input type="text" name="UniSite" value="@(g?.Unifi?.Site ?? "default")" />
+                </div>
+                <div class="field">
+                    <label>Username</label>
+                    <input type="text" name="UniUser" value="@(g?.Unifi?.Username ?? "")" autocomplete="off" />
+                    <div class="hint">Lokales UniFi‑Konto (kein Ubiquiti‑Cloud‑Login), 2FA aus.</div>
+                </div>
+                <div class="field">
+                    <label>Password</label>
+                    <input type="password" name="UniPass" placeholder="@(isNew ? "" : "•••••• (leer = unverändert)")" autocomplete="new-password" />
+                </div>
+                <div class="field full">
+                    <div class="checkbox-field">
+                        <input type="checkbox" id="UniIgnoreCert" name="UniIgnoreCert" value="true" @(g?.Unifi?.IgnoreCertificate != false ? "checked" : "") />
+                        <label for="UniIgnoreCert">Selbstsigniertes Zertifikat ignorieren (empfohlen bei UDM)</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Public IP Felder -->
+        <div class="type-fields @(kind == SourceKind.PublicIp ? "active" : "")" data-kind="PublicIp">
+            <p class="muted" style="margin-top:16px;">Keine weitere Konfiguration nötig – die öffentliche IP des Containers wird automatisch ermittelt.</p>
+        </div>
+
+        <div class="actions">
+            <button type="submit">@(isNew ? "Anlegen" : "Speichern")</button>
+            <a class="button ghost" href="/Sources">Abbrechen</a>
+            @if (!isNew)
+            {
+                <button type="submit" class="ghost" asp-page-handler="Test" name="Id" value="@g!.Id">Verbindung testen</button>
+                <button type="submit" class="ghost" asp-page-handler="Refresh" name="Id" value="@g.Id">Jetzt prüfen</button>
+                <button type="submit" class="danger" asp-page-handler="Delete" name="Id" value="@g.Id" onclick="return confirm('Gruppe und alle Einträge entfernen?');">Gruppe löschen</button>
+            }
+        </div>
+    </form>
+</div>
+
+@if (!isNew)
+{
+    <div class="section-title"><h2>Einträge</h2></div>
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Label</th>
+                    <th>Interface</th>
+                    <th>Aktuelle IP</th>
+                    <th>Letzte Prüfung</th>
+                    <th>Status</th>
+                    @if (kind == SourceKind.Unifi) { <th></th> }
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var e in g!.Entries)
+            {
+                var status = e.LastError == null ? (string.IsNullOrEmpty(e.CurrentIp) ? "warn" : "ok") : "err";
+                <tr>
+                    <td>@e.Label</td>
+                    <td class="mono">@(e.InterfaceName ?? "—")</td>
+                    <td class="mono">@(e.CurrentIp ?? "—")</td>
+                    <td><span class="muted-small">@(e.LastChecked?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—") UTC</span></td>
+                    <td><span class="status-pill"><span class="status-dot @status"></span>@(e.LastError ?? (string.IsNullOrEmpty(e.CurrentIp) ? "pending" : "ok"))</span></td>
+                    @if (kind == SourceKind.Unifi)
+                    {
+                        <td style="text-align:right">
+                            <form method="post" asp-page-handler="DeleteEntry" style="display:inline">
+                                <input type="hidden" name="Id" value="@g.Id" />
+                                <input type="hidden" name="EntryId" value="@e.Id" />
+                                <button type="submit" class="danger" onclick="return confirm('Eintrag entfernen?');">×</button>
+                            </form>
+                        </td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+
+        @if (kind == SourceKind.Unifi)
+        {
+            <form method="post" asp-page-handler="AddEntry" class="form-grid" style="margin-top:16px;">
+                <input type="hidden" name="Id" value="@g.Id" />
+                <div class="field">
+                    <label>Label</label>
+                    <input type="text" name="Label" placeholder="LTE Failover" required />
+                </div>
+                <div class="field">
+                    <label>Interface</label>
+                    <input type="text" name="InterfaceName" placeholder="wan2 / www / wan" required />
+                    <div class="hint">Name aus der UDM (z.B. wan, wan2, www).</div>
+                </div>
+                <div class="field full">
+                    <button type="submit">+ Eintrag hinzufügen</button>
+                </div>
+            </form>
+        }
+    </div>
+}
+
+@if (isNew)
+{
+    <script>
+        (function () {
+            var sel = document.getElementById('kindSelect');
+            var fields = document.querySelectorAll('.type-fields');
+            function sync() {
+                fields.forEach(function (f) {
+                    f.classList.toggle('active', f.getAttribute('data-kind') === sel.value);
+                });
+            }
+            sel.addEventListener('change', sync);
+            sync();
+        })();
+    </script>
+}

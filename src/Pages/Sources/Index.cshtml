@@ -1,0 +1,54 @@
+@page
+@model Matddns.Pages.Sources.IndexModel
+@{
+    ViewData["Title"] = "Sources – Matddns";
+}
+
+<div class="page-header">
+    <div>
+        <h1>Sources</h1>
+        <p>Quellen liefern aktuelle IPs. Eine Unifi‑Gruppe erzeugt je einen Eintrag pro WAN / LTE Failover.</p>
+    </div>
+    <a class="button" href="/Sources/Edit">+ Neue Source‑Gruppe</a>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
+@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert err">@Model.Error</div> }
+
+@if (Model.Groups.Count == 0)
+{
+    <div class="empty-state">
+        Noch keine Sources.<br />
+        <a class="button" style="margin-top:12px;" href="/Sources/Edit">Erste Source anlegen</a>
+    </div>
+}
+
+@foreach (var g in Model.Groups)
+{
+    var hasErr = g.Entries.Any(e => e.LastError != null);
+    var hasIp = g.Entries.Any(e => !string.IsNullOrEmpty(e.CurrentIp));
+    var dot = hasErr ? "err" : (hasIp ? "ok" : "warn");
+    var lastChecked = g.Entries.Where(e => e.LastChecked != null).Select(e => e.LastChecked!.Value).DefaultIfEmpty().Max();
+    <a class="list-item" href="/Sources/Edit?id=@g.Id">
+        <div class="li-main">
+            <span class="li-title">@g.Name</span>
+            <span class="li-sub">
+                @if (g.Kind == SourceKind.Unifi)
+                {
+                    @(string.Join(" · ", g.Entries.Select(e => $"{e.Label}={(string.IsNullOrEmpty(e.CurrentIp) ? "–" : e.CurrentIp)}")))
+                }
+                else
+                {
+                    @($"Public IP = {g.Entries.FirstOrDefault()?.CurrentIp ?? "–"}")
+                }
+            </span>
+            <span class="li-sub">
+                Intervall @(g.IntervalSeconds)s · letztes Update: @(lastChecked == default(DateTime) ? "—" : lastChecked.ToString("yyyy-MM-dd HH:mm:ss") + " UTC")
+            </span>
+        </div>
+        <div class="li-side">
+            <span class="status-pill"><span class="status-dot @dot"></span>@(g.Kind == SourceKind.Unifi ? "Unifi" : "Public IP")</span>
+            <span class="muted">›</span>
+        </div>
+    </a>
+}
