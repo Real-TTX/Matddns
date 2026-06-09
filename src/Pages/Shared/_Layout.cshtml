@@ -1,0 +1,43 @@
+@{
+    var path = Context.Request.Path.Value ?? "/";
+    bool Starts(string p) => path.StartsWith(p, StringComparison.OrdinalIgnoreCase);
+    bool DomainsActive() => path == "/" || Starts("/Domains");
+    var isLogin = Starts("/Login");
+}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(ViewData["Title"] ?? "Matddns")</title>
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body class="@(isLogin ? "login" : "app")">
+    @if (!isLogin)
+    {
+        <header class="topbar">
+            <div class="brand">
+                <span class="logo">◈</span>
+                <span class="title">Matddns</span>
+            </div>
+            <nav>
+                <a class="@(Starts("/Sources") ? "active" : "")" href="/Sources">Sources</a>
+                <a class="@(DomainsActive() ? "active" : "")" href="/Domains">Domains</a>
+                <a class="@(Starts("/Rules") ? "active" : "")" href="/Rules">Rules</a>
+                <a class="@(Starts("/System") ? "active" : "")" href="/System">System</a>
+                <a class="@(Starts("/Log") ? "active" : "")" href="/Log">Log</a>
+            </nav>
+            <form method="post" action="/Logout" class="logout">
+                <button type="submit" class="ghost">Logout</button>
+            </form>
+        </header>
+        <main class="container">
+            @RenderBody()
+        </main>
+    }
+    else
+    {
+        @RenderBody()
+    }
+</body>
+</html>

@@ -1,0 +1,15 @@
+services:
+  matddns:
+    build: .
+    image: matddns:latest
+    container_name: matddns
+    restart: unless-stopped
+    ports:
+      - "4060:8080"
+    environment:
+      - TZ=Europe/Berlin
+    volumes:
+      - ./data:/data
+    # erlaubt dem non-root-User ICMP/Ping (für Failover-Validierung "Ping")
+    sysctls:
+      - net.ipv4.ping_group_range=0 2147483647

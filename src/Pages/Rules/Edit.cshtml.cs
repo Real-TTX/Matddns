@@ -1,0 +1,187 @@
+using Matddns.Models;
+using Matddns.Services;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace Matddns.Pages.Rules;
+
+public class EditModel : PageModel
+{
+    private readonly ConfigService _config;
+    private readonly SourceResolver _resolver;
+    public EditModel(ConfigService config, SourceResolver resolver)
+    {
+        _config = config;
+        _resolver = resolver;
+    }
+
+    public Rule? RuleItem { get; private set; }
+    public bool IsNew => RuleItem == null;
+
+    public List<DomainGroup> AllDomains { get; private set; } = new();
+    public List<SourceGroup> AllSources { get; private set; } = new();
+    public Dictionary<string, SourceResolver.ResolvedEntry> SourceLookup { get; private set; } = new();
+
+    [TempData] public string? Notice { get; set; }
+    [TempData] public string? Error { get; set; }
+
+    private void LoadLookups()
+    {
+        var cfg = _config.Current;
+        AllDomains = cfg.Domains.ToList();
+        AllSources = cfg.Sources.ToList();
+        SourceLookup = _resolver.AllEntries(cfg).ToDictionary(r => r.Entry.Id);
+    }
+
+    public bool HasAnyRecord => AllDomains.SelectMany(d => d.Entries).Any();
+
+    public DomainEntry? TargetEntry
+    {
+        get
+        {
+            if (RuleItem == null) return null;
+            var dg = AllDomains.FirstOrDefault(d => d.Id == RuleItem.DomainGroupId);
+            return dg?.Entries.FirstOrDefault(e => e.Id == RuleItem.DomainEntryId);
+        }
+    }
+
+    public DomainGroup? TargetGroup =>
+        RuleItem == null ? null : AllDomains.FirstOrDefault(d => d.Id == RuleItem.DomainGroupId);
+
+    public IActionResult OnGet(string? id)
+    {
+        LoadLookups();
+        if (!string.IsNullOrEmpty(id))
+        {
+            RuleItem = _config.Read(c => c.Rules.FirstOrDefault(r => r.Id == id));
+            if (RuleItem == null) { Error = "Regel nicht gefunden"; return RedirectToPage("Index"); }
+        }
+        return Page();
+    }
+
+    public IActionResult OnPostCreate(RuleTrigger Trigger, int IntervalSeconds, string DomainEntryRef,
+        RuleValidation Validation, int ValidationPort)
+    {
+        if (string.IsNullOrWhiteSpace(DomainEntryRef)) { Error = "Domain erforderlich"; return RedirectToPage("Edit"); }
+        var parts = DomainEntryRef.Split(':', 2);
+        if (parts.Length != 2) { Error = "ungültige Auswahl"; return RedirectToPage("Edit"); }
+
+        var rule = new Rule
+        {
+            Trigger = Trigger,
+            IntervalSeconds = IntervalSeconds < 30 ? 300 : IntervalSeconds,
+            Validation = Validation,
+            ValidationPort = ValidationPort is < 1 or > 65535 ? 443 : ValidationPort,
+            DomainGroupId = parts[0],
+            DomainEntryId = parts[1]
+        };
+        _config.Mutate(c => c.Rules.Add(rule));
+        Notice = "Regel angelegt – jetzt Failover‑Quellen in Reihenfolge hinzufügen";
+        return RedirectToPage("Edit", new { id = rule.Id });
+    }
+
+    public IActionResult OnPostSave(string Id, RuleTrigger Trigger, int IntervalSeconds, bool Enabled, string DomainEntryRef,
+        RuleValidation Validation, int ValidationPort)
+    {
+        var parts = (DomainEntryRef ?? "").Split(':', 2);
+        _config.Mutate(c =>
+        {
+            var r = c.Rules.FirstOrDefault(x => x.Id == Id);
+            if (r == null) return;
+            r.Trigger = Trigger;
+            r.Enabled = Enabled;
+            if (IntervalSeconds >= 30) r.IntervalSeconds = IntervalSeconds;
+            r.Validation = Validation;
+            if (ValidationPort is >= 1 and <= 65535) r.ValidationPort = ValidationPort;
+            if (parts.Length == 2) { r.DomainGroupId = parts[0]; r.DomainEntryId = parts[1]; }
+        });
+        Notice = "Gespeichert";
+        return RedirectToPage("Edit", new { id = Id });
+    }
+
+    public IActionResult OnPostSaveSources(string Id, string[]? SourceEntryIdsInOrder, string[]? CnameTargets)
+    {
+        _config.Mutate(c =>
+        {
+            var r = c.Rules.FirstOrDefault(x => x.Id == Id);
+            if (r == null) return;
+            r.SourceEntryIdsInOrder = (SourceEntryIdsInOrder ?? Array.Empty<string>()).ToList();
+            r.CnameTargets = (CnameTargets ?? Array.Empty<string>()).ToList();
+            while (r.CnameTargets.Count < r.SourceEntryIdsInOrder.Count) r.CnameTargets.Add("");
+        });
+        Notice = "Failover gespeichert";
+        return RedirectToPage("Edit", new { id = Id });
+    }
+
+    public IActionResult OnPostDelete(string Id)
+    {
+        _config.Mutate(c => c.Rules.RemoveAll(r => r.Id == Id));
+        Notice = "Regel gelöscht";
+        return RedirectToPage("Index");
+    }
+
+    public IActionResult OnPostAddSource(string Id, string SourceEntryId)
+    {
+        _config.Mutate(c =>
+        {
+            var r = c.Rules.FirstOrDefault(x => x.Id == Id);
+            if (r == null || string.IsNullOrWhiteSpace(SourceEntryId)) return;
+            if (!r.SourceEntryIdsInOrder.Contains(SourceEntryId))
+            {
+                r.SourceEntryIdsInOrder.Add(SourceEntryId);
+                r.CnameTargets.Add("");
+            }
+        });
+        Notice = "Quelle hinzugefügt";
+        return RedirectToPage("Edit", new { id = Id });
+    }
+
+    public IActionResult OnPostRemoveSource(string Id, string SourceId)
+    {
+        _config.Mutate(c =>
+        {
+            var r = c.Rules.FirstOrDefault(x => x.Id == Id);
+            if (r == null) return;
+            var idx = r.SourceEntryIdsInOrder.IndexOf(SourceId);
+            if (idx >= 0)
+            {
+                r.SourceEntryIdsInOrder.RemoveAt(idx);
+                if (idx < r.CnameTargets.Count) r.CnameTargets.RemoveAt(idx);
+            }
+        });
+        return RedirectToPage("Edit", new { id = Id });
+    }
+
+    public IActionResult OnPostMoveSource(string Id, string SourceId, int Dir)
+    {
+        _config.Mutate(c =>
+        {
+            var r = c.Rules.FirstOrDefault(x => x.Id == Id);
+            if (r == null) return;
+            var idx = r.SourceEntryIdsInOrder.IndexOf(SourceId);
+            var to = idx + Dir;
+            if (idx < 0 || to < 0 || to >= r.SourceEntryIdsInOrder.Count) return;
+            (r.SourceEntryIdsInOrder[idx], r.SourceEntryIdsInOrder[to]) = (r.SourceEntryIdsInOrder[to], r.SourceEntryIdsInOrder[idx]);
+            if (idx < r.CnameTargets.Count && to < r.CnameTargets.Count)
+                (r.CnameTargets[idx], r.CnameTargets[to]) = (r.CnameTargets[to], r.CnameTargets[idx]);
+        });
+        return RedirectToPage("Edit", new { id = Id });
+    }
+
+    public IActionResult OnPostRunNow(string Id)
+    {
+        _config.Mutate(c =>
+        {
+            var r = c.Rules.FirstOrDefault(x => x.Id == Id);
+            if (r != null)
+            {
+                r.LastRun = null;
+                r.LastValue = null;
+                r.LastUsedSourceId = null;
+                r.LastResult = null;
+            }
+        });
+        Notice = "Ausführung erzwungen";
+        return RedirectToPage("Edit", new { id = Id });
+    }
+}

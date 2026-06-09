@@ -1,0 +1,38 @@
+@page
+@model Matddns.Pages.Domains.IndexModel
+@{
+    ViewData["Title"] = "Domains – Matddns";
+}
+
+<div class="page-header">
+    <div>
+        <h1>Domains</h1>
+        <p>Gruppen mit Zugangsdaten für DynDNS oder Netcup. Mehrere Hostnames pro Gruppe sparen API‑Last.</p>
+    </div>
+    <a class="button" href="/Domains/Edit">+ Neue Domain‑Gruppe</a>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
+@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert err">@Model.Error</div> }
+
+@if (Model.Groups.Count == 0)
+{
+    <div class="empty-state">
+        Noch keine Domain‑Gruppen.<br />
+        <a class="button" style="margin-top:12px;" href="/Domains/Edit">Erste Gruppe anlegen</a>
+    </div>
+}
+
+@foreach (var g in Model.Groups)
+{
+    <a class="list-item" href="/Domains/Edit?id=@g.Id">
+        <div class="li-main">
+            <span class="li-title">@g.Name</span>
+            <span class="li-sub">@(g.Entries.Count) Record(s)@(g.Entries.Count > 0 ? " · " + string.Join(", ", g.Entries.Take(3).Select(e => e.Display)) + (g.Entries.Count > 3 ? " …" : "") : "")</span>
+        </div>
+        <div class="li-side">
+            <span class="badge @(g.Kind == DomainKind.Netcup ? "update" : "info")">@(g.Kind == DomainKind.Netcup ? "Netcup API" : "DynDNS")</span>
+            <span class="muted">›</span>
+        </div>
+    </a>
+}

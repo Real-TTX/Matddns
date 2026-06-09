@@ -1,0 +1,207 @@
+@page
+@model Matddns.Pages.Rules.EditModel
+@{
+    var r = Model.RuleItem;
+    var isNew = Model.IsNew;
+    var de = Model.TargetEntry;
+    var isCname = de?.Type == DnsRecordType.CNAME;
+    ViewData["Title"] = (isNew ? "Neue Regel" : $"{de?.Type} {de?.Hostname}") + " – Matddns";
+}
+
+<a class="back-link" href="/Rules">‹ zurück zu Rules</a>
+
+<div class="page-header">
+    <div>
+        <h1>
+            @if (isNew) { <text>Neue Regel</text> }
+            else
+            {
+                <span class="badge info">@(de?.Type.ToString() ?? "?")</span>
+                <span class="mono">@(de?.Hostname ?? "(Ziel fehlt)")</span>
+            }
+        </h1>
+        <p>@(isNew ? "Ziel‑Record und Trigger wählen – Failover‑Quellen kommen nach dem Anlegen." : "Ziel, Trigger und Failover‑Reihenfolge dieser Regel.")</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
+@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert err">@Model.Error</div> }
+
+@if (isNew && !Model.HasAnyRecord)
+{
+    <div class="alert err">Noch kein Record vorhanden – lege zuerst unter <a href="/Domains">Domains</a> einen Record an (z.B. <span class="mono">home1.h5x.de (A)</span>).</div>
+}
+else
+{
+    @if (!isNew && !string.IsNullOrEmpty(r!.LastResult))
+    {
+        var cls = r.LastResult.StartsWith("ok", StringComparison.OrdinalIgnoreCase) ? "ok"
+            : r.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase) ? "err" : "warn";
+        <div class="muted-small" style="margin-bottom:12px;">Letzter Lauf @(r.LastRun?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—") UTC · <span class="badge @cls">@r.LastResult</span></div>
+    }
+
+    <div class="card">
+        <form method="post" asp-page-handler="@(isNew ? "Create" : "Save")">
+            @if (!isNew) { <input type="hidden" name="Id" value="@r!.Id" /> }
+
+            <div class="form-grid">
+                <div class="field full">
+                    <label>Domain</label>
+                    <select name="DomainEntryRef" required>
+                        @if (isNew) { <option value="">— wählen —</option> }
+                        @foreach (var d in Model.AllDomains)
+                        {
+                            foreach (var entry in d.Entries)
+                            {
+                                var sel = r != null && d.Id == r.DomainGroupId && entry.Id == r.DomainEntryId;
+                                <option value="@(d.Id):@(entry.Id)" selected="@sel">@entry.Display · @d.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label>Trigger</label>
+                    <select name="Trigger" data-trigger>
+                        <option value="OnChange" selected="@(r == null || r.Trigger == RuleTrigger.OnChange)">Bei IP‑Änderung</option>
+                        <option value="Interval" selected="@(r != null && r.Trigger == RuleTrigger.Interval)">Festes Intervall</option>
+                    </select>
+                    <div class="hint">„Bei IP‑Änderung": schreibt nur, wenn sich die Quell‑IP ändert.</div>
+                </div>
+
+                <div class="field interval-field">
+                    <label>Intervall (Sek.)</label>
+                    <input type="number" name="IntervalSeconds" value="@(r?.IntervalSeconds ?? 300)" min="30" />
+                </div>
+
+                <div class="field">
+                    <label>Failover‑Validierung</label>
+                    <select name="Validation" data-validation>
+                        <option value="None" selected="@(r == null || r.Validation == RuleValidation.None)">Nur IP vorhanden</option>
+                        <option value="Ping" selected="@(r != null && r.Validation == RuleValidation.Ping)">Ping (ICMP)</option>
+                        <option value="TcpPort" selected="@(r != null && r.Validation == RuleValidation.TcpPort)">TCP‑Port offen</option>
+                    </select>
+                    <div class="hint">Quelle gilt nur als „erreichbar", wenn der Check der Quell‑IP besteht.</div>
+                </div>
+
+                <div class="field validation-port-field">
+                    <label>Port</label>
+                    <input type="number" name="ValidationPort" value="@(r?.ValidationPort ?? 443)" min="1" max="65535" />
+                </div>
+
+                @if (!isNew)
+                {
+                    <div class="field">
+                        <label>Status</label>
+                        <select name="Enabled">
+                            <option value="true" selected="@r!.Enabled">aktiv</option>
+                            <option value="false" selected="@(!r.Enabled)">deaktiviert</option>
+                        </select>
+                    </div>
+                }
+            </div>
+
+            <div class="actions">
+                <button type="submit">@(isNew ? "Anlegen" : "Speichern")</button>
+                <a class="button ghost" href="/Rules">Abbrechen</a>
+                @if (!isNew)
+                {
+                    <button type="submit" class="ghost" asp-page-handler="RunNow" asp-route-Id="@r!.Id">Jetzt ausführen</button>
+                    <button type="submit" class="danger" asp-page-handler="Delete" asp-route-Id="@r.Id" onclick="return confirm('Regel löschen?');">Regel löschen</button>
+                }
+            </div>
+        </form>
+    </div>
+
+    @if (!isNew)
+    {
+        <div class="section-title"><h2>Failover‑Reihenfolge</h2></div>
+        <div class="card">
+            <div class="muted-small" style="margin-bottom:12px;">
+                Erste erreichbare Quelle (mit IP) gewinnt. @(isCname ? "CNAME: Zielhostname pro Quelle setzen." : "A/AAAA: die IP der Quelle wird geschrieben.")
+            </div>
+
+            <form method="post" asp-page-handler="SaveSources">
+                <input type="hidden" name="Id" value="@r!.Id" />
+
+                <div class="failover-list">
+                @for (int i = 0; i < r.SourceEntryIdsInOrder.Count; i++)
+                {
+                    var sid = r.SourceEntryIdsInOrder[i];
+                    var info = Model.SourceLookup.TryGetValue(sid, out var v) ? v : null;
+                    var ip = info?.Entry.CurrentIp;
+                    var status = info == null ? "muted" : (string.IsNullOrEmpty(ip) ? "warn" : "ok");
+                    var cname = i < r.CnameTargets.Count ? r.CnameTargets[i] : "";
+                    <div class="failover-row">
+                        <span class="idx">#@(i + 1)</span>
+                        <div>
+                            <div>@(info != null ? $"{info.Group.Name} · {info.Entry.Label}" : "(unbekannte Quelle)")</div>
+                            <div class="status-pill"><span class="status-dot @status"></span><span class="mono">@(ip ?? "–")</span></div>
+                        </div>
+                        <div>
+                            @if (isCname)
+                            {
+                                <input name="CnameTargets" value="@cname" placeholder="ziel.example.com" />
+                            }
+                            else
+                            {
+                                <input type="hidden" name="CnameTargets" value="@cname" />
+                                <span class="muted-small">(IP wird automatisch gesetzt)</span>
+                            }
+                        </div>
+                        <div class="move-btns">
+                            <button type="submit" class="ghost" asp-page-handler="MoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid" asp-route-Dir="-1" title="hoch" disabled="@(i == 0)">↑</button>
+                            <button type="submit" class="ghost" asp-page-handler="MoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid" asp-route-Dir="1" title="runter" disabled="@(i == r.SourceEntryIdsInOrder.Count - 1)">↓</button>
+                        </div>
+                        <button type="submit" class="danger" asp-page-handler="RemoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid">Entfernen</button>
+                        <input type="hidden" name="SourceEntryIdsInOrder" value="@sid" />
+                    </div>
+                }
+                </div>
+                @if (r.SourceEntryIdsInOrder.Count == 0)
+                {
+                    <div class="muted">Noch keine Quellen – unten hinzufügen.</div>
+                }
+                else
+                {
+                    <div class="actions"><button type="submit">@(isCname ? "Reihenfolge & CNAME‑Ziele speichern" : "Reihenfolge speichern")</button></div>
+                }
+            </form>
+
+            <form method="post" asp-page-handler="AddSource" class="inline-form" style="margin-top:16px;">
+                <input type="hidden" name="Id" value="@r.Id" />
+                <div class="col">
+                    <label>Quelle hinzufügen</label>
+                    <select name="SourceEntryId" required>
+                        <option value="">— wählen —</option>
+                        @foreach (var sg in Model.AllSources)
+                        {
+                            foreach (var se in sg.Entries)
+                            {
+                                if (r.SourceEntryIdsInOrder.Contains(se.Id)) continue;
+                                <option value="@se.Id">@sg.Name · @se.Label @(se.InterfaceName != null ? $"({se.InterfaceName})" : "")</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div><button type="submit">+ Anhängen</button></div>
+            </form>
+        </div>
+    }
+}
+
+<script>
+    function bindToggle(selector, fieldClass, matchValue) {
+        document.querySelectorAll(selector).forEach(function (sel) {
+            function sync() {
+                var form = sel.closest('form');
+                var f = form ? form.querySelector(fieldClass) : null;
+                if (f) f.style.display = (sel.value === matchValue) ? '' : 'none';
+            }
+            sel.addEventListener('change', sync);
+            sync();
+        });
+    }
+    bindToggle('select[data-trigger]', '.interval-field', 'Interval');
+    bindToggle('select[data-validation]', '.validation-port-field', 'TcpPort');
+</script>

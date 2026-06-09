@@ -1,0 +1,48 @@
+@page
+@model SystemModel
+@{
+    ViewData["Title"] = "System – Matddns";
+    var lvl = Model.CurrentLevel;
+}
+
+<div class="page-header">
+    <div>
+        <h1>System</h1>
+        <p>Log‑Verhalten: Mindest‑Level und automatische Aufbewahrung.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
+
+<div class="card">
+    <form method="post">
+        <div class="form-grid">
+            <div class="field">
+                <label>Log‑Level (Minimum)</label>
+                <select name="MinLogLevel">
+                    <option value="Debug" selected="@(lvl == Matddns.Services.LogLevel.Debug)">Debug – alles, inkl. Prüfungen/Polling</option>
+                    <option value="Info" selected="@(lvl == Matddns.Services.LogLevel.Info)">Info – Normalbetrieb (Standard)</option>
+                    <option value="Update" selected="@(lvl == Matddns.Services.LogLevel.Update)">Update – nur DNS‑Änderungen & Probleme</option>
+                    <option value="Warn" selected="@(lvl == Matddns.Services.LogLevel.Warn)">Warn – nur Warnungen & Fehler</option>
+                    <option value="Error" selected="@(lvl == Matddns.Services.LogLevel.Error)">Error – nur Fehler</option>
+                </select>
+                <div class="hint">Alles unterhalb wird gar nicht erst aufgezeichnet. Erreichbarkeits‑Checks & WAN‑Polling liegen auf <span class="mono">Debug</span>.</div>
+            </div>
+
+            <div class="field">
+                <label>Retention (Tage)</label>
+                <input type="number" name="LogRetentionDays" value="@Model.RetentionDays" min="0" max="3650" />
+                <div class="hint">Einträge älter als X Tage werden automatisch entfernt (stündlich). <span class="mono">0</span> = unbegrenzt.</div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button type="submit">Speichern</button>
+            <button type="submit" class="danger" asp-page-handler="Clear" onclick="return confirm('Gesamtes Log jetzt leeren?');">Log leeren</button>
+        </div>
+    </form>
+</div>
+
+<div class="muted-small" style="margin-top:12px;">
+    Aktuelle Logdatei <span class="mono">/data/log.txt</span>: @(string.Format("{0:N0}", Model.LogFileBytes / 1024)) KB
+</div>
