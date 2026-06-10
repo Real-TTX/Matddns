@@ -44,10 +44,21 @@ public class ConfigService
 
             var changed = MigrateConfig(_config);
 
-            if (string.IsNullOrEmpty(_config.Auth.PasswordHash))
+            // migrate the legacy single Auth account into the Users list
+            if (_config.Users.Count == 0 && !string.IsNullOrEmpty(_config.Auth.PasswordHash))
             {
-                _config.Auth.Username = "admin";
-                _config.Auth.PasswordHash = _auth.Hash("admin");
+                _config.Users.Add(new UserAccount
+                {
+                    Username = string.IsNullOrWhiteSpace(_config.Auth.Username) ? "admin" : _config.Auth.Username,
+                    PasswordHash = _config.Auth.PasswordHash
+                });
+                changed = true;
+            }
+
+            // seed default admin/admin if there are no users at all
+            if (_config.Users.Count == 0)
+            {
+                _config.Users.Add(new UserAccount { Username = "admin", PasswordHash = _auth.Hash("admin") });
                 changed = true;
             }
 

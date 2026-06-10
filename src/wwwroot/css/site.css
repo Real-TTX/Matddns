@@ -577,6 +577,37 @@ a.list-item:hover {
     color: var(--text);
 }
 
+.appfooter {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 22px 16px 28px;
+}
+
+/* ---- tabs ---- */
+.tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+
+.tabs .tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: var(--muted);
+    padding: 10px 16px;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 500;
+}
+
+.tabs .tab:hover { color: var(--text); }
+.tabs .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
 @@media (max-width: 700px) {
     .stat-grid { grid-template-columns: repeat(2, 1fr); }
     .status-banner { flex-wrap: wrap; }

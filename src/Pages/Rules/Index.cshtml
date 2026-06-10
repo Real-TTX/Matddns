@@ -47,7 +47,7 @@
             <span class="li-sub">
                 @if (!string.IsNullOrEmpty(r.LastValue) && r.LastChange != null)
                 {
-                    <text>last set: <span class="mono">@r.LastValue</span> · @r.LastChange.Value.ToString("yyyy-MM-dd HH:mm") UTC</text>
+                    <text>last set: <span class="mono">@r.LastValue</span> · @Tz.Format(r.LastChange, "yyyy-MM-dd HH:mm")</text>
                 }
                 else
                 {

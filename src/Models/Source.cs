@@ -4,7 +4,8 @@ public enum SourceKind
 {
     PublicIp,
     Unifi,
-    Static
+    Static,
+    Push
 }
 
 public class SourceGroup
@@ -15,12 +16,18 @@ public class SourceGroup
     public int IntervalSeconds { get; set; } = 60;
     public UnifiSettings? Unifi { get; set; }
     public StaticSettings? Static { get; set; }
+    public PushSettings? Push { get; set; }
     public List<SourceEntry> Entries { get; set; } = new();
 }
 
 public class StaticSettings
 {
     public string Ip { get; set; } = "";
+}
+
+public class PushSettings
+{
+    public string Token { get; set; } = "";   // secret in the update URL / dyndns2 basic-auth password
 }
 
 public class UnifiSettings

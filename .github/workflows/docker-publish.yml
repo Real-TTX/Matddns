@@ -19,6 +19,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Compute version & build metadata
+        id: ver
+        run: |
+          echo "version=0.1.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
       - name: Lowercase image name
         run: echo "IMAGE=${REGISTRY}/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
@@ -36,6 +42,7 @@ jobs:
           images: ${{ env.IMAGE }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.ver.outputs.version }}
             type=sha,format=short
             type=ref,event=tag
             type=semver,pattern={{version}}
@@ -53,3 +60,7 @@ jobs:
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ steps.ver.outputs.version }}
+            BUILD=${{ github.run_number }}
+            BUILD_DATE=${{ steps.ver.outputs.date }}
