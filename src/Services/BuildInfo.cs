@@ -9,6 +9,12 @@ public static class BuildInfo
 
     public static bool IsRelease => !Version.Equals("local", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Cache-busting token for static assets: stable per release image, fresh per restart locally.</summary>
+    public static string CacheTag { get; } =
+        !Version.Equals("local", StringComparison.OrdinalIgnoreCase)
+            ? $"{Version}.{Build}"
+            : DateTime.UtcNow.Ticks.ToString("x");
+
     /// <summary>Footer text: "v0.1.42 · build 42 · 2026-06-10" (release) or "local · build local".</summary>
     public static string Display
     {
