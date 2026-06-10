@@ -130,20 +130,20 @@
                 <div class="form-grid" style="margin-top:16px;">
                     <div class="field full">
                         <label>Update URL (simple)</label>
-                        <input type="text" value="@($"{baseUrl}/api/update?token={token}&ip=<your-ip>")" readonly onclick="this.select()" />
-                        <div class="hint">Call this from your device. Drop <span class="mono">&amp;ip=…</span> to use the caller's IP. Set the host so it's reachable from your device (not localhost).</div>
+                        <input type="text" value="@($"{baseUrl}/api/update?token={token}&ipv4=<your-ipv4>&ipv6=<your-ipv6>")" readonly onclick="this.select()" />
+                        <div class="hint">Separate parameters per family: <span class="mono">ipv4</span> sets the A source, <span class="mono">ipv6</span> the AAAA source. Send either or both. Omit both (or use <span class="mono">&amp;ip=</span> auto-detect) to fall back to the caller's IP. Use a host reachable from your device (not localhost).</div>
                     </div>
                     <div class="field full">
                         <label>dyndns2 (routers / FRITZ!Box)</label>
-                        <input type="text" value="@($"{baseUrl}/nic/update?hostname=matddns&myip=<ipaddr>")" readonly onclick="this.select()" />
-                        <div class="hint">Use this as the update URL; username = anything; password = the token below.</div>
+                        <input type="text" value="@($"{baseUrl}/nic/update?myip=<ipaddr>&myipv6=<ip6addr>")" readonly onclick="this.select()" />
+                        <div class="hint">Update URL for routers; username = anything; password = the token below. <span class="mono">myip</span> = IPv4, <span class="mono">myipv6</span> = IPv6 (drop the one your router doesn't send). FRITZ!Box fills <span class="mono">&lt;ipaddr&gt;</span>/<span class="mono">&lt;ip6addr&gt;</span> itself.</div>
                     </div>
                     <div class="field full">
                         <label>Token (password)</label>
                         <input type="text" value="@token" readonly onclick="this.select()" />
                     </div>
                     <div class="field full">
-                        <div class="hint">Supports IPv4 <strong>and</strong> IPv6: call with an IPv4 address to set the A source, with an IPv6 address for AAAA (routers usually send them via separate update URLs). No interval – updates happen on push.</div>
+                        <div class="hint">Supports IPv4 <strong>and</strong> IPv6 in a single call (<span class="mono">ipv4</span> + <span class="mono">ipv6</span>), or one family at a time. Each value is stored under the matching A / AAAA source. No interval – updates happen on push.</div>
                     </div>
                 </div>
             }
