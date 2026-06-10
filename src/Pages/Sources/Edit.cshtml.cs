@@ -48,7 +48,8 @@ public class EditModel : PageModel
         {
             Name = Name.Trim(),
             Kind = Kind,
-            IntervalSeconds = IntervalSeconds < 15 ? 60 : IntervalSeconds
+            // Push is push-driven (not polled) -> no interval; others clamp to a sane minimum.
+            IntervalSeconds = Kind == SourceKind.Push ? 0 : (IntervalSeconds < 15 ? 60 : IntervalSeconds)
         };
         if (Kind == SourceKind.Unifi)
         {
@@ -114,7 +115,8 @@ public class EditModel : PageModel
             var g = c.Sources.FirstOrDefault(x => x.Id == Id);
             if (g == null) return;
             if (!string.IsNullOrWhiteSpace(Name)) g.Name = Name.Trim();
-            if (IntervalSeconds >= 15) g.IntervalSeconds = IntervalSeconds;
+            if (g.Kind == SourceKind.Push) g.IntervalSeconds = 0; // push-driven, never polled
+            else if (IntervalSeconds >= 15) g.IntervalSeconds = IntervalSeconds;
             if (g.Kind == SourceKind.Unifi)
             {
                 g.Unifi ??= new UnifiSettings();

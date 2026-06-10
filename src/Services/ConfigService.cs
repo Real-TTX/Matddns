@@ -89,6 +89,15 @@ public class ConfigService
                 }
             }
         }
+        // Push sources are push-driven (never polled): a leftover interval is meaningless -> 0.
+        foreach (var s in cfg.Sources)
+        {
+            if (s.Kind == SourceKind.Push && s.IntervalSeconds != 0)
+            {
+                s.IntervalSeconds = 0;
+                changed = true;
+            }
+        }
         return changed;
     }
 
