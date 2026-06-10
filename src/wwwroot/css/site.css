@@ -578,16 +578,30 @@ a.list-item:hover {
 }
 
 .appfooter {
-    text-align: center;
-    color: var(--muted);
-    font-size: 12px;
-    padding: 22px 16px 28px;
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px 30px;
 }
 
-/* ---- tabs ---- */
+.appfooter .build-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    border-radius: 999px;
+    padding: 7px 16px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.appfooter .build-chip .logo { color: var(--accent); }
+.appfooter .build-chip .mono { color: var(--text); }
+
+/* ---- tabs (underline style) ---- */
 .tabs {
     display: flex;
-    gap: 2px;
+    gap: 6px;
     border-bottom: 1px solid var(--border);
     margin-bottom: 18px;
     flex-wrap: wrap;
@@ -595,18 +609,25 @@ a.list-item:hover {
 
 .tabs .tab {
     background: transparent;
-    border: none;
+    border: 0;
     border-bottom: 2px solid transparent;
     border-radius: 0;
     color: var(--muted);
-    padding: 10px 16px;
+    padding: 9px 4px;
+    margin: 0 10px -1px;
     cursor: pointer;
     font: inherit;
+    font-size: 14px;
     font-weight: 500;
+    transition: color 0.15s, border-color 0.15s;
 }
 
-.tabs .tab:hover { color: var(--text); }
-.tabs .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.tabs .tab:first-child { margin-left: 2px; }
+.tabs .tab:hover { color: var(--text); background: transparent; }
+.tabs .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* monitoring API table: keep endpoint column from wrapping the URLs */
+.api-table td:first-child, .api-table th:first-child { white-space: nowrap; width: 1%; padding-right: 22px; }
 
 @@media (max-width: 700px) {
     .stat-grid { grid-template-columns: repeat(2, 1fr); }

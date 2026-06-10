@@ -9,10 +9,16 @@ public static class BuildInfo
 
     public static bool IsRelease => !Version.Equals("local", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Footer text: "v0.1.42 · build 42 · 2026-06-10" (release) or "local build · …".</summary>
-    public static string Display =>
-        (IsRelease ? $"v{Version} · build {Build}" : "local build")
-        + (string.IsNullOrWhiteSpace(Date) ? "" : $" · {Date}");
+    /// <summary>Footer text: "v0.1.42 · build 42 · 2026-06-10" (release) or "local · build local".</summary>
+    public static string Display
+    {
+        get
+        {
+            var s = $"{(IsRelease ? "v" + Version : "local")} · build {Build}";
+            if (!string.IsNullOrWhiteSpace(Date)) s += $" · {Date}";
+            return s;
+        }
+    }
 
     private static string Get(string key, string fallback)
     {

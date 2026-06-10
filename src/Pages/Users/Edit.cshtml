@@ -1,0 +1,68 @@
+@page
+@model Matddns.Pages.Users.EditModel
+@{
+    var isNew = Model.IsNew;
+    ViewData["Title"] = (isNew ? "New user" : Model.Username) + " – Matddns";
+}
+
+<a class="back-link" href="/System">‹ back to System</a>
+
+<div class="page-header">
+    <div>
+        <h1>@(isNew ? "New user" : Model.Username)</h1>
+        <p>@(isNew ? "Create a login account (name + password)." : "Change the password or delete this account.")</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
+@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert err">@Model.Error</div> }
+
+<div class="card">
+    @if (isNew)
+    {
+        <form method="post" asp-page-handler="Create">
+            <div class="form-grid">
+                <div class="field">
+                    <label>Username</label>
+                    <input type="text" name="NewUsername" required autocomplete="off" />
+                </div>
+                <div class="field">
+                    <label>Password</label>
+                    <input type="password" name="NewPassword" required autocomplete="new-password" />
+                </div>
+            </div>
+            <div class="actions">
+                <button type="submit">Create user</button>
+                <a class="button ghost" href="/System">Cancel</a>
+            </div>
+        </form>
+    }
+    else
+    {
+        <form method="post" asp-page-handler="Save">
+            <input type="hidden" name="Name" value="@Model.Username" />
+            <div class="form-grid">
+                <div class="field">
+                    <label>Username</label>
+                    <input type="text" value="@Model.Username" disabled />
+                </div>
+                <div class="field">
+                    <label>New password</label>
+                    <input type="password" name="NewPassword" placeholder="leave empty = unchanged" autocomplete="new-password" />
+                </div>
+            </div>
+            <div class="actions">
+                <button type="submit">Save</button>
+                <a class="button ghost" href="/System">Cancel</a>
+                @if (Model.IsCurrentUser)
+                {
+                    <span class="muted-small" style="align-self:center;">You can't delete the account you're logged in as.</span>
+                }
+                else
+                {
+                    <button type="submit" class="danger" asp-page-handler="Delete" asp-route-Name="@Model.Username" onclick="return confirm('Delete user @Model.Username?');">Delete user</button>
+                }
+            </div>
+        </form>
+    }
+</div>

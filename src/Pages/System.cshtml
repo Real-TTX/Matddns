@@ -68,58 +68,28 @@
 </div>
 
 <div class="tab-panel" id="tab-users" hidden>
-    <div class="card">
-        <table>
-            <thead><tr><th>Username</th><th>Set new password</th><th></th></tr></thead>
-            <tbody>
-            @foreach (var u in Model.Users)
-            {
-                <tr>
-                    <td>
-                        <span class="mono">@u</span>
-                        @if (string.Equals(u, User.Identity?.Name, StringComparison.OrdinalIgnoreCase)) { <span class="muted-small">(you)</span> }
-                    </td>
-                    <td>
-                        <form method="post" asp-page-handler="SetPassword" style="display:flex; gap:6px; margin:0; max-width:360px;">
-                            <input type="hidden" name="Username" value="@u" />
-                            <input type="password" name="Password" placeholder="new password" required autocomplete="new-password" style="flex:1;" />
-                            <button type="submit" class="ghost">Update</button>
-                        </form>
-                    </td>
-                    <td style="text-align:right">
-                        @if (Model.Users.Count > 1)
-                        {
-                            <form method="post" asp-page-handler="DeleteUser" style="display:inline">
-                                <input type="hidden" name="Username" value="@u" />
-                                <button type="submit" class="danger" onclick="return confirm('Remove user @u?');">Remove</button>
-                            </form>
-                        }
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
-
-        <form method="post" asp-page-handler="AddUser" class="form-grid" style="margin-top:16px;">
-            <div class="field">
-                <label>New username</label>
-                <input type="text" name="NewUsername" required autocomplete="off" />
-            </div>
-            <div class="field">
-                <label>Password</label>
-                <input type="password" name="NewPassword" required autocomplete="new-password" />
-            </div>
-            <div class="field full">
-                <button type="submit">+ Add user</button>
-            </div>
-        </form>
+    <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+        <a class="button" href="/Users/Edit">+ New user</a>
     </div>
+    @foreach (var u in Model.Users)
+    {
+        <a class="list-item" href="/Users/Edit?name=@u">
+            <div class="li-main">
+                <span class="li-title">
+                    <span class="mono">@u</span>
+                    @if (string.Equals(u, User.Identity?.Name, StringComparison.OrdinalIgnoreCase)) { <span class="muted-small">(you)</span> }
+                </span>
+                <span class="li-sub">Edit password or delete</span>
+            </div>
+            <div class="li-side"><span class="muted">›</span></div>
+        </a>
+    }
 </div>
 
 <div class="tab-panel" id="tab-api" hidden>
     <div class="card">
         <p class="muted-small" style="margin-top:0;">Public JSON endpoints for monitoring software (Uptime Kuma, Zabbix, …) — <strong>no authentication required</strong>. They never expose passwords or API keys.</p>
-        <table>
+        <table class="api-table">
             <thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead>
             <tbody>
                 <tr><td class="mono">GET /healthz</td><td>Liveness — returns <span class="mono">ok</span> (200) while the app runs.</td></tr>
