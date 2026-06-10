@@ -10,6 +10,6 @@ services:
       - TZ=Europe/Berlin
     volumes:
       - ./data:/data
-    # erlaubt dem non-root-User ICMP/Ping (für Failover-Validierung "Ping")
+    # let the non-root user send ICMP for the "Ping" failover check
     sysctls:
       - net.ipv4.ping_group_range=0 2147483647
