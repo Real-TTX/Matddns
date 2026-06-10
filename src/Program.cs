@@ -98,22 +98,23 @@ app.MapGet("/api/update", (HttpContext ctx, PushReceiver push) =>
 {
     var q = ctx.Request.Query;
     var token = q["token"].FirstOrDefault();
-    var ipv4 = q["ipv4"].FirstOrDefault() ?? q["myip"].FirstOrDefault();
-    var ipv6 = q["ipv6"].FirstOrDefault() ?? q["myipv6"].FirstOrDefault() ?? q["myip6"].FirstOrDefault();
+    var ipv4 = q["ipv4"].FirstOrDefault();
+    var ipv6 = q["ipv6"].FirstOrDefault();
     var ipAuto = q["ip"].FirstOrDefault();
     var caller = ctx.Connection.RemoteIpAddress?.ToString();
     var (statusCode, body) = push.Update(token, ipv4, ipv6, ipAuto, caller);
     return Results.Text(body, "text/plain", statusCode: statusCode);
 }).AllowAnonymous();
 
-// dyndns2-compatible (routers / FRITZ!Box): /nic/update?myip=<v4>&myipv6=<v6>  with HTTP Basic auth (password = token).
+// dyndns2-compatible (routers / FRITZ!Box): /nic/update?ipv4=<v4>&ipv6=<v6>  with HTTP Basic auth (password = token).
 app.MapGet("/nic/update", (HttpContext ctx, PushReceiver push) =>
 {
     var q = ctx.Request.Query;
     var token = PushReceiver.BasicAuthPassword(ctx.Request.Headers.Authorization.FirstOrDefault())
                 ?? q["token"].FirstOrDefault();
-    var ipv4 = q["myip"].FirstOrDefault() ?? q["ipv4"].FirstOrDefault();
-    var ipv6 = q["myipv6"].FirstOrDefault() ?? q["myip6"].FirstOrDefault() ?? q["ipv6"].FirstOrDefault();
+    // ipv4/ipv6 are canonical; myip/myipv6 accepted silently for stock dyndns2 clients.
+    var ipv4 = q["ipv4"].FirstOrDefault() ?? q["myip"].FirstOrDefault();
+    var ipv6 = q["ipv6"].FirstOrDefault() ?? q["myipv6"].FirstOrDefault() ?? q["myip6"].FirstOrDefault();
     var ipAuto = q["ip"].FirstOrDefault();
     var caller = ctx.Connection.RemoteIpAddress?.ToString();
     var (statusCode, body) = push.Update(token, ipv4, ipv6, ipAuto, caller);
