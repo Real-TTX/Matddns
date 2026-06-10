@@ -11,7 +11,7 @@ public class LogModel : PageModel
 
     public IReadOnlyList<LogEntry> Entries { get; private set; } = Array.Empty<LogEntry>();
 
-    // Mindest-Level-Filter für die Anzeige; "Debug" = alles Aufgezeichnete.
+    // minimum-level filter for the display; "Debug" = everything recorded.
     [BindProperty(SupportsGet = true)] public string? Level { get; set; }
     public Services.LogLevel MinFilter { get; private set; } = Services.LogLevel.Debug;
 

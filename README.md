@@ -30,9 +30,11 @@ services:
     restart: unless-stopped
 ```
 
-## Datenmodell
-- **Sources** - Gruppe = Verbindung (z. B. ein Unifi Controller). Eine Unifi-Gruppe legt automatisch je einen Eintrag pro WAN an (Display-Name + IP werden aus der UDM gelesen). Public-IP Gruppe hat genau einen Eintrag.
-- **Domains** - Gruppe = Account (DynDNS-Credentials oder Netcup API). Jeder Eintrag ist ein Record: voller FQDN + Typ (A / AAAA / CNAME); fuer Netcup als Subdomain/Record + Zone.
+UI language: English.
+
+## Data model
+- **Sources** - group = a connection. Kinds: **Public IP** (container's own IP, single entry), **Unifi** (auto-creates one entry per WAN; display name + IP read from the UDM), **Static IP** (fixed value, e.g. a known server or fallback).
+- **Domains** - group = account (DynDNS credentials or Netcup API). Each entry is a record: full FQDN + type (A / AAAA / CNAME); for Netcup as subdomain/record + zone. DynDNS offers provider presets (DuckDNS, No-IP, Dynu, DynDNS.org, Strato, deSEC) that prefill the update URL.
 - **Rules** - verbinden 1 Record mit einer geordneten Liste von Source-Eintraegen (Failover). Der Record-Typ kommt vom Ziel-Eintrag.
   - Trigger: **Bei IP-Aenderung** (nur schreiben wenn sich die Quell-IP aendert) oder **festes Intervall**.
   - Failover-Validierung: **keine** (nur IP vorhanden), **Ping** oder **TCP-Port offen** - eine Quelle gilt nur als erreichbar, wenn der Check der Quell-IP besteht.

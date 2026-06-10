@@ -55,7 +55,7 @@ public class ConfigService
         }
     }
 
-    /// <summary>Einmalige Datenkorrekturen für Altbestände. Gibt true zurück, wenn etwas geändert wurde.</summary>
+    /// <summary>One-time data fixes for legacy data. Returns true if anything changed.</summary>
     private static bool MigrateConfig(AppConfig cfg)
     {
         bool changed = false;
@@ -63,8 +63,8 @@ public class ConfigService
         {
             foreach (var e in g.Entries)
             {
-                // Legacy: Subdomain stand im RecordName-Override, während Hostname nur die Zone war.
-                // -> echten FQDN rekonstruieren und Zone setzen, damit Anzeige/Update stimmen.
+                // Legacy: the subdomain was in the RecordName override while Hostname was only the zone.
+                // -> reconstruct the real FQDN and set the zone so display/update are correct.
                 if (string.IsNullOrWhiteSpace(e.Domain)
                     && !string.IsNullOrWhiteSpace(e.RecordName)
                     && e.RecordName is not ("@" or "*")

@@ -7,9 +7,9 @@
 <div class="page-header">
     <div>
         <h1>Sources</h1>
-        <p>Quellen liefern aktuelle IPs. Eine Unifi‑Gruppe erzeugt je einen Eintrag pro WAN / LTE Failover.</p>
+        <p>Sources provide current IPs. A Unifi group creates one entry per WAN / LTE failover.</p>
     </div>
-    <a class="button" href="/Sources/Edit">+ Neue Source‑Gruppe</a>
+    <a class="button" href="/Sources/Edit">+ New source group</a>
 </div>
 
 @if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
@@ -18,8 +18,8 @@
 @if (Model.Groups.Count == 0)
 {
     <div class="empty-state">
-        Noch keine Sources.<br />
-        <a class="button" style="margin-top:12px;" href="/Sources/Edit">Erste Source anlegen</a>
+        No sources yet.<br />
+        <a class="button" style="margin-top:12px;" href="/Sources/Edit">Create the first source</a>
     </div>
 }
 
@@ -29,6 +29,7 @@
     var hasIp = g.Entries.Any(e => !string.IsNullOrEmpty(e.CurrentIp));
     var dot = hasErr ? "err" : (hasIp ? "ok" : "warn");
     var lastChecked = g.Entries.Where(e => e.LastChecked != null).Select(e => e.LastChecked!.Value).DefaultIfEmpty().Max();
+    var kindLabel = g.Kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static", _ => "Public IP" };
     <a class="list-item" href="/Sources/Edit?id=@g.Id">
         <div class="li-main">
             <span class="li-title">@g.Name</span>
@@ -39,15 +40,15 @@
                 }
                 else
                 {
-                    @($"Public IP = {g.Entries.FirstOrDefault()?.CurrentIp ?? "–"}")
+                    @($"{kindLabel} = {g.Entries.FirstOrDefault()?.CurrentIp ?? "–"}")
                 }
             </span>
             <span class="li-sub">
-                Intervall @(g.IntervalSeconds)s · letztes Update: @(lastChecked == default(DateTime) ? "—" : lastChecked.ToString("yyyy-MM-dd HH:mm:ss") + " UTC")
+                Interval @(g.IntervalSeconds)s · last update: @(lastChecked == default(DateTime) ? "—" : lastChecked.ToString("yyyy-MM-dd HH:mm:ss") + " UTC")
             </span>
         </div>
         <div class="li-side">
-            <span class="status-pill"><span class="status-dot @dot"></span>@(g.Kind == SourceKind.Unifi ? "Unifi" : "Public IP")</span>
+            <span class="status-pill"><span class="status-dot @dot"></span>@kindLabel</span>
             <span class="muted">›</span>
         </div>
     </a>

@@ -26,6 +26,7 @@ builder.Services.AddSingleton<NetcupClient>();
 builder.Services.AddSingleton<DynDnsClient>();
 builder.Services.AddSingleton<SourceResolver>();
 builder.Services.AddSingleton<ReachabilityChecker>();
+builder.Services.AddSingleton<StatusService>();
 builder.Services.AddHostedService<UpdaterService>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -58,7 +59,36 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapRazorPages();
+
+// Liveness + public monitoring endpoints (no authentication, for monitoring software).
 app.MapGet("/healthz", () => "ok").AllowAnonymous();
+
+app.MapGet("/api/health", (StatusService status) =>
+{
+    var s = status.Build(5);
+    var body = new
+    {
+        status = s.Ok ? "ok" : "degraded",
+        sources = s.Sources,
+        rules = s.Rules,
+        ipChanges = new { s.IpChanges.Total, s.IpChanges.Last24h, s.IpChanges.Last7d, s.IpChanges.LastChange },
+        time = s.Time
+    };
+    return s.Ok ? Results.Json(body) : Results.Json(body, statusCode: 503);
+}).AllowAnonymous();
+
+app.MapGet("/api/state", (StatusService status) =>
+{
+    var s = status.Build(50);
+    return Results.Json(new
+    {
+        status = s.Ok ? "ok" : "degraded",
+        time = s.Time,
+        sources = s.SourceList,
+        rules = s.RuleList,
+        ipChanges = s.IpChanges
+    });
+}).AllowAnonymous();
 
 app.Services.GetRequiredService<ConfigService>().EnsureLoaded();
 

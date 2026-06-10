@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 
 namespace Matddns.Services;
 
-// Reihenfolge = Schweregrad (für Mindestlevel-Filter): Debug < Info < Update < Warn < Error
+// order = severity (for the minimum-level filter): Debug < Info < Update < Warn < Error
 public enum LogLevel { Debug, Info, Update, Warn, Error }
 
 public record LogEntry(DateTime Timestamp, LogLevel Level, string Source, string Message);
@@ -41,7 +41,7 @@ public class LogService
 
     public void Log(LogLevel level, string source, string message)
     {
-        // Schreib-Filter: alles unter dem Mindestlevel wird gar nicht erst aufgezeichnet (kein Spam).
+        // write filter: anything below the minimum level is not recorded at all (no spam).
         if ((int)level < (int)MinLevel()) return;
 
         var e = new LogEntry(DateTime.UtcNow, level, source, message);
@@ -66,7 +66,7 @@ public class LogService
         }
     }
 
-    /// <summary>Entfernt Datei-Einträge älter als die konfigurierte Retention (Tage). 0 = unbegrenzt.</summary>
+    /// <summary>Removes file entries older than the configured retention (days). 0 = unlimited.</summary>
     public void ApplyRetention()
     {
         int days;
@@ -107,6 +107,27 @@ public class LogService
         {
             try { File.WriteAllText(_paths.LogFile, ""); } catch { /* best effort */ }
         }
+    }
+
+    /// <summary>All entries of exactly one level from the retained log file, newest first.</summary>
+    public IReadOnlyList<LogEntry> EntriesOfLevel(LogLevel level, int max = 1000)
+    {
+        var list = new List<LogEntry>();
+        lock (_fileLock)
+        {
+            try
+            {
+                if (File.Exists(_paths.LogFile))
+                    foreach (var line in File.ReadLines(_paths.LogFile))
+                    {
+                        var e = Parse(line);
+                        if (e != null && e.Level == level) list.Add(e);
+                    }
+            }
+            catch { /* best effort */ }
+        }
+        list.Reverse();
+        return list.Count > max ? list.Take(max).ToList() : list;
     }
 
     public IReadOnlyList<LogEntry> Recent(int count = 500, LogLevel? min = null, int? withinDays = null)

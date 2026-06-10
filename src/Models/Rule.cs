@@ -29,5 +29,5 @@ public class Rule
     public string? LastResult { get; set; }
     public string? LastUsedSourceId { get; set; }
     public string? LastValue { get; set; }
-    public DateTime? LastChange { get; set; }   // wann der Wert zuletzt tatsächlich gesetzt wurde
+    public DateTime? LastChange { get; set; }   // when the value was last actually set
 }

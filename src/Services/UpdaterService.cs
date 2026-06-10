@@ -124,18 +124,34 @@ public class UpdaterService : BackgroundService
                             match = new SourceEntry { InterfaceName = wan.Name };
                             g.Entries.Add(match);
                         }
-                        // Display-Name aus Unifi übernehmen (Label folgt der Unifi-Konfiguration).
+                        // take the display name from Unifi (label follows the Unifi configuration)
                         if (!string.IsNullOrWhiteSpace(wan.DisplayName))
                             match.Label = wan.DisplayName!;
                         else if (string.IsNullOrWhiteSpace(match.Label))
                             match.Label = wan.Name.ToUpperInvariant();
                         match.CurrentIp = wan.Ip;
                         match.LastChecked = DateTime.UtcNow;
-                        match.LastError = wan.Up ? (string.IsNullOrEmpty(wan.Ip) ? "kein Lease" : null) : "down";
+                        match.LastError = wan.Up ? (string.IsNullOrEmpty(wan.Ip) ? "no lease" : null) : "down";
                     }
                 });
                 _log.Log(LogLevel.Debug, $"src:{group.Name}",
                     $"Unifi WANs: {string.Join(", ", wans.Select(w => $"{(string.IsNullOrEmpty(w.DisplayName) ? w.Name : w.DisplayName)} [{w.Name}]={(w.Up ? (w.Ip ?? "no-ip") : "down")}"))}");
+            }
+            else if (group.Kind == SourceKind.Static)
+            {
+                _config.Mutate(c =>
+                {
+                    var g = c.Sources.FirstOrDefault(x => x.Id == group.Id);
+                    if (g == null) return;
+                    var ip = g.Static?.Ip;
+                    if (g.Entries.Count == 0)
+                        g.Entries.Add(new SourceEntry { Label = "Static IP" });
+                    var entry = g.Entries[0];
+                    entry.Label = "Static IP";
+                    entry.CurrentIp = string.IsNullOrWhiteSpace(ip) ? null : ip!.Trim();
+                    entry.LastChecked = DateTime.UtcNow;
+                    entry.LastError = string.IsNullOrWhiteSpace(ip) ? "no IP configured" : null;
+                });
             }
         }
     }
@@ -192,7 +208,7 @@ public class UpdaterService : BackgroundService
             var ip = resolved.Entry.CurrentIp;
             if (string.IsNullOrWhiteSpace(ip)) continue;
 
-            // Failover-Validierung: Quelle nur akzeptieren, wenn sie den Erreichbarkeits-Check besteht.
+            // failover validation: only accept the source if it passes the reachability check.
             if (rule.Validation != RuleValidation.None)
             {
                 var reachable = await _reach.CheckAsync(rule.Validation, ip!, rule.ValidationPort, ct);
@@ -220,7 +236,7 @@ public class UpdaterService : BackgroundService
 
         if (chosenValue == null)
         {
-            // nur beim Zustandswechsel loggen (sonst Spam bei OnChange alle 15s)
+            // only log on state change (otherwise spam with OnChange every 15s)
             if (rule.LastResult != "no source")
                 _log.Log(LogLevel.Warn, $"rule:{RuleDesc(rule, cfg)}", "no reachable source");
             _config.Mutate(c =>
@@ -287,7 +303,7 @@ public class UpdaterService : BackgroundService
             if (r == null) return;
             r.LastRun = DateTime.UtcNow;
             r.LastResult = ok ? "ok: " + msg : "err: " + msg;
-            // erfolgreicher Schreibvorgang = Zeitpunkt des Setzens (passiert durch Skip-Logik nur bei Änderung)
+            // a successful write = the moment it was set (happens only on change due to the skip logic)
             if (ok) r.LastChange = DateTime.UtcNow;
             r.LastValue = chosenValue;
             r.LastUsedSourceId = chosenSourceId;
@@ -300,8 +316,8 @@ public class UpdaterService : BackgroundService
         var age = (now - rule.LastRun.Value).TotalSeconds;
         if (rule.Trigger == RuleTrigger.Interval)
             return age >= rule.IntervalSeconds;
-        // OnChange: jede Schleife auswerten (Änderungserkennung passiert in RunSingleRuleAsync);
-        // nach einem Fehler kurz drosseln, damit die DNS-API bei Fehlkonfiguration nicht geflutet wird.
+        // OnChange: evaluate every loop (change detection happens in RunSingleRuleAsync);
+        // throttle briefly after an error so the DNS API isn't flooded on misconfiguration.
         var lastErr = rule.LastResult != null && rule.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase);
         return !lastErr || age >= 30;
     }

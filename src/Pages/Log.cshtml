@@ -8,26 +8,25 @@
 <div class="page-header">
     <div>
         <h1>Log</h1>
-        <p>Jüngste Einträge. Persistent in <span class="mono">/data/log.txt</span> (Level & Aufbewahrung unter <a href="/System">System</a>).</p>
     </div>
 </div>
 
 <form method="get" class="log-toolbar">
     <label for="lvl">Filter</label>
     <select id="lvl" name="Level" onchange="this.form.submit()">
-        <option value="Debug" selected="@(f == Matddns.Services.LogLevel.Debug)">Alle</option>
+        <option value="Debug" selected="@(f == Matddns.Services.LogLevel.Debug)">All</option>
         <option value="Info" selected="@(f == Matddns.Services.LogLevel.Info)">Info+</option>
         <option value="Update" selected="@(f == Matddns.Services.LogLevel.Update)">Update+</option>
         <option value="Warn" selected="@(f == Matddns.Services.LogLevel.Warn)">Warn+</option>
-        <option value="Error" selected="@(f == Matddns.Services.LogLevel.Error)">Nur Error</option>
+        <option value="Error" selected="@(f == Matddns.Services.LogLevel.Error)">Error only</option>
     </select>
-    <button type="submit" class="ghost">Aktualisieren</button>
+    <button type="submit" class="ghost">Refresh</button>
 </form>
 
 <div class="log-view">
 @if (!Model.Entries.Any())
 {
-    <div class="muted">Keine Einträge für diesen Filter.</div>
+    <div class="muted">No entries for this filter.</div>
 }
 @foreach (var e in Model.Entries)
 {
