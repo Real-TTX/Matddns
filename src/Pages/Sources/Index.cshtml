@@ -26,7 +26,7 @@
 @foreach (var g in Model.Groups)
 {
     var hasErr = g.Entries.Any(e => e.LastError != null);
-    var hasIp = g.Entries.Any(e => !string.IsNullOrEmpty(e.CurrentIp));
+    var hasIp = g.Entries.Any(e => !string.IsNullOrEmpty(e.CurrentIp) || !string.IsNullOrEmpty(e.CurrentIpv6));
     var dot = hasErr ? "err" : (hasIp ? "ok" : "warn");
     var lastChecked = g.Entries.Where(e => e.LastChecked != null).Select(e => e.LastChecked!.Value).DefaultIfEmpty().Max();
     var kindLabel = g.Kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static", SourceKind.Push => "Push", _ => "Public IP" };
@@ -36,11 +36,11 @@
             <span class="li-sub">
                 @if (g.Kind == SourceKind.Unifi)
                 {
-                    @(string.Join(" · ", g.Entries.Select(e => $"{e.Label}={(string.IsNullOrEmpty(e.CurrentIp) ? "–" : e.CurrentIp)}")))
+                    @(string.Join(" · ", g.Entries.Select(e => $"{e.Label}={(string.IsNullOrEmpty(e.CurrentIp) ? "–" : e.CurrentIp)}{(string.IsNullOrEmpty(e.CurrentIpv6) ? "" : " / " + e.CurrentIpv6)}")))
                 }
                 else
                 {
-                    @($"{kindLabel} = {g.Entries.FirstOrDefault()?.CurrentIp ?? "–"}")
+                    @($"{kindLabel} = {g.Entries.FirstOrDefault()?.CurrentIp ?? "–"}{(string.IsNullOrEmpty(g.Entries.FirstOrDefault()?.CurrentIpv6) ? "" : " · IPv6 " + g.Entries.FirstOrDefault()!.CurrentIpv6)}")
                 }
             </span>
             <span class="li-sub">

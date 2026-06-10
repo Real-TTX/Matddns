@@ -100,10 +100,16 @@
         <!-- Static fields -->
         <div class="type-fields @(kind == SourceKind.Static ? "active" : "")" data-kind="Static">
             <div class="form-grid" style="margin-top:16px;">
-                <div class="field full">
-                    <label>Static IP</label>
+                <div class="field">
+                    <label>Static IPv4</label>
                     <input type="text" name="StaticIp" value="@(g?.Static?.Ip ?? "")" placeholder="203.0.113.10" />
-                    <div class="hint">Fixed value written by rules using this source – e.g. a known server or fallback IP.</div>
+                </div>
+                <div class="field">
+                    <label>Static IPv6</label>
+                    <input type="text" name="StaticIpv6" value="@(g?.Static?.Ipv6 ?? "")" placeholder="2001:db8::1" />
+                </div>
+                <div class="field full">
+                    <div class="hint">Either or both. Rules pick IPv4 for A records and IPv6 for AAAA – e.g. a known server or fallback.</div>
                 </div>
             </div>
         </div>
@@ -169,7 +175,8 @@
                 <tr>
                     <th>Label</th>
                     <th>Interface</th>
-                    <th>Current IP</th>
+                    <th>IPv4</th>
+                    <th>IPv6</th>
                     <th>Last check</th>
                     <th>Status</th>
                     @if (kind == SourceKind.Unifi) { <th></th> }
@@ -183,6 +190,7 @@
                     <td>@e.Label</td>
                     <td class="mono">@(e.InterfaceName ?? "—")</td>
                     <td class="mono">@(e.CurrentIp ?? "—")</td>
+                    <td class="mono">@(e.CurrentIpv6 ?? "—")</td>
                     <td><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
                     <td><span class="status-pill"><span class="status-dot @status"></span>@(e.LastError ?? (string.IsNullOrEmpty(e.CurrentIp) ? "pending" : "ok"))</span></td>
                     @if (kind == SourceKind.Unifi)

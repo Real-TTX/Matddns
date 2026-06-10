@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Sockets;
 using System.Text.Json;
 using Matddns.Models;
 
@@ -7,7 +8,7 @@ namespace Matddns.Services;
 
 public class UnifiClient
 {
-    public record WanInfo(string Name, string? Ip, bool Up, string? GatewayMac, string? Ifname = null, string? DisplayName = null);
+    public record WanInfo(string Name, string? Ip, bool Up, string? GatewayMac, string? Ifname = null, string? DisplayName = null, string? Ipv6 = null);
 
     public async Task<List<WanInfo>> GetWansAsync(UnifiSettings cfg, CancellationToken ct)
     {
@@ -26,7 +27,7 @@ public class UnifiClient
 
         // 1) Gateway-Device: ifname->networkgroup (ethernet_overrides) + Live-IP/Status je WAN-Port.
         var ifnameToGroup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var liveByGroup = new Dictionary<string, (string? Ip, bool Up, string? Ifname)>(StringComparer.OrdinalIgnoreCase);
+        var liveByGroup = new Dictionary<string, (string? Ip, string? Ipv6, bool Up, string? Ifname)>(StringComparer.OrdinalIgnoreCase);
         string? gwMac = null;
 
         using (var devResp = await http.GetAsync($"{pathPrefix}/api/s/{site}/stat/device", ct))
@@ -54,11 +55,12 @@ public class UnifiClient
                         if (!dev.TryGetProperty($"wan{i}", out var w) || w.ValueKind != JsonValueKind.Object) continue;
                         var ifname = TryGetString(w, "ifname") ?? TryGetString(w, "name");
                         var ip = TryGetString(w, "ip");
+                        var ipv6 = FirstGlobalV6(w);
                         var up = TryGetBool(w, "up") ?? !string.IsNullOrEmpty(ip);
                         var group = ifname != null && ifnameToGroup.TryGetValue(ifname, out var g)
                             ? g
                             : (i == 1 ? "WAN" : $"WAN{i}");
-                        liveByGroup[group] = (string.IsNullOrEmpty(ip) ? null : ip, up, ifname);
+                        liveByGroup[group] = (string.IsNullOrEmpty(ip) ? null : ip, ipv6, up, ifname);
                     }
                 }
             }
@@ -83,7 +85,7 @@ public class UnifiClient
                         liveByGroup.TryGetValue(group, out var live);
                         var ip = !string.IsNullOrEmpty(live.Ip) ? live.Ip : (string.IsNullOrEmpty(cfgIp) ? null : cfgIp);
                         var up = live.Ip != null ? live.Up : !string.IsNullOrEmpty(cfgIp);
-                        result.Add(new WanInfo(group, ip, up, gwMac, live.Ifname, display));
+                        result.Add(new WanInfo(group, ip, up, gwMac, live.Ifname, display, live.Ipv6));
                     }
                 }
             }
@@ -93,7 +95,7 @@ public class UnifiClient
         // 3) Fallback without networkconf: directly from the gateway's live groups.
         if (result.Count == 0)
             foreach (var kv in liveByGroup)
-                result.Add(new WanInfo(kv.Key, kv.Value.Ip, kv.Value.Up, gwMac, kv.Value.Ifname, null));
+                result.Add(new WanInfo(kv.Key, kv.Value.Ip, kv.Value.Up, gwMac, kv.Value.Ifname, null, kv.Value.Ipv6));
 
         // order: WAN, WAN2, … and LTE failover last.
         return result.OrderBy(GroupRank).ToList();
@@ -106,6 +108,27 @@ public class UnifiClient
         var m = System.Text.RegularExpressions.Regex.Match(n, @"WAN(\d*)");
         if (m.Success) return m.Groups[1].Value == "" ? 1 : int.Parse(m.Groups[1].Value);
         return 500;
+    }
+
+    // wanN.ipv6 is an array (sometimes a string); pick the first globally routable address (skip link-local/ULA).
+    private static string? FirstGlobalV6(JsonElement w)
+    {
+        if (!w.TryGetProperty("ipv6", out var v6)) return null;
+        IEnumerable<string?> candidates = v6.ValueKind switch
+        {
+            JsonValueKind.Array => v6.EnumerateArray().Select(e => e.ValueKind == JsonValueKind.String ? e.GetString() : null),
+            JsonValueKind.String => new[] { v6.GetString() },
+            _ => Array.Empty<string?>()
+        };
+        return candidates.FirstOrDefault(IsGlobalV6);
+    }
+
+    private static bool IsGlobalV6(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return false;
+        if (!IPAddress.TryParse(s, out var a) || a.AddressFamily != AddressFamily.InterNetworkV6) return false;
+        if (a.IsIPv6LinkLocal || a.IsIPv6SiteLocal || a.IsIPv6Multicast || IPAddress.IsLoopback(a)) return false;
+        return (a.GetAddressBytes()[0] & 0xfe) != 0xfc; // exclude ULA fc00::/7
     }
 
     public static Uri NormalizeBaseUrl(string? raw)

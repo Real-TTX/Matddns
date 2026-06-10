@@ -40,7 +40,7 @@ public class EditModel : PageModel
 
     public IActionResult OnPostCreate(string Name, SourceKind Kind, int IntervalSeconds,
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
-        string? StaticIp = null)
+        string? StaticIp = null, string? StaticIpv6 = null)
     {
         if (string.IsNullOrWhiteSpace(Name)) { Error = "Name missing"; return RedirectToPage("Edit"); }
 
@@ -65,11 +65,13 @@ public class EditModel : PageModel
         else if (Kind == SourceKind.Static)
         {
             var ip = (StaticIp ?? "").Trim();
-            g.Static = new StaticSettings { Ip = ip };
+            var ipv6 = (StaticIpv6 ?? "").Trim();
+            g.Static = new StaticSettings { Ip = ip, Ipv6 = ipv6 };
             g.Entries.Add(new SourceEntry
             {
                 Label = "Static IP",
                 CurrentIp = string.IsNullOrEmpty(ip) ? null : ip,
+                CurrentIpv6 = string.IsNullOrEmpty(ipv6) ? null : ipv6,
                 LastChecked = DateTime.UtcNow
             });
         }
@@ -105,7 +107,7 @@ public class EditModel : PageModel
 
     public IActionResult OnPostSave(string Id, string Name, int IntervalSeconds,
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
-        string? StaticIp = null)
+        string? StaticIp = null, string? StaticIpv6 = null)
     {
         _config.Mutate(c =>
         {
@@ -126,9 +128,11 @@ public class EditModel : PageModel
             {
                 g.Static ??= new StaticSettings();
                 g.Static.Ip = (StaticIp ?? "").Trim();
+                g.Static.Ipv6 = (StaticIpv6 ?? "").Trim();
                 var e = g.Entries.FirstOrDefault();
                 if (e == null) { e = new SourceEntry { Label = "Static IP" }; g.Entries.Add(e); }
                 e.CurrentIp = string.IsNullOrEmpty(g.Static.Ip) ? null : g.Static.Ip;
+                e.CurrentIpv6 = string.IsNullOrEmpty(g.Static.Ipv6) ? null : g.Static.Ipv6;
                 e.LastChecked = DateTime.UtcNow;
                 e.LastError = null;
             }

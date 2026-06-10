@@ -31,6 +31,7 @@ public class StatusService
                 Label = e.Label,
                 Interface = e.InterfaceName,
                 Ip = e.CurrentIp,
+                Ipv6 = e.CurrentIpv6,
                 LastChecked = e.LastChecked,
                 Error = e.LastError
             }).ToList()
@@ -74,7 +75,7 @@ public class StatusService
             {
                 Total = cfg.Sources.Count,
                 Entries = allEntries.Count,
-                Ok = allEntries.Count(e => e.Error == null && !string.IsNullOrEmpty(e.Ip)),
+                Ok = allEntries.Count(e => e.Error == null && (!string.IsNullOrEmpty(e.Ip) || !string.IsNullOrEmpty(e.Ipv6))),
                 Errors = sourceErrors
             },
             Rules = new RuleCountSummary
@@ -160,6 +161,7 @@ public class EntryStatus
     public string Label { get; set; } = "";
     public string? Interface { get; set; }
     public string? Ip { get; set; }
+    public string? Ipv6 { get; set; }
     public DateTime? LastChecked { get; set; }
     public string? Error { get; set; }
 }
