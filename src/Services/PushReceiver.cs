@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using Matddns.Models;
 
@@ -30,9 +31,10 @@ public class PushReceiver
             return (401, "badauth");
 
         var chosen = !string.IsNullOrWhiteSpace(ip) ? ip!.Trim() : callerIp;
-        if (string.IsNullOrWhiteSpace(chosen) || !IPAddress.TryParse(chosen, out _))
+        if (string.IsNullOrWhiteSpace(chosen) || !IPAddress.TryParse(chosen, out var addr))
             return (200, "nohost");
 
+        var isV6 = addr.AddressFamily == AddressFamily.InterNetworkV6;
         var changed = false;
         _config.Mutate(c =>
         {
@@ -40,14 +42,15 @@ public class PushReceiver
             if (g == null) return;
             if (g.Entries.Count == 0) g.Entries.Add(new SourceEntry { Label = "Pushed IP" });
             var e = g.Entries[0];
-            changed = e.CurrentIp != chosen;
+            // route into the right family field; keep the other family untouched (dual-stack push via separate calls)
+            if (isV6) { changed = e.CurrentIpv6 != chosen; e.CurrentIpv6 = chosen; }
+            else { changed = e.CurrentIp != chosen; e.CurrentIp = chosen; }
             e.Label = "Pushed IP";
-            e.CurrentIp = chosen;
             e.LastChecked = DateTime.UtcNow;
             e.LastError = null;
         });
 
-        _log.Log(LogLevel.Debug, $"src:{grp.Name}", $"push update: {chosen}{(changed ? " (changed)" : "")}");
+        _log.Log(LogLevel.Debug, $"src:{grp.Name}", $"push update ({(isV6 ? "v6" : "v4")}): {chosen}{(changed ? " (changed)" : "")}");
         return (200, $"{(changed ? "good" : "nochg")} {chosen}");
     }
 

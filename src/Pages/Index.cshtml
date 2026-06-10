@@ -41,25 +41,27 @@
 <div class="section-title"><h2>Sources</h2><a class="muted-small" href="/Sources">manage →</a></div>
 <div class="card">
     <table>
-        <thead><tr><th>Source</th><th>Entry</th><th>IP</th><th>Last check</th><th>Status</th></tr></thead>
+        <thead><tr><th>Source</th><th>Entry</th><th>IPv4</th><th>IPv6</th><th>Last check</th><th>Status</th></tr></thead>
         <tbody>
         @foreach (var src in s.SourceList)
         {
             @foreach (var e in src.Entries)
             {
-                var st = e.Error != null ? "err" : (string.IsNullOrEmpty(e.Ip) ? "warn" : "ok");
+                var noIp = string.IsNullOrEmpty(e.Ip) && string.IsNullOrEmpty(e.Ipv6);
+                var st = e.Error != null ? "err" : (noIp ? "warn" : "ok");
                 <tr>
                     <td>@src.Name <span class="muted-small">(@src.Kind)</span></td>
                     <td>@e.Label</td>
                     <td class="mono">@(e.Ip ?? "—")</td>
+                    <td class="mono">@(e.Ipv6 ?? "—")</td>
                     <td><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
-                    <td><span class="status-pill"><span class="status-dot @st"></span>@(e.Error ?? (string.IsNullOrEmpty(e.Ip) ? "pending" : "ok"))</span></td>
+                    <td><span class="status-pill"><span class="status-dot @st"></span>@(e.Error ?? (noIp ? "pending" : "ok"))</span></td>
                 </tr>
             }
         }
         @if (s.SourceList.Count == 0)
         {
-            <tr><td colspan="5" class="muted">No sources configured. <a href="/Sources/Edit">Add one</a>.</td></tr>
+            <tr><td colspan="6" class="muted">No sources configured. <a href="/Sources/Edit">Add one</a>.</td></tr>
         }
         </tbody>
     </table>

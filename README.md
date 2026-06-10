@@ -48,6 +48,9 @@ A "Push" source exposes update URLs (shown on its page):
 - A / AAAA: erste erreichbare Source gewinnt -> deren IP wird gesetzt.
 - CNAME: erste erreichbare Source gewinnt -> der pro Source hinterlegte Zielhostname wird in den CNAME geschrieben.
 
+## IPv6 / Dual-Stack
+Jeder Source-Eintrag haelt optional IPv4 und IPv6 (auch IPv6-only moeglich). Public-IP und Unifi lesen beide Familien (Unifi nur global routbare v6); Static und Push (per Familie der gepushten Adresse) ebenfalls. Regeln waehlen passend zum Record-Typ: **A -> IPv4**, **AAAA -> IPv6**; eine Source ohne passende Familie wird im Failover uebersprungen. Die UI zeigt v4 und v6 ueberall an.
+
 ## System / Log
 - **System**-Tab: Log-Mindestlevel (Debug < Info < Update < Warn < Error) und Retention (Tage, 0 = unbegrenzt) + "Log leeren".
 - Routine-Logs (WAN-Polling, Erreichbarkeits-Checks) liegen auf `Debug` und spammen bei Standard-Level `Info` nicht.

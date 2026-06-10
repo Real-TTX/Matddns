@@ -72,6 +72,7 @@ public class UpdaterService : BackgroundService
             if (group.Kind == SourceKind.PublicIp)
             {
                 var ip = await _publicIp.GetPublicIpAsync(ct);
+                var ipv6 = await _publicIp.GetPublicIpv6Async(ct);
                 _config.Mutate(c =>
                 {
                     var g = c.Sources.FirstOrDefault(x => x.Id == group.Id);
@@ -81,11 +82,12 @@ public class UpdaterService : BackgroundService
                     var entry = g.Entries[0];
                     entry.Label = "Public IP";
                     entry.CurrentIp = ip;
+                    entry.CurrentIpv6 = ipv6;
                     entry.LastChecked = DateTime.UtcNow;
-                    entry.LastError = ip == null ? "no IP" : null;
+                    entry.LastError = (ip == null && ipv6 == null) ? "no IP" : null;
                 });
-                if (ip != null)
-                    _log.Log(LogLevel.Debug, $"src:{group.Name}", $"Public IP {ip}");
+                if (ip != null || ipv6 != null)
+                    _log.Log(LogLevel.Debug, $"src:{group.Name}", $"Public IP v4={ip ?? "-"} v6={ipv6 ?? "-"}");
                 else
                     _log.Log(LogLevel.Warn, $"src:{group.Name}", "could not resolve public IP");
             }
@@ -130,8 +132,9 @@ public class UpdaterService : BackgroundService
                         else if (string.IsNullOrWhiteSpace(match.Label))
                             match.Label = wan.Name.ToUpperInvariant();
                         match.CurrentIp = wan.Ip;
+                        match.CurrentIpv6 = wan.Ipv6;
                         match.LastChecked = DateTime.UtcNow;
-                        match.LastError = wan.Up ? (string.IsNullOrEmpty(wan.Ip) ? "no lease" : null) : "down";
+                        match.LastError = wan.Up ? (string.IsNullOrEmpty(wan.Ip) && string.IsNullOrEmpty(wan.Ipv6) ? "no lease" : null) : "down";
                     }
                 });
                 _log.Log(LogLevel.Debug, $"src:{group.Name}",
@@ -144,13 +147,15 @@ public class UpdaterService : BackgroundService
                     var g = c.Sources.FirstOrDefault(x => x.Id == group.Id);
                     if (g == null) return;
                     var ip = g.Static?.Ip;
+                    var ipv6 = g.Static?.Ipv6;
                     if (g.Entries.Count == 0)
                         g.Entries.Add(new SourceEntry { Label = "Static IP" });
                     var entry = g.Entries[0];
                     entry.Label = "Static IP";
                     entry.CurrentIp = string.IsNullOrWhiteSpace(ip) ? null : ip!.Trim();
+                    entry.CurrentIpv6 = string.IsNullOrWhiteSpace(ipv6) ? null : ipv6!.Trim();
                     entry.LastChecked = DateTime.UtcNow;
-                    entry.LastError = string.IsNullOrWhiteSpace(ip) ? "no IP configured" : null;
+                    entry.LastError = (string.IsNullOrWhiteSpace(ip) && string.IsNullOrWhiteSpace(ipv6)) ? "no IP configured" : null;
                 });
             }
         }
@@ -205,30 +210,40 @@ public class UpdaterService : BackgroundService
             var sid = rule.SourceEntryIdsInOrder[i];
             var resolved = _resolver.Find(cfg, sid);
             if (resolved == null) continue;
-            var ip = resolved.Entry.CurrentIp;
-            if (string.IsNullOrWhiteSpace(ip)) continue;
 
-            // failover validation: only accept the source if it passes the reachability check.
-            if (rule.Validation != RuleValidation.None)
+            // pick the address matching the record family (A=IPv4, AAAA=IPv6; CNAME uses any IP just for reachability)
+            var familyIp = dentry.Type switch
             {
-                var reachable = await _reach.CheckAsync(rule.Validation, ip!, rule.ValidationPort, ct);
-                var how = rule.Validation == RuleValidation.TcpPort ? $"TCP:{rule.ValidationPort}" : "Ping";
-                _log.Log(LogLevel.Debug, $"rule:{RuleDesc(rule, cfg)}",
-                    $"check {resolved.Entry.Label} {ip} ({how}) -> {(reachable ? "ok" : "fail")}");
-                if (!reachable) continue;
-            }
+                DnsRecordType.AAAA => resolved.Entry.CurrentIpv6,
+                DnsRecordType.A => resolved.Entry.CurrentIp,
+                _ => resolved.Entry.CurrentIp ?? resolved.Entry.CurrentIpv6
+            };
+            if (string.IsNullOrWhiteSpace(familyIp)) continue; // source has no usable address for this record type
 
+            string? candidateValue;
             if (dentry.Type == DnsRecordType.CNAME)
             {
                 if (i >= rule.CnameTargets.Count) continue;
                 var target = rule.CnameTargets[i];
                 if (string.IsNullOrWhiteSpace(target)) continue;
-                chosenValue = target;
+                candidateValue = target;
             }
             else
             {
-                chosenValue = ip;
+                candidateValue = familyIp;
             }
+
+            // failover validation: only accept the source if its address passes the reachability check.
+            if (rule.Validation != RuleValidation.None)
+            {
+                var reachable = await _reach.CheckAsync(rule.Validation, familyIp!, rule.ValidationPort, ct);
+                var how = rule.Validation == RuleValidation.TcpPort ? $"TCP:{rule.ValidationPort}" : "Ping";
+                _log.Log(LogLevel.Debug, $"rule:{RuleDesc(rule, cfg)}",
+                    $"check {resolved.Entry.Label} {familyIp} ({how}) -> {(reachable ? "ok" : "fail")}");
+                if (!reachable) continue;
+            }
+
+            chosenValue = candidateValue;
             chosenSourceId = sid;
             chosenIndex = i;
             break;

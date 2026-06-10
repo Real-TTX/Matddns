@@ -22,7 +22,8 @@ public class SourceGroup
 
 public class StaticSettings
 {
-    public string Ip { get; set; } = "";
+    public string Ip { get; set; } = "";     // IPv4 (optional)
+    public string Ipv6 { get; set; } = "";   // IPv6 (optional) – either or both
 }
 
 public class PushSettings
@@ -44,7 +45,8 @@ public class SourceEntry
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Label { get; set; } = "";
     public string? InterfaceName { get; set; }
-    public string? CurrentIp { get; set; }
+    public string? CurrentIp { get; set; }       // IPv4
+    public string? CurrentIpv6 { get; set; }     // IPv6
     public DateTime? LastChecked { get; set; }
     public string? LastError { get; set; }
 }
