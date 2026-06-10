@@ -93,7 +93,7 @@ app.MapGet("/api/state", (StatusService status) =>
 }).AllowAnonymous();
 
 // DynDNS receiver: external devices push their IP into a "Push" source (token-protected).
-// Simple form: /api/update?token=<token>&ipv4=<v4>&ipv6=<v6>  (send either or both; legacy ?ip= auto-detects family).
+// JSON API form: /api/update?token=<token>&ipv4=<v4>&ipv6=<v6>  (send either or both; legacy ?ip= auto-detects family).
 app.MapGet("/api/update", (HttpContext ctx, PushReceiver push) =>
 {
     var q = ctx.Request.Query;
@@ -102,11 +102,17 @@ app.MapGet("/api/update", (HttpContext ctx, PushReceiver push) =>
     var ipv6 = q["ipv6"].FirstOrDefault();
     var ipAuto = q["ip"].FirstOrDefault();
     var caller = ctx.Connection.RemoteIpAddress?.ToString();
-    var (statusCode, body) = push.Update(token, ipv4, ipv6, ipAuto, caller);
-    return Results.Text(body, "text/plain", statusCode: statusCode);
+    var r = push.Update(token, ipv4, ipv6, ipAuto, caller);
+    return r.Status switch
+    {
+        "ok" => Results.Json(new { status = "ok", changed = r.Changed, ipv4 = r.Ipv4, ipv6 = r.Ipv6, time = DateTime.UtcNow }, statusCode: 200),
+        "no-ip" => Results.Json(new { status = "no-ip", message = "Supply ipv4 and/or ipv6 (or ip)." }, statusCode: 400),
+        _ => Results.Json(new { status = "unauthorized", message = "Invalid or missing token." }, statusCode: 401),
+    };
 }).AllowAnonymous();
 
 // dyndns2-compatible (routers / FRITZ!Box): /nic/update?ipv4=<v4>&ipv6=<v6>  with HTTP Basic auth (password = token).
+// Keeps the dyndns2 plain-text protocol (good/nochg/badauth/nohost) that routers expect.
 app.MapGet("/nic/update", (HttpContext ctx, PushReceiver push) =>
 {
     var q = ctx.Request.Query;
@@ -117,8 +123,14 @@ app.MapGet("/nic/update", (HttpContext ctx, PushReceiver push) =>
     var ipv6 = q["ipv6"].FirstOrDefault() ?? q["myipv6"].FirstOrDefault() ?? q["myip6"].FirstOrDefault();
     var ipAuto = q["ip"].FirstOrDefault();
     var caller = ctx.Connection.RemoteIpAddress?.ToString();
-    var (statusCode, body) = push.Update(token, ipv4, ipv6, ipAuto, caller);
-    return Results.Text(body, "text/plain", statusCode: statusCode);
+    var r = push.Update(token, ipv4, ipv6, ipAuto, caller);
+    var body = r.Status switch
+    {
+        "unauthorized" => "badauth",
+        "no-ip" => "nohost",
+        _ => $"{(r.Changed ? "good" : "nochg")} {string.Join(" ", new[] { r.Ipv4, r.Ipv6 }.Where(x => x != null))}".Trim(),
+    };
+    return Results.Text(body, "text/plain", statusCode: 200); // dyndns2 carries status in the body
 }).AllowAnonymous();
 
 app.Services.GetRequiredService<ConfigService>().EnsureLoaded();

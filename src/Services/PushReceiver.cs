@@ -5,6 +5,10 @@ using Matddns.Models;
 
 namespace Matddns.Services;
 
+/// <summary>Structured result of a push update; endpoints render it as JSON (/api/update) or dyndns2 text (/nic/update).</summary>
+/// <param name="Status">Canonical status: "ok" | "unauthorized" | "no-ip".</param>
+public record PushOutcome(int HttpStatus, string Status, bool Changed, string? Ipv4, string? Ipv6);
+
 /// <summary>Receives DynDNS-style pushes: an external device reports its IP, which is stored in a Push source.</summary>
 public class PushReceiver
 {
@@ -21,17 +25,17 @@ public class PushReceiver
 
     /// <summary>
     /// Accepts explicit per-family values (ipv4/ipv6) and/or a legacy single value (ipAuto, family auto-detected);
-    /// falls back to the caller IP. Each value is routed by its actual address family. dyndns2-style result.
+    /// falls back to the caller IP. Each value is routed by its actual address family.
     /// </summary>
-    public (int Status, string Body) Update(string? token, string? ipv4, string? ipv6, string? ipAuto, string? callerIp)
+    public PushOutcome Update(string? token, string? ipv4, string? ipv6, string? ipAuto, string? callerIp)
     {
         if (string.IsNullOrWhiteSpace(token))
-            return (401, "badauth");
+            return new PushOutcome(401, "unauthorized", false, null, null);
 
         var grp = _config.Read(c => c.Sources.FirstOrDefault(s =>
             s.Kind == SourceKind.Push && s.Push != null && s.Push.Token == token));
         if (grp == null)
-            return (401, "badauth");
+            return new PushOutcome(401, "unauthorized", false, null, null);
 
         string? newV4 = null, newV6 = null;
         void Consider(string? s)
@@ -39,6 +43,7 @@ public class PushReceiver
             if (string.IsNullOrWhiteSpace(s)) return;
             s = s.Trim();
             if (!IPAddress.TryParse(s, out var a)) return;
+            if (a.IsIPv4MappedToIPv6) { a = a.MapToIPv4(); s = a.ToString(); } // ::ffff:1.2.3.4 -> 1.2.3.4 (dual-stack caller IP)
             if (a.AddressFamily == AddressFamily.InterNetworkV6) newV6 ??= s;
             else newV4 ??= s;
         }
@@ -48,7 +53,7 @@ public class PushReceiver
         if (newV4 == null && newV6 == null) Consider(callerIp); // no explicit IP -> use the caller's
 
         if (newV4 == null && newV6 == null)
-            return (200, "nohost");
+            return new PushOutcome(400, "no-ip", false, null, null);
 
         var changed = false;
         _config.Mutate(c =>
@@ -67,7 +72,7 @@ public class PushReceiver
 
         var joined = string.Join(" ", new[] { newV4, newV6 }.Where(x => x != null));
         _log.Log(LogLevel.Debug, $"src:{grp.Name}", $"push update: {joined}{(changed ? " (changed)" : "")}");
-        return (200, $"{(changed ? "good" : "nochg")} {joined}");
+        return new PushOutcome(200, "ok", changed, newV4, newV6);
     }
 
     /// <summary>Reads the password from an HTTP Basic auth header value, or null.</summary>

@@ -129,9 +129,9 @@
                 var token = g!.Push?.Token ?? "";
                 <div class="form-grid" style="margin-top:16px;">
                     <div class="field full">
-                        <label>Update URL (simple)</label>
+                        <label>Update URL (JSON API)</label>
                         <input type="text" value="@($"{baseUrl}/api/update?token={token}&ipv4=<your-ipv4>&ipv6=<your-ipv6>")" readonly onclick="this.select()" />
-                        <div class="hint">Separate parameters per family: <span class="mono">ipv4</span> sets the A source, <span class="mono">ipv6</span> the AAAA source. Send either or both. Omit both (or use <span class="mono">&amp;ip=</span> auto-detect) to fall back to the caller's IP. Use a host reachable from your device (not localhost).</div>
+                        <div class="hint">Separate parameters per family: <span class="mono">ipv4</span> sets the A source, <span class="mono">ipv6</span> the AAAA source. Send either or both. Omit both (or use <span class="mono">&amp;ip=</span> auto-detect) to fall back to the caller's IP. Returns JSON (<span class="mono">{"status":"ok","changed":true,…}</span>) with a proper HTTP status. Use a host reachable from your device (not localhost).</div>
                     </div>
                     <div class="field full">
                         <label>dyndns2 (routers / FRITZ!Box)</label>
