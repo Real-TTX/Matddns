@@ -27,6 +27,8 @@ builder.Services.AddSingleton<DynDnsClient>();
 builder.Services.AddSingleton<SourceResolver>();
 builder.Services.AddSingleton<ReachabilityChecker>();
 builder.Services.AddSingleton<StatusService>();
+builder.Services.AddSingleton<TimeZoneService>();
+builder.Services.AddSingleton<PushReceiver>();
 builder.Services.AddHostedService<UpdaterService>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -88,6 +90,28 @@ app.MapGet("/api/state", (StatusService status) =>
         rules = s.RuleList,
         ipChanges = s.IpChanges
     });
+}).AllowAnonymous();
+
+// DynDNS receiver: external devices push their IP into a "Push" source (token-protected).
+// Simple form: /api/update?token=<token>&ip=<ip>   (ip optional -> caller IP)
+app.MapGet("/api/update", (HttpContext ctx, PushReceiver push) =>
+{
+    var token = ctx.Request.Query["token"].FirstOrDefault();
+    var ip = ctx.Request.Query["ip"].FirstOrDefault() ?? ctx.Request.Query["myip"].FirstOrDefault();
+    var caller = ctx.Connection.RemoteIpAddress?.ToString();
+    var (statusCode, body) = push.Update(token, ip, caller);
+    return Results.Text(body, "text/plain", statusCode: statusCode);
+}).AllowAnonymous();
+
+// dyndns2-compatible (routers / FRITZ!Box): /nic/update?hostname=&myip=  with HTTP Basic auth (password = token)
+app.MapGet("/nic/update", (HttpContext ctx, PushReceiver push) =>
+{
+    var token = PushReceiver.BasicAuthPassword(ctx.Request.Headers.Authorization.FirstOrDefault())
+                ?? ctx.Request.Query["token"].FirstOrDefault();
+    var ip = ctx.Request.Query["myip"].FirstOrDefault() ?? ctx.Request.Query["ip"].FirstOrDefault();
+    var caller = ctx.Connection.RemoteIpAddress?.ToString();
+    var (statusCode, body) = push.Update(token, ip, caller);
+    return Results.Text(body, "text/plain", statusCode: statusCode);
 }).AllowAnonymous();
 
 app.Services.GetRequiredService<ConfigService>().EnsureLoaded();

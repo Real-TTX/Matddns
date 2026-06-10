@@ -29,7 +29,7 @@
     var hasIp = g.Entries.Any(e => !string.IsNullOrEmpty(e.CurrentIp));
     var dot = hasErr ? "err" : (hasIp ? "ok" : "warn");
     var lastChecked = g.Entries.Where(e => e.LastChecked != null).Select(e => e.LastChecked!.Value).DefaultIfEmpty().Max();
-    var kindLabel = g.Kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static", _ => "Public IP" };
+    var kindLabel = g.Kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static", SourceKind.Push => "Push", _ => "Public IP" };
     <a class="list-item" href="/Sources/Edit?id=@g.Id">
         <div class="li-main">
             <span class="li-title">@g.Name</span>
@@ -44,7 +44,7 @@
                 }
             </span>
             <span class="li-sub">
-                Interval @(g.IntervalSeconds)s · last update: @(lastChecked == default(DateTime) ? "—" : lastChecked.ToString("yyyy-MM-dd HH:mm:ss") + " UTC")
+                Interval @(g.IntervalSeconds)s · last update: @(lastChecked == default(DateTime) ? "—" : Tz.Format(lastChecked))
             </span>
         </div>
         <div class="li-side">

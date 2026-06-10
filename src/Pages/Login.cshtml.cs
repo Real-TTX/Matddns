@@ -34,10 +34,11 @@ public class LoginModel : PageModel
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {
-        var stored = _config.Read(c => (c.Auth.Username, c.Auth.PasswordHash));
-        if (Username == stored.Username && _auth.Verify(Password, stored.PasswordHash))
+        var user = _config.Read(c => c.Users.FirstOrDefault(u =>
+            u.Username.Equals(Username, StringComparison.OrdinalIgnoreCase)));
+        if (user != null && _auth.Verify(Password, user.PasswordHash))
         {
-            var claims = new[] { new Claim(ClaimTypes.Name, Username) };
+            var claims = new[] { new Claim(ClaimTypes.Name, user.Username) };
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,

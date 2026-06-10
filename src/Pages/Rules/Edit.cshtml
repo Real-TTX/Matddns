@@ -37,7 +37,7 @@ else
     {
         var cls = r.LastResult.StartsWith("ok", StringComparison.OrdinalIgnoreCase) ? "ok"
             : r.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase) ? "err" : "warn";
-        <div class="muted-small" style="margin-bottom:12px;">Last run @(r.LastRun?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—") UTC · <span class="badge @cls">@r.LastResult</span></div>
+        <div class="muted-small" style="margin-bottom:12px;">Last run @Tz.Format(r.LastRun) (@Tz.Label()) · <span class="badge @cls">@r.LastResult</span></div>
     }
 
     <div class="card">

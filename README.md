@@ -33,7 +33,12 @@ services:
 UI language: English.
 
 ## Data model
-- **Sources** - group = a connection. Kinds: **Public IP** (container's own IP, single entry), **Unifi** (auto-creates one entry per WAN; display name + IP read from the UDM), **Static IP** (fixed value, e.g. a known server or fallback).
+- **Sources** - group = a connection. Kinds: **Public IP** (container's own IP, single entry), **Unifi** (auto-creates one entry per WAN; display name + IP read from the UDM), **Static IP** (fixed value, e.g. a known server or fallback), **Push / DynDNS receiver** (an external device/router pushes its IP to a token-protected URL — Matddns acts as a DynDNS server and rules forward it to the real targets).
+
+## DynDNS receiver endpoints (token-protected, no login)
+A "Push" source exposes update URLs (shown on its page):
+- Simple: `GET /api/update?token=<token>&ip=<ip>` (omit `ip` to use the caller IP). Returns `good <ip>` / `nochg <ip>`.
+- dyndns2 (routers / FRITZ!Box): `GET /nic/update?hostname=...&myip=<ip>` with HTTP Basic auth, password = the token. Returns `good`/`nochg`/`badauth`.
 - **Domains** - group = account (DynDNS credentials or Netcup API). Each entry is a record: full FQDN + type (A / AAAA / CNAME); for Netcup as subdomain/record + zone. DynDNS offers provider presets (DuckDNS, No-IP, Dynu, DynDNS.org, Strato, deSEC) that prefill the update URL.
 - **Rules** - verbinden 1 Record mit einer geordneten Liste von Source-Eintraegen (Failover). Der Record-Typ kommt vom Ziel-Eintrag.
   - Trigger: **Bei IP-Aenderung** (nur schreiben wenn sich die Quell-IP aendert) oder **festes Intervall**.

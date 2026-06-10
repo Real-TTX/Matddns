@@ -20,6 +20,7 @@ public class EditModel : PageModel
 
     public SourceGroup? Group { get; private set; }
     public bool IsNew => Group == null;
+    public string BaseUrl { get; private set; } = "";
 
     [TempData] public string? Notice { get; set; }
     [TempData] public string? Error { get; set; }
@@ -28,6 +29,7 @@ public class EditModel : PageModel
 
     public IActionResult OnGet(string? id)
     {
+        BaseUrl = $"{Request.Scheme}://{Request.Host}";
         if (!string.IsNullOrEmpty(id))
         {
             Group = _config.Read(c => c.Sources.FirstOrDefault(g => g.Id == id));
@@ -71,15 +73,34 @@ public class EditModel : PageModel
                 LastChecked = DateTime.UtcNow
             });
         }
+        else if (Kind == SourceKind.Push)
+        {
+            g.Push = new PushSettings { Token = PushReceiver.NewToken() };
+            g.Entries.Add(new SourceEntry { Label = "Pushed IP" });
+        }
         else
         {
             g.Entries.Add(new SourceEntry { Label = "Public IP" });
         }
         _config.Mutate(c => c.Sources.Add(g));
-        Notice = Kind == SourceKind.Unifi
-            ? "Created – use \"Test connection\"; the WAN entries appear automatically on first fetch."
-            : "Created.";
+        Notice = Kind switch
+        {
+            SourceKind.Unifi => "Created – use \"Test connection\"; the WAN entries appear automatically on first fetch.",
+            SourceKind.Push => "Created – configure the update URL shown below in your device/router.",
+            _ => "Created."
+        };
         return RedirectToPage("Edit", new { id = g.Id });
+    }
+
+    public IActionResult OnPostRegenerateToken(string Id)
+    {
+        _config.Mutate(c =>
+        {
+            var g = c.Sources.FirstOrDefault(x => x.Id == Id);
+            if (g?.Push != null) g.Push.Token = PushReceiver.NewToken();
+        });
+        Notice = "New token generated – update your device.";
+        return RedirectToPage("Edit", new { id = Id });
     }
 
     public IActionResult OnPostSave(string Id, string Name, int IntervalSeconds,

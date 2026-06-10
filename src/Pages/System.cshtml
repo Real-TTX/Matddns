@@ -8,65 +8,152 @@
 <div class="page-header">
     <div>
         <h1>System</h1>
-        <p>Logging behaviour: minimum level and automatic retention.</p>
+        <p>Logging, time zone, users and the monitoring API.</p>
     </div>
 </div>
 
 @if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
 
-<div class="card">
-    <form method="post">
-        <div class="form-grid">
-            <div class="field">
-                <label>Log level (minimum)</label>
-                <select name="MinLogLevel">
-                    <option value="Debug" selected="@(lvl == Matddns.Services.LogLevel.Debug)">Debug – everything, incl. checks/polling</option>
-                    <option value="Info" selected="@(lvl == Matddns.Services.LogLevel.Info)">Info – normal operation (default)</option>
-                    <option value="Update" selected="@(lvl == Matddns.Services.LogLevel.Update)">Update – only DNS changes & problems</option>
-                    <option value="Warn" selected="@(lvl == Matddns.Services.LogLevel.Warn)">Warn – only warnings & errors</option>
-                    <option value="Error" selected="@(lvl == Matddns.Services.LogLevel.Error)">Error – only errors</option>
-                </select>
-                <div class="hint">Anything below is not recorded at all. Reachability checks & WAN polling are on <span class="mono">Debug</span>.</div>
-            </div>
-
-            <div class="field">
-                <label>Retention (days)</label>
-                <input type="number" name="LogRetentionDays" value="@Model.RetentionDays" min="0" max="3650" />
-                <div class="hint">Entries older than X days are removed automatically (hourly). <span class="mono">0</span> = unlimited.</div>
-            </div>
-        </div>
-
-        <div class="actions">
-            <button type="submit">Save</button>
-            <button type="submit" class="danger" asp-page-handler="Clear" onclick="return confirm('Clear the entire log now?');">Clear log</button>
-        </div>
-    </form>
+<div class="tabs">
+    <button type="button" class="tab" data-tab="general">General</button>
+    <button type="button" class="tab" data-tab="users">Users</button>
+    <button type="button" class="tab" data-tab="api">API</button>
 </div>
 
-<div class="muted-small" style="margin-top:12px;">
-    Current log file <span class="mono">/data/log.txt</span>: @(string.Format("{0:N0}", Model.LogFileBytes / 1024)) KB
+<div class="tab-panel" id="tab-general">
+    <div class="card">
+        <form method="post">
+            <div class="form-grid">
+                <div class="field">
+                    <label>Log level (minimum)</label>
+                    <select name="MinLogLevel">
+                        <option value="Debug" selected="@(lvl == Matddns.Services.LogLevel.Debug)">Debug – everything, incl. checks/polling</option>
+                        <option value="Info" selected="@(lvl == Matddns.Services.LogLevel.Info)">Info – normal operation (default)</option>
+                        <option value="Update" selected="@(lvl == Matddns.Services.LogLevel.Update)">Update – only DNS changes & problems</option>
+                        <option value="Warn" selected="@(lvl == Matddns.Services.LogLevel.Warn)">Warn – only warnings & errors</option>
+                        <option value="Error" selected="@(lvl == Matddns.Services.LogLevel.Error)">Error – only errors</option>
+                    </select>
+                    <div class="hint">Anything below is not recorded at all. Reachability checks & WAN polling are on <span class="mono">Debug</span>.</div>
+                </div>
+
+                <div class="field">
+                    <label>Retention (days)</label>
+                    <input type="number" name="LogRetentionDays" value="@Model.RetentionDays" min="0" max="3650" />
+                    <div class="hint">Entries older than X days are removed automatically (hourly). <span class="mono">0</span> = unlimited.</div>
+                </div>
+
+                <div class="field full">
+                    <label>Time zone</label>
+                    <select name="TimeZone">
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.CurrentTimeZone))">UTC (default)</option>
+                        @foreach (var z in Model.Zones)
+                        {
+                            <option value="@z.Id" selected="@(z.Id == Model.CurrentTimeZone)">@z.Id</option>
+                        }
+                    </select>
+                    <div class="hint">Applies to all dates/times in the UI (dashboard, lists, sources, rules). The <a href="/Log">Log</a> always stays UTC.</div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button type="submit">Save</button>
+                <button type="submit" class="danger" asp-page-handler="Clear" onclick="return confirm('Clear the entire log now?');">Clear log</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="muted-small" style="margin-top:12px;">
+        Current log file <span class="mono">/data/log.txt</span>: @(string.Format("{0:N0}", Model.LogFileBytes / 1024)) KB
+    </div>
 </div>
 
-<div class="section-title"><h2>Monitoring API</h2></div>
-<div class="card">
-    <p class="muted-small" style="margin-top:0;">Public JSON endpoints for monitoring software (Uptime Kuma, Zabbix, …) — <strong>no authentication required</strong>. They never expose passwords or API keys.</p>
-    <table>
-        <thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead>
-        <tbody>
-            <tr><td class="mono">GET /healthz</td><td>Liveness — returns <span class="mono">ok</span> (200) while the app runs.</td></tr>
-            <tr><td class="mono">GET /api/health</td><td>Health summary. HTTP <span class="mono">200</span> when everything is OK, <span class="mono">503</span> when degraded — plus JSON with source/rule counts and IP‑change stats.</td></tr>
-            <tr><td class="mono">GET /api/state</td><td>Full state as JSON: per‑source IPs, per‑rule status and recent IP changes.</td></tr>
-        </tbody>
-    </table>
-    <div class="hint" style="margin-top:10px;">Example: <span class="mono">curl http://&lt;host&gt;:4060/api/health</span> — point your monitor at <span class="mono">/api/health</span> and alert on a non‑200 status.</div>
-    <details style="margin-top:10px;">
-        <summary class="muted-small" style="cursor:pointer;">Example <span class="mono">/api/health</span> response</summary>
-        <pre class="code-block">{
+<div class="tab-panel" id="tab-users" hidden>
+    <div class="card">
+        <table>
+            <thead><tr><th>Username</th><th>Set new password</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var u in Model.Users)
+            {
+                <tr>
+                    <td>
+                        <span class="mono">@u</span>
+                        @if (string.Equals(u, User.Identity?.Name, StringComparison.OrdinalIgnoreCase)) { <span class="muted-small">(you)</span> }
+                    </td>
+                    <td>
+                        <form method="post" asp-page-handler="SetPassword" style="display:flex; gap:6px; margin:0; max-width:360px;">
+                            <input type="hidden" name="Username" value="@u" />
+                            <input type="password" name="Password" placeholder="new password" required autocomplete="new-password" style="flex:1;" />
+                            <button type="submit" class="ghost">Update</button>
+                        </form>
+                    </td>
+                    <td style="text-align:right">
+                        @if (Model.Users.Count > 1)
+                        {
+                            <form method="post" asp-page-handler="DeleteUser" style="display:inline">
+                                <input type="hidden" name="Username" value="@u" />
+                                <button type="submit" class="danger" onclick="return confirm('Remove user @u?');">Remove</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+
+        <form method="post" asp-page-handler="AddUser" class="form-grid" style="margin-top:16px;">
+            <div class="field">
+                <label>New username</label>
+                <input type="text" name="NewUsername" required autocomplete="off" />
+            </div>
+            <div class="field">
+                <label>Password</label>
+                <input type="password" name="NewPassword" required autocomplete="new-password" />
+            </div>
+            <div class="field full">
+                <button type="submit">+ Add user</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="tab-panel" id="tab-api" hidden>
+    <div class="card">
+        <p class="muted-small" style="margin-top:0;">Public JSON endpoints for monitoring software (Uptime Kuma, Zabbix, …) — <strong>no authentication required</strong>. They never expose passwords or API keys.</p>
+        <table>
+            <thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead>
+            <tbody>
+                <tr><td class="mono">GET /healthz</td><td>Liveness — returns <span class="mono">ok</span> (200) while the app runs.</td></tr>
+                <tr><td class="mono">GET /api/health</td><td>Health summary. HTTP <span class="mono">200</span> when everything is OK, <span class="mono">503</span> when degraded — plus JSON with source/rule counts and IP‑change stats.</td></tr>
+                <tr><td class="mono">GET /api/state</td><td>Full state as JSON: per‑source IPs, per‑rule status and recent IP changes.</td></tr>
+                <tr><td class="mono">GET /api/update<br />GET /nic/update</td><td>DynDNS <strong>receiver</strong> — external devices/routers push their IP into a “Push” source. The exact token‑protected URL is shown on that source's page (Sources → a Push source).</td></tr>
+            </tbody>
+        </table>
+        <div class="hint" style="margin-top:10px;">Example: <span class="mono">curl http://&lt;host&gt;:4060/api/health</span> — point your monitor at <span class="mono">/api/health</span> and alert on a non‑200 status.</div>
+        <details style="margin-top:10px;">
+            <summary class="muted-small" style="cursor:pointer;">Example <span class="mono">/api/health</span> response</summary>
+            <pre class="code-block">{
   "status": "ok",
   "sources": { "total": 2, "entries": 3, "ok": 3, "errors": 0 },
   "rules":   { "total": 2, "ok": 2, "issues": 0, "disabled": 0 },
   "ipChanges": { "total": 12, "last24h": 1, "last7d": 4, "lastChange": "2026-06-09T23:24:00Z" },
   "time": "2026-06-10T08:00:00Z"
 }</pre>
-    </details>
+        </details>
+    </div>
 </div>
+
+<script>
+    (function () {
+        var tabs = document.querySelectorAll('.tabs .tab');
+        var panels = document.querySelectorAll('.tab-panel');
+        function show(name) {
+            tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
+            panels.forEach(function (p) { p.hidden = (p.id !== 'tab-' + name); });
+            try { sessionStorage.setItem('systemTab', name); } catch (e) { }
+        }
+        tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
+        var saved = null;
+        try { saved = sessionStorage.getItem('systemTab'); } catch (e) { }
+        show(saved || 'general');
+    })();
+</script>

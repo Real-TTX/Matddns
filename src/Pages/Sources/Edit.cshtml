@@ -45,11 +45,12 @@
                         <option value="PublicIp">Public IP (of the container)</option>
                         <option value="Unifi">Unifi (UDM / UGW)</option>
                         <option value="Static">Static IP (fixed value)</option>
+                        <option value="Push">DynDNS receiver (push)</option>
                     </select>
                 }
                 else
                 {
-                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi (UDM / UGW)", SourceKind.Static => "Static IP (fixed value)", _ => "Public IP (of the container)" };
+                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi (UDM / UGW)", SourceKind.Static => "Static IP (fixed value)", SourceKind.Push => "DynDNS receiver (push)", _ => "Public IP (of the container)" };
                     <input type="text" value="@typeLabel" disabled />
                     <div class="hint">Type cannot be changed after creation.</div>
                 }
@@ -107,17 +108,53 @@
             </div>
         </div>
 
+        <!-- Push / DynDNS receiver fields -->
+        <div class="type-fields @(kind == SourceKind.Push ? "active" : "")" data-kind="Push">
+            @if (isNew)
+            {
+                <p class="muted" style="margin-top:16px;">A secret token and update URL are generated after creating. Point your router/device/script at it; rules then propagate the pushed IP to your DNS targets.</p>
+            }
+            else
+            {
+                var baseUrl = Model.BaseUrl;
+                var token = g!.Push?.Token ?? "";
+                <div class="form-grid" style="margin-top:16px;">
+                    <div class="field full">
+                        <label>Update URL (simple)</label>
+                        <input type="text" value="@($"{baseUrl}/api/update?token={token}&ip=<your-ip>")" readonly onclick="this.select()" />
+                        <div class="hint">Call this from your device. Drop <span class="mono">&amp;ip=…</span> to use the caller's IP. Set the host so it's reachable from your device (not localhost).</div>
+                    </div>
+                    <div class="field full">
+                        <label>dyndns2 (routers / FRITZ!Box)</label>
+                        <input type="text" value="@($"{baseUrl}/nic/update?hostname=matddns&myip=<ipaddr>")" readonly onclick="this.select()" />
+                        <div class="hint">Use this as the update URL; username = anything; password = the token below.</div>
+                    </div>
+                    <div class="field full">
+                        <label>Token (password)</label>
+                        <input type="text" value="@token" readonly onclick="this.select()" />
+                    </div>
+                </div>
+            }
+        </div>
+
         <div class="actions">
             <button type="submit">@(isNew ? "Create" : "Save")</button>
             <a class="button ghost" href="/Sources">Cancel</a>
             @if (!isNew)
             {
-                @if (kind != SourceKind.Static)
+                @if (kind == SourceKind.Unifi || kind == SourceKind.PublicIp)
                 {
                     <button type="submit" class="ghost" asp-page-handler="Test" name="Id" value="@g!.Id">Test connection</button>
                 }
-                <button type="submit" class="ghost" asp-page-handler="Refresh" name="Id" value="@g!.Id">Check now</button>
-                <button type="submit" class="danger" asp-page-handler="Delete" name="Id" value="@g.Id" onclick="return confirm('Remove group and all entries?');">Delete group</button>
+                @if (kind != SourceKind.Push)
+                {
+                    <button type="submit" class="ghost" asp-page-handler="Refresh" name="Id" value="@g!.Id">Check now</button>
+                }
+                @if (kind == SourceKind.Push)
+                {
+                    <button type="submit" class="ghost" asp-page-handler="RegenerateToken" name="Id" value="@g!.Id">Regenerate token</button>
+                }
+                <button type="submit" class="danger" asp-page-handler="Delete" name="Id" value="@g!.Id" onclick="return confirm('Remove group and all entries?');">Delete group</button>
             }
         </div>
     </form>
@@ -146,7 +183,7 @@
                     <td>@e.Label</td>
                     <td class="mono">@(e.InterfaceName ?? "—")</td>
                     <td class="mono">@(e.CurrentIp ?? "—")</td>
-                    <td><span class="muted-small">@(e.LastChecked?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—") UTC</span></td>
+                    <td><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
                     <td><span class="status-pill"><span class="status-dot @status"></span>@(e.LastError ?? (string.IsNullOrEmpty(e.CurrentIp) ? "pending" : "ok"))</span></td>
                     @if (kind == SourceKind.Unifi)
                     {

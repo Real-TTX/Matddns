@@ -8,7 +8,7 @@
 <div class="page-header">
     <div>
         <h1>Dashboard</h1>
-        <p>Overview of sources, rules and recent IP changes.</p>
+        <p>Overview of sources, rules and recent IP changes. <span class="muted-small">All times in @Tz.Label().</span></p>
     </div>
     <form method="get"><button type="submit" class="ghost">Refresh</button></form>
 </div>
@@ -52,7 +52,7 @@
                     <td>@src.Name <span class="muted-small">(@src.Kind)</span></td>
                     <td>@e.Label</td>
                     <td class="mono">@(e.Ip ?? "—")</td>
-                    <td><span class="muted-small">@(e.LastChecked?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—")</span></td>
+                    <td><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
                     <td><span class="status-pill"><span class="status-dot @st"></span>@(e.Error ?? (string.IsNullOrEmpty(e.Ip) ? "pending" : "ok"))</span></td>
                 </tr>
             }
@@ -77,7 +77,7 @@
                 <td><span class="badge info">@r.Type</span> <span class="mono">@r.Target</span></td>
                 <td class="muted-small">@(r.Group ?? "—")</td>
                 <td class="mono">@(r.LastValue ?? "—")</td>
-                <td><span class="muted-small">@(r.LastChange?.ToString("yyyy-MM-dd HH:mm") ?? "—")</span></td>
+                <td><span class="muted-small">@Tz.Format(r.LastChange, "yyyy-MM-dd HH:mm")</span></td>
                 <td><span class="status-pill"><span class="status-dot @st"></span>@(!r.Enabled ? "disabled" : (r.LastResult ?? "pending"))</span></td>
             </tr>
         }
@@ -92,12 +92,12 @@
 <div class="section-title"><h2>Recent IP changes</h2><a class="muted-small" href="/Log?Level=Update">full log →</a></div>
 <div class="card">
     <table>
-        <thead><tr><th>Time (UTC)</th><th>Target</th><th>Detail</th></tr></thead>
+        <thead><tr><th>Time</th><th>Target</th><th>Detail</th></tr></thead>
         <tbody>
         @foreach (var c in s.IpChanges.Recent)
         {
             <tr>
-                <td class="mono">@c.Time.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                <td class="mono">@Tz.Format(c.Time)</td>
                 <td class="mono">@c.Target</td>
                 <td class="muted-small">@c.Detail</td>
             </tr>
