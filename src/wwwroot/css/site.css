@@ -578,14 +578,17 @@ a.list-item:hover {
 }
 
 .appfooter {
-    display: flex;
-    justify-content: center;
     padding: 24px 16px 30px;
+    text-align: center;
 }
 
 .appfooter .build-chip {
-    display: inline-flex;
+    display: flex;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 auto;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     border: 1px solid var(--border);
     background: var(--panel);
