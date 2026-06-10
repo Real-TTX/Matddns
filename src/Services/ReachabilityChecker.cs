@@ -4,7 +4,7 @@ using Matddns.Models;
 
 namespace Matddns.Services;
 
-/// <summary>Prüft die Erreichbarkeit einer Quell-IP für Failover-Validierung (Ping / offener TCP-Port).</summary>
+/// <summary>Checks reachability of a source IP for failover validation (ping / open TCP port).</summary>
 public class ReachabilityChecker
 {
     private const int TimeoutMs = 2500;

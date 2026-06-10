@@ -43,7 +43,7 @@ public class SystemModel : PageModel
     public IActionResult OnPostClear()
     {
         _log.Clear();
-        Notice = "Log geleert";
+        Notice = "Log cleared";
         return RedirectToPage();
     }
 }

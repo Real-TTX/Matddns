@@ -3,16 +3,16 @@
 @{
     var g = Model.Group;
     var isNew = Model.IsNew;
-    ViewData["Title"] = (isNew ? "Neue Domain‑Gruppe" : g!.Name) + " – Matddns";
+    ViewData["Title"] = (isNew ? "New domain group" : g!.Name) + " – Matddns";
     var kind = g?.Kind ?? DomainKind.DynDns;
 }
 
-<a class="back-link" href="/Domains">‹ zurück zu Domains</a>
+<a class="back-link" href="/Domains">‹ back to Domains</a>
 
 <div class="page-header">
     <div>
-        <h1>@(isNew ? "Neue Domain‑Gruppe" : g!.Name)</h1>
-        <p>@(isNew ? "Typ wählen – die passenden Felder erscheinen automatisch." : "Zugangsdaten und Hostnames dieser Gruppe.")</p>
+        <h1>@(isNew ? "New domain group" : g!.Name)</h1>
+        <p>@(isNew ? "Pick a type – the matching fields appear automatically." : "Credentials and records of this group.")</p>
     </div>
 </div>
 
@@ -26,69 +26,82 @@
         <div class="form-grid">
             <div class="field full">
                 <label>Name</label>
-                <input type="text" name="Name" value="@(g?.Name ?? "")" required placeholder="z.B. Netcup Hauptaccount" />
+                <input type="text" name="Name" value="@(g?.Name ?? "")" required placeholder="e.g. Netcup main account" />
             </div>
 
             <div class="field full">
-                <label>Typ</label>
+                <label>Type</label>
                 @if (isNew)
                 {
                     <select name="Kind" id="kindSelect">
-                        <option value="DynDns">DynDNS (Update‑URL)</option>
+                        <option value="DynDns">DynDNS (update URL)</option>
                         <option value="Netcup">Netcup DNS API</option>
                     </select>
                 }
                 else
                 {
-                    <input type="text" value="@(kind == DomainKind.Netcup ? "Netcup DNS API" : "DynDNS (Update‑URL)")" disabled />
-                    <div class="hint">Typ kann nach dem Anlegen nicht geändert werden.</div>
+                    <input type="text" value="@(kind == DomainKind.Netcup ? "Netcup DNS API" : "DynDNS (update URL)")" disabled />
+                    <div class="hint">Type cannot be changed after creation.</div>
                 }
             </div>
         </div>
 
-        <!-- DynDNS Felder -->
+        <!-- DynDNS fields -->
         <div class="type-fields @(kind == DomainKind.DynDns ? "active" : "")" data-kind="DynDns">
             <div class="form-grid" style="margin-top:16px;">
                 <div class="field full">
-                    <label>Update‑URL</label>
-                    <input type="text" name="DynUrl" value="@(g?.DynDns?.UpdateUrl ?? "")" placeholder="https://members.dyndns.org/v3/update?hostname={hostname}&myip={ip}" />
-                    <div class="hint">Platzhalter: {hostname}, {ip}, {user}, {password}</div>
+                    <label>Provider preset</label>
+                    <select id="dynProvider">
+                        <option value="">Custom / manual</option>
+                        <option value="duckdns">DuckDNS</option>
+                        <option value="noip">No-IP</option>
+                        <option value="dynu">Dynu</option>
+                        <option value="dyndns">DynDNS.org</option>
+                        <option value="strato">Strato</option>
+                        <option value="desec">deSEC</option>
+                    </select>
+                    <div class="hint">Fills the update URL below. Adjust if your provider differs.</div>
+                </div>
+                <div class="field full">
+                    <label>Update URL</label>
+                    <input type="text" id="dynUrlInput" name="DynUrl" value="@(g?.DynDns?.UpdateUrl ?? "")" placeholder="https://members.dyndns.org/v3/update?hostname={hostname}&myip={ip}" />
+                    <div class="hint">Placeholders: {hostname}, {ip}, {user}, {password}</div>
                 </div>
                 <div class="field">
                     <label>Username</label>
                     <input type="text" name="DynUser" value="@(g?.DynDns?.Username ?? "")" autocomplete="off" />
                 </div>
                 <div class="field">
-                    <label>Password</label>
-                    <input type="password" name="DynPass" placeholder="@(isNew ? "" : "•••••• (leer = unverändert)")" autocomplete="new-password" />
+                    <label>Password / Token</label>
+                    <input type="password" name="DynPass" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
                 </div>
             </div>
         </div>
 
-        <!-- Netcup Felder -->
+        <!-- Netcup fields -->
         <div class="type-fields @(kind == DomainKind.Netcup ? "active" : "")" data-kind="Netcup">
             <div class="form-grid" style="margin-top:16px;">
                 <div class="field">
-                    <label>Customer Nr.</label>
+                    <label>Customer no.</label>
                     <input type="text" name="NcCustomer" value="@(g?.Netcup?.CustomerNumber ?? "")" />
                 </div>
                 <div class="field">
-                    <label>API Key</label>
+                    <label>API key</label>
                     <input type="text" name="NcKey" value="@(g?.Netcup?.ApiKey ?? "")" autocomplete="off" />
                 </div>
                 <div class="field full">
-                    <label>API Password</label>
-                    <input type="password" name="NcPass" placeholder="@(isNew ? "" : "•••••• (leer = unverändert)")" autocomplete="new-password" />
+                    <label>API password</label>
+                    <input type="password" name="NcPass" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
                 </div>
             </div>
         </div>
 
         <div class="actions">
-            <button type="submit">@(isNew ? "Anlegen" : "Speichern")</button>
-            <a class="button ghost" href="/Domains">Abbrechen</a>
+            <button type="submit">@(isNew ? "Create" : "Save")</button>
+            <a class="button ghost" href="/Domains">Cancel</a>
             @if (!isNew)
             {
-                <button type="submit" class="danger" asp-page-handler="Delete" name="Id" value="@g!.Id" onclick="return confirm('Gruppe inkl. Hostnames und zugehöriger Regeln löschen?');">Gruppe löschen</button>
+                <button type="submit" class="danger" asp-page-handler="Delete" name="Id" value="@g!.Id" onclick="return confirm('Delete group incl. records and related rules?');">Delete group</button>
             }
         </div>
     </form>
@@ -103,11 +116,11 @@
                 <tr>
                     @if (kind == DomainKind.Netcup)
                     {
-                        <th>Record (Host)</th>
+                        <th>Record (host)</th>
                         <th>Zone</th>
                     }
-                    <th>Voller Name</th>
-                    <th>Typ</th>
+                    <th>Full name</th>
+                    <th>Type</th>
                     <th></th>
                 </tr>
             </thead>
@@ -126,14 +139,14 @@
                         <form method="post" asp-page-handler="DeleteEntry" style="display:inline">
                             <input type="hidden" name="Id" value="@g.Id" />
                             <input type="hidden" name="EntryId" value="@e.Id" />
-                            <button type="submit" class="danger" onclick="return confirm('Record entfernen?');">Entfernen</button>
+                            <button type="submit" class="danger" onclick="return confirm('Remove record?');">Remove</button>
                         </form>
                     </td>
                 </tr>
             }
             @if (g.Entries.Count == 0)
             {
-                <tr><td colspan="@(kind == DomainKind.Netcup ? 5 : 3)" class="muted">Noch keine Records.</td></tr>
+                <tr><td colspan="@(kind == DomainKind.Netcup ? 5 : 3)" class="muted">No records yet.</td></tr>
             }
             </tbody>
         </table>
@@ -143,12 +156,12 @@
             @if (kind == DomainKind.Netcup)
             {
                 <div class="field">
-                    <label>Record / Subdomain</label>
-                    <input type="text" name="RecordName" placeholder="@@, www oder home1" />
-                    <div class="hint">@@ = Hauptdomain (Apex). Sonst der Host‑Teil, z.B. home1.</div>
+                    <label>Record / subdomain</label>
+                    <input type="text" name="RecordName" placeholder="@@, www or home1" />
+                    <div class="hint">@@ = root domain (apex). Otherwise the host part, e.g. home1.</div>
                 </div>
                 <div class="field">
-                    <label>Domain / Zone</label>
+                    <label>Domain / zone</label>
                     <input type="text" name="DomainZone" required placeholder="h5x.de" />
                 </div>
             }
@@ -160,7 +173,7 @@
                 </div>
             }
             <div class="field">
-                <label>Typ</label>
+                <label>Type</label>
                 <select name="Type">
                     <option value="A">A</option>
                     <option value="AAAA">AAAA</option>
@@ -168,25 +181,42 @@
                 </select>
             </div>
             <div class="field full">
-                <button type="submit">+ Record hinzufügen</button>
+                <button type="submit">+ Add record</button>
             </div>
         </form>
     </div>
 }
 
-@if (isNew)
-{
-    <script>
-        (function () {
-            var sel = document.getElementById('kindSelect');
-            var fields = document.querySelectorAll('.type-fields');
-            function sync() {
-                fields.forEach(function (f) {
-                    f.classList.toggle('active', f.getAttribute('data-kind') === sel.value);
-                });
-            }
-            sel.addEventListener('change', sync);
-            sync();
-        })();
-    </script>
-}
+<script>
+    // type toggle (only on new, where the kind select exists)
+    (function () {
+        var sel = document.getElementById('kindSelect');
+        if (!sel) return;
+        var fields = document.querySelectorAll('.type-fields');
+        function sync() {
+            fields.forEach(function (f) {
+                f.classList.toggle('active', f.getAttribute('data-kind') === sel.value);
+            });
+        }
+        sel.addEventListener('change', sync);
+        sync();
+    })();
+
+    // DynDNS provider presets -> fill update URL
+    (function () {
+        var prov = document.getElementById('dynProvider');
+        var url = document.getElementById('dynUrlInput');
+        if (!prov || !url) return;
+        var presets = {
+            duckdns: 'https://www.duckdns.org/update?domains={hostname}&token={password}&ip={ip}',
+            noip: 'https://dynupdate.no-ip.com/nic/update?hostname={hostname}&myip={ip}',
+            dynu: 'https://api.dynu.com/nic/update?hostname={hostname}&myip={ip}',
+            dyndns: 'https://members.dyndns.org/v3/update?hostname={hostname}&myip={ip}',
+            strato: 'https://dyndns.strato.com/nic/update?hostname={hostname}&myip={ip}',
+            desec: 'https://update.dedyn.io/?hostname={hostname}&myipv4={ip}'
+        };
+        prov.addEventListener('change', function () {
+            if (presets[prov.value]) url.value = presets[prov.value];
+        });
+    })();
+</script>

@@ -64,7 +64,7 @@ public class UnifiClient
             }
         }
 
-        // 2) networkconf: alle konfigurierten WANs mit Display-Name + Gruppe (inkl. LTE-Failover ohne Port).
+        // 2) networkconf: all configured WANs with display name + group (incl. LTE failover without a port).
         var result = new List<WanInfo>();
         try
         {
@@ -90,12 +90,12 @@ public class UnifiClient
         }
         catch { /* networkconf optional */ }
 
-        // 3) Fallback ohne networkconf: direkt aus den Live-Gruppen des Gateways.
+        // 3) Fallback without networkconf: directly from the gateway's live groups.
         if (result.Count == 0)
             foreach (var kv in liveByGroup)
                 result.Add(new WanInfo(kv.Key, kv.Value.Ip, kv.Value.Up, gwMac, kv.Value.Ifname, null));
 
-        // Reihenfolge: WAN, WAN2, … und LTE-Failover zuletzt.
+        // order: WAN, WAN2, … and LTE failover last.
         return result.OrderBy(GroupRank).ToList();
     }
 
@@ -112,18 +112,18 @@ public class UnifiClient
     {
         var s = (raw ?? "").Trim();
         if (string.IsNullOrEmpty(s))
-            throw new InvalidOperationException("Base URL ist leer — bitte z.B. https://10.10.0.1 eintragen.");
+            throw new InvalidOperationException("Base URL is empty — please enter e.g. https://10.10.0.1.");
         if (!s.Contains("://", StringComparison.Ordinal)) s = "https://" + s;
         s = s.TrimEnd('/');
         if (!Uri.TryCreate(s, UriKind.Absolute, out var uri) || (uri.Scheme != "http" && uri.Scheme != "https"))
-            throw new InvalidOperationException($"Base URL ungültig: '{raw}'. Erwartet z.B. https://10.10.0.1");
+            throw new InvalidOperationException($"Base URL invalid: '{raw}'. Expected e.g. https://10.10.0.1");
         return uri;
     }
 
     private static async Task<bool> LoginAsync(HttpClient http, UnifiSettings cfg, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(cfg.Username) || string.IsNullOrWhiteSpace(cfg.Password))
-            throw new InvalidOperationException("Username/Passwort fehlt für die Unifi-Anmeldung.");
+            throw new InvalidOperationException("Username/password missing for the Unifi login.");
 
         var body = new { username = cfg.Username, password = cfg.Password, remember = true };
 
@@ -148,7 +148,7 @@ public class UnifiClient
         }
         catch (Exception ex) { osBody = ex.Message; }
 
-        // 2) Legacy controller (Software / ältere Hardware)
+        // 2) Legacy controller (software / older hardware)
         System.Net.HttpStatusCode? legacyStatus = null;
         string legacyBody = "";
         try
@@ -162,16 +162,16 @@ public class UnifiClient
 
         var hint = (osStatus == System.Net.HttpStatusCode.Unauthorized || legacyStatus == System.Net.HttpStatusCode.Unauthorized
                     || osStatus == System.Net.HttpStatusCode.BadRequest)
-            ? " — Tipp: ein lokales UniFi-Konto verwenden (kein Ubiquiti-Cloud/SSO-Login) und 2FA für dieses Konto deaktivieren."
+            ? " — Tip: use a local UniFi account (no Ubiquiti cloud/SSO login) and disable 2FA for this account."
             : "";
 
         throw new InvalidOperationException(
-            $"Login fehlgeschlagen. UniFi-OS /api/auth/login: {Describe(osStatus, osBody)}; Legacy /api/login: {Describe(legacyStatus, legacyBody)}.{hint}");
+            $"Login failed. UniFi-OS /api/auth/login: {Describe(osStatus, osBody)}; Legacy /api/login: {Describe(legacyStatus, legacyBody)}.{hint}");
     }
 
     private static string Describe(System.Net.HttpStatusCode? status, string body)
     {
-        var s = status.HasValue ? $"{(int)status.Value} {status.Value}" : "keine Antwort";
+        var s = status.HasValue ? $"{(int)status.Value} {status.Value}" : "no response";
         body = (body ?? "").Replace('\n', ' ').Replace('\r', ' ').Trim();
         if (body.Length > 120) body = body[..120] + "…";
         return string.IsNullOrEmpty(body) ? s : $"{s} ({body})";

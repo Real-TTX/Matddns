@@ -3,7 +3,8 @@ namespace Matddns.Models;
 public enum SourceKind
 {
     PublicIp,
-    Unifi
+    Unifi,
+    Static
 }
 
 public class SourceGroup
@@ -13,7 +14,13 @@ public class SourceGroup
     public SourceKind Kind { get; set; } = SourceKind.PublicIp;
     public int IntervalSeconds { get; set; } = 60;
     public UnifiSettings? Unifi { get; set; }
+    public StaticSettings? Static { get; set; }
     public List<SourceEntry> Entries { get; set; } = new();
+}
+
+public class StaticSettings
+{
+    public string Ip { get; set; } = "";
 }
 
 public class UnifiSettings

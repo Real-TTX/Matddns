@@ -7,9 +7,9 @@
 <div class="page-header">
     <div>
         <h1>Domains</h1>
-        <p>Gruppen mit Zugangsdaten für DynDNS oder Netcup. Mehrere Hostnames pro Gruppe sparen API‑Last.</p>
+        <p>Groups holding credentials for DynDNS or Netcup. Multiple records per group reduce API load.</p>
     </div>
-    <a class="button" href="/Domains/Edit">+ Neue Domain‑Gruppe</a>
+    <a class="button" href="/Domains/Edit">+ New domain group</a>
 </div>
 
 @if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
@@ -18,8 +18,8 @@
 @if (Model.Groups.Count == 0)
 {
     <div class="empty-state">
-        Noch keine Domain‑Gruppen.<br />
-        <a class="button" style="margin-top:12px;" href="/Domains/Edit">Erste Gruppe anlegen</a>
+        No domain groups yet.<br />
+        <a class="button" style="margin-top:12px;" href="/Domains/Edit">Create the first group</a>
     </div>
 }
 

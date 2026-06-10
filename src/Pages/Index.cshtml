@@ -1,2 +1,111 @@
 @page
 @model IndexModel
+@{
+    ViewData["Title"] = "Dashboard – Matddns";
+    var s = Model.Snapshot;
+}
+
+<div class="page-header">
+    <div>
+        <h1>Dashboard</h1>
+        <p>Overview of sources, rules and recent IP changes.</p>
+    </div>
+    <form method="get"><button type="submit" class="ghost">Refresh</button></form>
+</div>
+
+<div class="status-banner @(s.Ok ? "ok" : "bad")">
+    <span class="status-dot @(s.Ok ? "ok" : "err")"></span>
+    <strong>@(s.Ok ? "All systems OK" : "Attention needed")</strong>
+    <span class="muted-small">@s.Sources.Errors source error(s) · @s.Rules.Issues rule issue(s)</span>
+</div>
+
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="stat-num">@s.Sources.Ok<span class="stat-den">/@s.Sources.Entries</span></div>
+        <div class="stat-label">Source IPs OK</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-num">@s.Rules.Ok<span class="stat-den">/@s.Rules.Total</span></div>
+        <div class="stat-label">Rules OK</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-num">@s.IpChanges.Last24h</div>
+        <div class="stat-label">IP changes (24h)</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-num">@s.IpChanges.Total</div>
+        <div class="stat-label">IP changes (total)</div>
+    </div>
+</div>
+
+<div class="section-title"><h2>Sources</h2><a class="muted-small" href="/Sources">manage →</a></div>
+<div class="card">
+    <table>
+        <thead><tr><th>Source</th><th>Entry</th><th>IP</th><th>Last check</th><th>Status</th></tr></thead>
+        <tbody>
+        @foreach (var src in s.SourceList)
+        {
+            @foreach (var e in src.Entries)
+            {
+                var st = e.Error != null ? "err" : (string.IsNullOrEmpty(e.Ip) ? "warn" : "ok");
+                <tr>
+                    <td>@src.Name <span class="muted-small">(@src.Kind)</span></td>
+                    <td>@e.Label</td>
+                    <td class="mono">@(e.Ip ?? "—")</td>
+                    <td><span class="muted-small">@(e.LastChecked?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—")</span></td>
+                    <td><span class="status-pill"><span class="status-dot @st"></span>@(e.Error ?? (string.IsNullOrEmpty(e.Ip) ? "pending" : "ok"))</span></td>
+                </tr>
+            }
+        }
+        @if (s.SourceList.Count == 0)
+        {
+            <tr><td colspan="5" class="muted">No sources configured. <a href="/Sources/Edit">Add one</a>.</td></tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<div class="section-title"><h2>Rules</h2><a class="muted-small" href="/Rules">manage →</a></div>
+<div class="card">
+    <table>
+        <thead><tr><th>Target</th><th>Group</th><th>Last set</th><th>When</th><th>Status</th></tr></thead>
+        <tbody>
+        @foreach (var r in s.RuleList)
+        {
+            var st = !r.Enabled ? "muted" : (r.Issue ? "err" : (r.Ok ? "ok" : "warn"));
+            <tr>
+                <td><span class="badge info">@r.Type</span> <span class="mono">@r.Target</span></td>
+                <td class="muted-small">@(r.Group ?? "—")</td>
+                <td class="mono">@(r.LastValue ?? "—")</td>
+                <td><span class="muted-small">@(r.LastChange?.ToString("yyyy-MM-dd HH:mm") ?? "—")</span></td>
+                <td><span class="status-pill"><span class="status-dot @st"></span>@(!r.Enabled ? "disabled" : (r.LastResult ?? "pending"))</span></td>
+            </tr>
+        }
+        @if (s.RuleList.Count == 0)
+        {
+            <tr><td colspan="5" class="muted">No rules configured. <a href="/Rules/Edit">Add one</a>.</td></tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<div class="section-title"><h2>Recent IP changes</h2><a class="muted-small" href="/Log?Level=Update">full log →</a></div>
+<div class="card">
+    <table>
+        <thead><tr><th>Time (UTC)</th><th>Target</th><th>Detail</th></tr></thead>
+        <tbody>
+        @foreach (var c in s.IpChanges.Recent)
+        {
+            <tr>
+                <td class="mono">@c.Time.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                <td class="mono">@c.Target</td>
+                <td class="muted-small">@c.Detail</td>
+            </tr>
+        }
+        @if (s.IpChanges.Recent.Count == 0)
+        {
+            <tr><td colspan="3" class="muted">No IP changes recorded yet.</td></tr>
+        }
+        </tbody>
+    </table>
+</div>

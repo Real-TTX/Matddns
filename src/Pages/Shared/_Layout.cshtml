@@ -1,25 +1,26 @@
 @{
     var path = Context.Request.Path.Value ?? "/";
     bool Starts(string p) => path.StartsWith(p, StringComparison.OrdinalIgnoreCase);
-    bool DomainsActive() => path == "/" || Starts("/Domains");
+    bool DomainsActive() => Starts("/Domains");
     var isLogin = Starts("/Login");
 }
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@(ViewData["Title"] ?? "Matddns")</title>
+    <link rel="icon" href="~/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="~/css/site.css" />
 </head>
 <body class="@(isLogin ? "login" : "app")">
     @if (!isLogin)
     {
         <header class="topbar">
-            <div class="brand">
+            <a class="brand" href="/" title="Dashboard">
                 <span class="logo">◈</span>
                 <span class="title">Matddns</span>
-            </div>
+            </a>
             <nav>
                 <a class="@(Starts("/Sources") ? "active" : "")" href="/Sources">Sources</a>
                 <a class="@(DomainsActive() ? "active" : "")" href="/Domains">Domains</a>

@@ -54,7 +54,7 @@ public class EditModel : PageModel
         if (!string.IsNullOrEmpty(id))
         {
             RuleItem = _config.Read(c => c.Rules.FirstOrDefault(r => r.Id == id));
-            if (RuleItem == null) { Error = "Regel nicht gefunden"; return RedirectToPage("Index"); }
+            if (RuleItem == null) { Error = "Rule not found"; return RedirectToPage("Index"); }
         }
         return Page();
     }
@@ -62,9 +62,9 @@ public class EditModel : PageModel
     public IActionResult OnPostCreate(RuleTrigger Trigger, int IntervalSeconds, string DomainEntryRef,
         RuleValidation Validation, int ValidationPort)
     {
-        if (string.IsNullOrWhiteSpace(DomainEntryRef)) { Error = "Domain erforderlich"; return RedirectToPage("Edit"); }
+        if (string.IsNullOrWhiteSpace(DomainEntryRef)) { Error = "Domain required"; return RedirectToPage("Edit"); }
         var parts = DomainEntryRef.Split(':', 2);
-        if (parts.Length != 2) { Error = "ungültige Auswahl"; return RedirectToPage("Edit"); }
+        if (parts.Length != 2) { Error = "Invalid selection"; return RedirectToPage("Edit"); }
 
         var rule = new Rule
         {
@@ -76,7 +76,7 @@ public class EditModel : PageModel
             DomainEntryId = parts[1]
         };
         _config.Mutate(c => c.Rules.Add(rule));
-        Notice = "Regel angelegt – jetzt Failover‑Quellen in Reihenfolge hinzufügen";
+        Notice = "Rule created – now add failover sources in order";
         return RedirectToPage("Edit", new { id = rule.Id });
     }
 
@@ -95,7 +95,7 @@ public class EditModel : PageModel
             if (ValidationPort is >= 1 and <= 65535) r.ValidationPort = ValidationPort;
             if (parts.Length == 2) { r.DomainGroupId = parts[0]; r.DomainEntryId = parts[1]; }
         });
-        Notice = "Gespeichert";
+        Notice = "Saved";
         return RedirectToPage("Edit", new { id = Id });
     }
 
@@ -109,14 +109,14 @@ public class EditModel : PageModel
             r.CnameTargets = (CnameTargets ?? Array.Empty<string>()).ToList();
             while (r.CnameTargets.Count < r.SourceEntryIdsInOrder.Count) r.CnameTargets.Add("");
         });
-        Notice = "Failover gespeichert";
+        Notice = "Failover saved";
         return RedirectToPage("Edit", new { id = Id });
     }
 
     public IActionResult OnPostDelete(string Id)
     {
         _config.Mutate(c => c.Rules.RemoveAll(r => r.Id == Id));
-        Notice = "Regel gelöscht";
+        Notice = "Rule deleted";
         return RedirectToPage("Index");
     }
 
@@ -132,7 +132,7 @@ public class EditModel : PageModel
                 r.CnameTargets.Add("");
             }
         });
-        Notice = "Quelle hinzugefügt";
+        Notice = "Source added";
         return RedirectToPage("Edit", new { id = Id });
     }
 
@@ -181,7 +181,7 @@ public class EditModel : PageModel
                 r.LastResult = null;
             }
         });
-        Notice = "Ausführung erzwungen";
+        Notice = "Run forced";
         return RedirectToPage("Edit", new { id = Id });
     }
 }

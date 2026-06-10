@@ -21,7 +21,7 @@ public class EditModel : PageModel
         if (!string.IsNullOrEmpty(id))
         {
             Group = _config.Read(c => c.Domains.FirstOrDefault(g => g.Id == id));
-            if (Group == null) { Error = "Gruppe nicht gefunden"; return RedirectToPage("Index"); }
+            if (Group == null) { Error = "Group not found"; return RedirectToPage("Index"); }
         }
         return Page();
     }
@@ -30,7 +30,7 @@ public class EditModel : PageModel
         string? DynUrl, string? DynUser, string? DynPass,
         string? NcCustomer, string? NcKey, string? NcPass)
     {
-        if (string.IsNullOrWhiteSpace(Name)) { Error = "Name fehlt"; return RedirectToPage("Edit"); }
+        if (string.IsNullOrWhiteSpace(Name)) { Error = "Name missing"; return RedirectToPage("Edit"); }
 
         var g = new DomainGroup { Name = Name.Trim(), Kind = Kind };
         if (Kind == DomainKind.DynDns)
@@ -39,7 +39,7 @@ public class EditModel : PageModel
             g.Netcup = new NetcupSettings { CustomerNumber = NcCustomer ?? "", ApiKey = NcKey ?? "", ApiPassword = NcPass ?? "" };
 
         _config.Mutate(c => c.Domains.Add(g));
-        Notice = "Gruppe angelegt – jetzt Hostnames hinzufügen";
+        Notice = "Group created – now add records";
         return RedirectToPage("Edit", new { id = g.Id });
     }
 
@@ -57,17 +57,17 @@ public class EditModel : PageModel
                 g.DynDns ??= new DynDnsSettings();
                 g.DynDns.UpdateUrl = DynUrl ?? "";
                 g.DynDns.Username = DynUser ?? "";
-                if (!string.IsNullOrEmpty(DynPass)) g.DynDns.Password = DynPass; // leer = unverändert
+                if (!string.IsNullOrEmpty(DynPass)) g.DynDns.Password = DynPass; // empty = unchanged
             }
             else
             {
                 g.Netcup ??= new NetcupSettings();
                 g.Netcup.CustomerNumber = NcCustomer ?? "";
                 g.Netcup.ApiKey = NcKey ?? "";
-                if (!string.IsNullOrEmpty(NcPass)) g.Netcup.ApiPassword = NcPass; // leer = unverändert
+                if (!string.IsNullOrEmpty(NcPass)) g.Netcup.ApiPassword = NcPass; // empty = unchanged
             }
         });
-        Notice = "Gespeichert";
+        Notice = "Saved";
         return RedirectToPage("Edit", new { id = Id });
     }
 
@@ -78,7 +78,7 @@ public class EditModel : PageModel
             c.Domains.RemoveAll(g => g.Id == Id);
             c.Rules.RemoveAll(r => r.DomainGroupId == Id);
         });
-        Notice = "Gruppe entfernt";
+        Notice = "Group removed";
         return RedirectToPage("Index");
     }
 
@@ -86,7 +86,7 @@ public class EditModel : PageModel
         string? Hostname, string? RecordName, string? DomainZone)
     {
         var kind = _config.Read(c => c.Domains.FirstOrDefault(x => x.Id == Id)?.Kind);
-        if (kind == null) { Error = "Gruppe nicht gefunden"; return RedirectToPage("Index"); }
+        if (kind == null) { Error = "Group not found"; return RedirectToPage("Index"); }
 
         string fqdn;
         string? rec = null;
@@ -96,14 +96,14 @@ public class EditModel : PageModel
         {
             zone = (DomainZone ?? "").Trim().TrimEnd('.');
             rec = string.IsNullOrWhiteSpace(RecordName) ? "@" : RecordName.Trim().TrimEnd('.');
-            if (string.IsNullOrEmpty(zone)) { Error = "Domain/Zone fehlt (z.B. h5x.de)"; return RedirectToPage("Edit", new { id = Id }); }
+            if (string.IsNullOrEmpty(zone)) { Error = "Domain/zone missing (e.g. h5x.de)"; return RedirectToPage("Edit", new { id = Id }); }
             fqdn = (rec is "@" or "*" or "") ? zone : $"{rec}.{zone}";
         }
         else
         {
             fqdn = (Hostname ?? "").Trim().TrimEnd('.');
-            if (string.IsNullOrEmpty(fqdn)) { Error = "Hostname (FQDN) fehlt"; return RedirectToPage("Edit", new { id = Id }); }
-            if (Type == DnsRecordType.CNAME) Type = DnsRecordType.A; // DynDNS kann kein CNAME setzen
+            if (string.IsNullOrEmpty(fqdn)) { Error = "Hostname (FQDN) missing"; return RedirectToPage("Edit", new { id = Id }); }
+            if (Type == DnsRecordType.CNAME) Type = DnsRecordType.A; // DynDNS cannot set CNAME
         }
 
         _config.Mutate(c =>
@@ -111,7 +111,7 @@ public class EditModel : PageModel
             var g = c.Domains.FirstOrDefault(x => x.Id == Id);
             g?.Entries.Add(new DomainEntry { Hostname = fqdn, Type = Type, RecordName = rec, Domain = zone });
         });
-        Notice = "Record hinzugefügt";
+        Notice = "Record added";
         return RedirectToPage("Edit", new { id = Id });
     }
 
@@ -123,7 +123,7 @@ public class EditModel : PageModel
             g?.Entries.RemoveAll(e => e.Id == EntryId);
             c.Rules.RemoveAll(r => r.DomainEntryId == EntryId);
         });
-        Notice = "Hostname entfernt";
+        Notice = "Record removed";
         return RedirectToPage("Edit", new { id = Id });
     }
 }

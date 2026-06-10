@@ -51,7 +51,11 @@ body.login {
     gap: 8px;
     font-weight: 600;
     font-size: 16px;
+    color: inherit;
+    text-decoration: none;
 }
+
+a.brand:hover .title { color: var(--accent); }
 
 .brand .logo {
     color: var(--accent);
@@ -166,7 +170,7 @@ input[type=text], input[type=password], input[type=number], input[type=url], sel
     transition: border-color 0.15s;
 }
 
-/* einheitliche Höhe für alle einzeiligen Felder (auch im .row/.col-Layout) */
+/* uniform height for all single-line fields (also in the .row/.col layout) */
 input[type=text], input[type=password], input[type=number], input[type=url], select {
     height: 38px;
     line-height: 1.2;
@@ -524,6 +528,60 @@ a.list-item:hover {
 .test-result.ok { border-color: rgba(46,160,67,0.4); }
 .test-result.err { border-color: rgba(248,81,73,0.4); }
 .test-result .mono { display: block; margin-top: 4px; }
+
+/* ---- dashboard ---- */
+.status-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--panel);
+    margin-bottom: 16px;
+}
+
+.status-banner strong { font-size: 16px; }
+.status-banner.ok { border-color: rgba(46, 160, 67, 0.45); background: rgba(46, 160, 67, 0.07); }
+.status-banner.bad { border-color: rgba(248, 81, 73, 0.45); background: rgba(248, 81, 73, 0.07); }
+.status-banner .status-dot { width: 12px; height: 12px; }
+.status-banner .muted-small { margin-left: auto; }
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 8px;
+}
+
+.stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+}
+
+.stat-num { font-size: 28px; font-weight: 700; line-height: 1.1; }
+.stat-num .stat-den { font-size: 18px; font-weight: 500; color: var(--muted); }
+.stat-label { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+
+.code-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 8px 0 0;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--text);
+}
+
+@@media (max-width: 700px) {
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .status-banner { flex-wrap: wrap; }
+    .status-banner .muted-small { margin-left: 0; flex-basis: 100%; }
+}
 
 @@media (max-width: 700px) {
     .topbar { padding: 0 12px; gap: 8px; }
