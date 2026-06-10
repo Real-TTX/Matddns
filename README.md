@@ -37,8 +37,8 @@ UI language: English.
 
 ## DynDNS receiver endpoints (token-protected, no login)
 A "Push" source exposes update URLs (shown on its page):
-- Simple: `GET /api/update?token=<token>&ipv4=<v4>&ipv6=<v6>` — send either or both; each value is stored under the matching A / AAAA source and the other family is left untouched. Omit both (or use legacy `&ip=`, auto-detected) to fall back to the caller IP. Returns `good <ips>` / `nochg <ips>`.
-- dyndns2 (routers / FRITZ!Box): `GET /nic/update?ipv4=<v4>&ipv6=<v6>` with HTTP Basic auth, password = the token. Returns `good`/`nochg`/`badauth`.
+- JSON API: `GET /api/update?token=<token>&ipv4=<v4>&ipv6=<v6>` — send either or both; each value is stored under the matching A / AAAA source and the other family is left untouched. Omit both (or use legacy `&ip=`, auto-detected) to fall back to the caller IP. Returns JSON with a proper HTTP status: `200 {"status":"ok","changed":true,"ipv4":"…","ipv6":"…","time":"…"}`, `400 {"status":"no-ip"}`, `401 {"status":"unauthorized"}`.
+- dyndns2 (routers / FRITZ!Box): `GET /nic/update?ipv4=<v4>&ipv6=<v6>` with HTTP Basic auth, password = the token. Keeps the plain-text dyndns2 protocol routers expect: `good`/`nochg`/`badauth`/`nohost`.
 - **Domains** - group = account (DynDNS credentials or Netcup API). Each entry is a record: full FQDN + type (A / AAAA / CNAME); for Netcup as subdomain/record + zone. DynDNS offers provider presets (DuckDNS, No-IP, Dynu, DynDNS.org, Strato, deSEC) that prefill the update URL.
 - **Rules** - link one record to an ordered list of source entries (failover). The record type comes from the target entry.
   - Trigger: **Bei IP-Aenderung** (nur schreiben wenn sich die Quell-IP aendert) oder **festes Intervall**.
