@@ -135,8 +135,8 @@
                     </div>
                     <div class="field full">
                         <label>dyndns2 (routers / FRITZ!Box)</label>
-                        <input type="text" value="@($"{baseUrl}/nic/update?myip=<ipaddr>&myipv6=<ip6addr>")" readonly onclick="this.select()" />
-                        <div class="hint">Update URL for routers; username = anything; password = the token below. <span class="mono">myip</span> = IPv4, <span class="mono">myipv6</span> = IPv6 (drop the one your router doesn't send). FRITZ!Box fills <span class="mono">&lt;ipaddr&gt;</span>/<span class="mono">&lt;ip6addr&gt;</span> itself.</div>
+                        <input type="text" value="@($"{baseUrl}/nic/update?ipv4=<ipaddr>&ipv6=<ip6addr>")" readonly onclick="this.select()" />
+                        <div class="hint">Update URL for routers; username = anything; password = the token below. <span class="mono">ipv4</span> = IPv4, <span class="mono">ipv6</span> = IPv6 (drop the one your router doesn't send). FRITZ!Box fills <span class="mono">&lt;ipaddr&gt;</span>/<span class="mono">&lt;ip6addr&gt;</span> itself.</div>
                     </div>
                     <div class="field full">
                         <label>Token (password)</label>

@@ -37,10 +37,10 @@ UI language: English.
 
 ## DynDNS receiver endpoints (token-protected, no login)
 A "Push" source exposes update URLs (shown on its page):
-- Simple: `GET /api/update?token=<token>&ip=<ip>` (omit `ip` to use the caller IP). Returns `good <ip>` / `nochg <ip>`.
-- dyndns2 (routers / FRITZ!Box): `GET /nic/update?hostname=...&myip=<ip>` with HTTP Basic auth, password = the token. Returns `good`/`nochg`/`badauth`.
+- Simple: `GET /api/update?token=<token>&ipv4=<v4>&ipv6=<v6>` — send either or both; each value is stored under the matching A / AAAA source and the other family is left untouched. Omit both (or use legacy `&ip=`, auto-detected) to fall back to the caller IP. Returns `good <ips>` / `nochg <ips>`.
+- dyndns2 (routers / FRITZ!Box): `GET /nic/update?ipv4=<v4>&ipv6=<v6>` with HTTP Basic auth, password = the token. Returns `good`/`nochg`/`badauth`.
 - **Domains** - group = account (DynDNS credentials or Netcup API). Each entry is a record: full FQDN + type (A / AAAA / CNAME); for Netcup as subdomain/record + zone. DynDNS offers provider presets (DuckDNS, No-IP, Dynu, DynDNS.org, Strato, deSEC) that prefill the update URL.
-- **Rules** - verbinden 1 Record mit einer geordneten Liste von Source-Eintraegen (Failover). Der Record-Typ kommt vom Ziel-Eintrag.
+- **Rules** - link one record to an ordered list of source entries (failover). The record type comes from the target entry.
   - Trigger: **Bei IP-Aenderung** (nur schreiben wenn sich die Quell-IP aendert) oder **festes Intervall**.
   - Failover-Validierung: **keine** (nur IP vorhanden), **Ping** oder **TCP-Port offen** - eine Quelle gilt nur als erreichbar, wenn der Check der Quell-IP besteht.
 
