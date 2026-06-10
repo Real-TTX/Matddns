@@ -30,6 +30,7 @@
     var dot = hasErr ? "err" : (hasIp ? "ok" : "warn");
     var lastChecked = g.Entries.Where(e => e.LastChecked != null).Select(e => e.LastChecked!.Value).DefaultIfEmpty().Max();
     var kindLabel = g.Kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static", SourceKind.Push => "Push", _ => "Public IP" };
+    var schedule = g.Kind == SourceKind.Push ? "Push-driven" : (g.IntervalSeconds > 0 ? $"Interval {g.IntervalSeconds}s" : "No polling");
     <a class="list-item" href="/Sources/Edit?id=@g.Id">
         <div class="li-main">
             <span class="li-title">@g.Name</span>
@@ -44,7 +45,7 @@
                 }
             </span>
             <span class="li-sub">
-                Interval @(g.IntervalSeconds)s · last update: @(lastChecked == default(DateTime) ? "—" : Tz.Format(lastChecked))
+                @schedule · last update: @(lastChecked == default(DateTime) ? "—" : Tz.Format(lastChecked))
             </span>
         </div>
         <div class="li-side">
