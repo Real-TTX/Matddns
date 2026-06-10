@@ -56,10 +56,13 @@
                 }
             </div>
 
-            <div class="field full">
-                <label>Interval (seconds)</label>
-                <input type="number" name="IntervalSeconds" value="@(g?.IntervalSeconds ?? 60)" min="15" />
-            </div>
+            @if (isNew || kind != SourceKind.Push)
+            {
+                <div class="field full" id="intervalField">
+                    <label>Interval (seconds)</label>
+                    <input type="number" name="IntervalSeconds" value="@(g?.IntervalSeconds ?? 60)" min="15" />
+                </div>
+            }
         </div>
 
         <!-- Unifi fields -->
@@ -139,6 +142,9 @@
                         <label>Token (password)</label>
                         <input type="text" value="@token" readonly onclick="this.select()" />
                     </div>
+                    <div class="field full">
+                        <div class="hint">Supports IPv4 <strong>and</strong> IPv6: call with an IPv4 address to set the A source, with an IPv6 address for AAAA (routers usually send them via separate update URLs). No interval – updates happen on push.</div>
+                    </div>
                 </div>
             }
         </div>
@@ -185,14 +191,15 @@
             <tbody>
             @foreach (var e in g!.Entries)
             {
-                var status = e.LastError == null ? (string.IsNullOrEmpty(e.CurrentIp) ? "warn" : "ok") : "err";
+                var noIp = string.IsNullOrEmpty(e.CurrentIp) && string.IsNullOrEmpty(e.CurrentIpv6);
+                var status = e.LastError == null ? (noIp ? "warn" : "ok") : "err";
                 <tr>
                     <td>@e.Label</td>
                     <td class="mono">@(e.InterfaceName ?? "—")</td>
                     <td class="mono">@(e.CurrentIp ?? "—")</td>
                     <td class="mono">@(e.CurrentIpv6 ?? "—")</td>
                     <td><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
-                    <td><span class="status-pill"><span class="status-dot @status"></span>@(e.LastError ?? (string.IsNullOrEmpty(e.CurrentIp) ? "pending" : "ok"))</span></td>
+                    <td><span class="status-pill"><span class="status-dot @status"></span>@(e.LastError ?? (noIp ? "pending" : "ok"))</span></td>
                     @if (kind == SourceKind.Unifi)
                     {
                         <td style="text-align:right">
@@ -210,21 +217,7 @@
 
         @if (kind == SourceKind.Unifi)
         {
-            <form method="post" asp-page-handler="AddEntry" class="form-grid" style="margin-top:16px;">
-                <input type="hidden" name="Id" value="@g.Id" />
-                <div class="field">
-                    <label>Label</label>
-                    <input type="text" name="Label" placeholder="LTE Failover" required />
-                </div>
-                <div class="field">
-                    <label>Interface</label>
-                    <input type="text" name="InterfaceName" placeholder="wan2 / www / wan" required />
-                    <div class="hint">Name from the UDM (e.g. wan, wan2, www).</div>
-                </div>
-                <div class="field full">
-                    <button type="submit">+ Add entry</button>
-                </div>
-            </form>
+            <div class="muted-small" style="margin-top:12px;">Entries are discovered automatically from the UDM – one per WAN. No manual entries.</div>
         }
     </div>
 }
@@ -235,10 +228,12 @@
         (function () {
             var sel = document.getElementById('kindSelect');
             var fields = document.querySelectorAll('.type-fields');
+            var interval = document.getElementById('intervalField');
             function sync() {
                 fields.forEach(function (f) {
                     f.classList.toggle('active', f.getAttribute('data-kind') === sel.value);
                 });
+                if (interval) interval.style.display = (sel.value === 'Push') ? 'none' : '';
             }
             sel.addEventListener('change', sync);
             sync();

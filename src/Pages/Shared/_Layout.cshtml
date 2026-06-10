@@ -35,7 +35,13 @@
         <main class="container">
             @RenderBody()
         </main>
-        <footer class="appfooter">Matddns @Matddns.Services.BuildInfo.Display</footer>
+        <footer class="appfooter">
+            <span class="build-chip">
+                <span class="logo">◈</span>
+                <span>Matddns</span>
+                <span class="mono">@Matddns.Services.BuildInfo.Display</span>
+            </span>
+        </footer>
     }
     else
     {
