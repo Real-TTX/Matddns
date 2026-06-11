@@ -52,7 +52,7 @@
                     <td class="mono">@(e.Ip ?? "—")</td>
                     <td class="mono hide-sm">@(e.Ipv6 ?? "—")</td>
                     <td class="hide-sm"><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
-                    <td><span class="status-pill"><span class="status-dot @st"></span>@(e.Error ?? (noIp ? "pending" : "ok"))</span></td>
+                    <td><span class="status-pill"><span class="status-dot @st"></span><span class="hide-sm">@(e.Error ?? (noIp ? "pending" : "ok"))</span></span></td>
                 </tr>
             }
         }
@@ -77,7 +77,7 @@
                 <td class="muted-small hide-sm">@(r.Group ?? "—")</td>
                 <td class="mono">@(r.LastValue ?? "—")</td>
                 <td class="hide-sm"><span class="muted-small">@Tz.Format(r.LastChange, "yyyy-MM-dd HH:mm")</span></td>
-                <td><span class="status-pill"><span class="status-dot @st"></span>@(!r.Enabled ? "disabled" : (r.Issue ? "issue" : (r.Ok ? "ok" : "pending")))</span></td>
+                <td><span class="status-pill"><span class="status-dot @st"></span><span class="hide-sm">@(!r.Enabled ? "disabled" : (r.Issue ? "issue" : (r.Ok ? "ok" : "pending")))</span></span></td>
             </tr>
         }
         @if (s.RuleList.Count == 0)

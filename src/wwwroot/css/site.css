@@ -787,6 +787,7 @@ table.dtable tbody.dt-group.clickable:hover { background: var(--panel-2); }
     .card { overflow-x: auto; }
     .hide-sm { display: none; }
     th, td { padding: 8px 8px; }
+    td.mono, .mono { font-size: 12px; }
 
     /* burger menu */
     .navtoggle { display: flex; }
