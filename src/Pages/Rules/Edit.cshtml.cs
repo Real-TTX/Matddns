@@ -59,7 +59,7 @@ public class EditModel : PageModel
         return Page();
     }
 
-    public IActionResult OnPostCreate(RuleTrigger Trigger, int IntervalSeconds, string DomainEntryRef,
+    public IActionResult OnPostCreate(bool OnChange, int IntervalSeconds, string DomainEntryRef,
         RuleValidation Validation, int ValidationPort)
     {
         if (string.IsNullOrWhiteSpace(DomainEntryRef)) { Error = "Domain required"; return RedirectToPage("Edit"); }
@@ -68,19 +68,20 @@ public class EditModel : PageModel
 
         var rule = new Rule
         {
-            Trigger = Trigger,
-            IntervalSeconds = IntervalSeconds < 30 ? 300 : IntervalSeconds,
+            OnChange = OnChange,
+            IntervalSeconds = IntervalSeconds <= 0 ? 0 : Math.Max(15, IntervalSeconds),
             Validation = Validation,
             ValidationPort = ValidationPort is < 1 or > 65535 ? 443 : ValidationPort,
             DomainGroupId = parts[0],
             DomainEntryId = parts[1]
         };
+        if (!rule.OnChange && rule.IntervalSeconds <= 0) rule.OnChange = true; // keep at least one trigger active
         _config.Mutate(c => c.Rules.Add(rule));
         Notice = "Rule created – now add failover sources in order";
         return RedirectToPage("Edit", new { id = rule.Id });
     }
 
-    public IActionResult OnPostSave(string Id, RuleTrigger Trigger, int IntervalSeconds, bool Enabled, string DomainEntryRef,
+    public IActionResult OnPostSave(string Id, bool OnChange, int IntervalSeconds, bool Enabled, string DomainEntryRef,
         RuleValidation Validation, int ValidationPort)
     {
         var parts = (DomainEntryRef ?? "").Split(':', 2);
@@ -88,9 +89,10 @@ public class EditModel : PageModel
         {
             var r = c.Rules.FirstOrDefault(x => x.Id == Id);
             if (r == null) return;
-            r.Trigger = Trigger;
+            r.OnChange = OnChange;
+            r.IntervalSeconds = IntervalSeconds <= 0 ? 0 : Math.Max(15, IntervalSeconds);
+            if (!r.OnChange && r.IntervalSeconds <= 0) r.OnChange = true; // keep at least one trigger active
             r.Enabled = Enabled;
-            if (IntervalSeconds >= 30) r.IntervalSeconds = IntervalSeconds;
             r.Validation = Validation;
             if (ValidationPort is >= 1 and <= 65535) r.ValidationPort = ValidationPort;
             if (parts.Length == 2) { r.DomainGroupId = parts[0]; r.DomainEntryId = parts[1]; }

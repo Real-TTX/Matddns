@@ -50,7 +50,13 @@ else
                         : (!string.IsNullOrEmpty(r.LastResult) && (r.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase) || r.LastResult == "no source" || r.LastResult == "target missing")) ? "issue"
                         : "pending";
                     var dot = statusKey switch { "ok" => "ok", "issue" => "err", "disabled" => "muted", _ => "warn" };
-                    var triggerText = r.Trigger == RuleTrigger.OnChange ? "on IP change" : $"every {r.IntervalSeconds}s";
+                    var triggerText = (r.OnChange, r.IntervalSeconds > 0) switch
+                    {
+                        (true, true) => $"on change · every {r.IntervalSeconds}s",
+                        (true, false) => "on change",
+                        (false, true) => $"every {r.IntervalSeconds}s",
+                        _ => "manual"
+                    };
                     var recordText = de != null ? de.Display : "(domain missing)";
                     var search = $"{recordText} {dg?.Name} {string.Join(' ', sources)} {r.LastValue} {statusKey}";
                     <tbody class="dt-group" data-search="@search" data-status="@statusKey" data-href="/Rules/Edit?id=@r.Id">

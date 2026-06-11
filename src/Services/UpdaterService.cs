@@ -168,7 +168,8 @@ public class UpdaterService : BackgroundService
         foreach (var rule in cfg.Rules)
         {
             if (!rule.Enabled) continue;
-            if (!RuleDue(rule, now)) continue;
+            var signature = SourceSignature(rule, cfg);
+            if (!RuleDue(rule, now, signature)) continue;
 
             try { await RunSingleRuleAsync(rule, cfg, ct); }
             catch (Exception ex)
@@ -180,7 +181,25 @@ public class UpdaterService : BackgroundService
                     if (r != null) { r.LastRun = DateTime.UtcNow; r.LastResult = "error: " + ex.Message; }
                 });
             }
+            // remember the source-IP snapshot we just evaluated, so OnChange fires only on the next real change
+            _config.Mutate(c =>
+            {
+                var r = c.Rules.FirstOrDefault(x => x.Id == rule.Id);
+                if (r != null) r.LastSourceSignature = signature;
+            });
         }
+    }
+
+    // Concatenated current IPs of the rule's sources; changes when any source IP changes.
+    private static string SourceSignature(Rule rule, AppConfig cfg)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var sid in rule.SourceEntryIdsInOrder)
+        {
+            var e = cfg.Sources.SelectMany(s => s.Entries).FirstOrDefault(x => x.Id == sid);
+            sb.Append(e?.CurrentIp ?? "-").Append('/').Append(e?.CurrentIpv6 ?? "-").Append(';');
+        }
+        return sb.ToString();
     }
 
     private async Task RunSingleRuleAsync(Rule rule, AppConfig cfg, CancellationToken ct)
@@ -325,16 +344,23 @@ public class UpdaterService : BackgroundService
         });
     }
 
-    private static bool RuleDue(Rule rule, DateTime now)
+    private static bool RuleDue(Rule rule, DateTime now, string signature)
     {
-        if (rule.LastRun == null) return true;
+        if (rule.LastRun == null) return true; // first evaluation after (re)start
         var age = (now - rule.LastRun.Value).TotalSeconds;
-        if (rule.Trigger == RuleTrigger.Interval)
-            return age >= rule.IntervalSeconds;
-        // OnChange: evaluate every loop (change detection happens in RunSingleRuleAsync);
-        // throttle briefly after an error so the DNS API isn't flooded on misconfiguration.
+
+        // back off briefly after an error so a misconfiguration doesn't flood the DNS API
         var lastErr = rule.LastResult != null && rule.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase);
-        return !lastErr || age >= 30;
+        if (lastErr && age < 30) return false;
+
+        // time-driven: periodic re-check — re-validates reachability, so a source going DOWN
+        // (without its IP changing) still triggers failover.
+        if (rule.IntervalSeconds > 0 && age >= rule.IntervalSeconds) return true;
+
+        // event-driven: a source IP changed since the last evaluation.
+        if (rule.OnChange && signature != (rule.LastSourceSignature ?? "")) return true;
+
+        return false;
     }
 
     private static string RuleDesc(Rule rule, AppConfig cfg)

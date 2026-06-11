@@ -47,7 +47,7 @@
                 var noIp = string.IsNullOrEmpty(e.Ip) && string.IsNullOrEmpty(e.Ipv6);
                 var st = e.Error != null ? "err" : (noIp ? "warn" : "ok");
                 <tr>
-                    <td>@src.Name <span class="muted-small">(@src.Kind)</span></td>
+                    <td>@src.Name <span class="muted-small">(@(src.Kind == "Push" ? "DynDNS Server" : src.Kind))</span></td>
                     <td>@e.Label</td>
                     <td class="mono">@(e.Ip ?? "—")</td>
                     <td class="mono">@(e.Ipv6 ?? "—")</td>

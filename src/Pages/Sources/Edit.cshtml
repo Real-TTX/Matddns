@@ -45,12 +45,12 @@
                         <option value="PublicIp">Public IP</option>
                         <option value="Unifi">Unifi</option>
                         <option value="Static">Static IP</option>
-                        <option value="Push">Push</option>
+                        <option value="Push">DynDNS Server</option>
                     </select>
                 }
                 else
                 {
-                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static IP", SourceKind.Push => "Push", _ => "Public IP" };
+                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static IP", SourceKind.Push => "DynDNS Server", _ => "Public IP" };
                     <input type="text" value="@typeLabel" disabled />
                     <div class="hint">Type cannot be changed after creation.</div>
                 }
