@@ -27,11 +27,11 @@
                 <div class="field">
                     <label>Log level (minimum)</label>
                     <select name="MinLogLevel">
-                        <option value="Debug" selected="@(lvl == Matddns.Services.LogLevel.Debug)">Debug – everything, incl. checks/polling</option>
-                        <option value="Info" selected="@(lvl == Matddns.Services.LogLevel.Info)">Info – normal operation (default)</option>
-                        <option value="Update" selected="@(lvl == Matddns.Services.LogLevel.Update)">Update – only DNS changes & problems</option>
-                        <option value="Warn" selected="@(lvl == Matddns.Services.LogLevel.Warn)">Warn – only warnings & errors</option>
-                        <option value="Error" selected="@(lvl == Matddns.Services.LogLevel.Error)">Error – only errors</option>
+                        <option value="Debug" selected="@(lvl == Matddns.Services.LogLevel.Debug)">Debug</option>
+                        <option value="Info" selected="@(lvl == Matddns.Services.LogLevel.Info)">Info</option>
+                        <option value="Update" selected="@(lvl == Matddns.Services.LogLevel.Update)">Update</option>
+                        <option value="Warn" selected="@(lvl == Matddns.Services.LogLevel.Warn)">Warn</option>
+                        <option value="Error" selected="@(lvl == Matddns.Services.LogLevel.Error)">Error</option>
                     </select>
                 </div>
 
@@ -43,7 +43,7 @@
                 <div class="field full">
                     <label>Time zone</label>
                     <select name="TimeZone">
-                        <option value="" selected="@(string.IsNullOrEmpty(Model.CurrentTimeZone))">UTC (default)</option>
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.CurrentTimeZone))">UTC</option>
                         @foreach (var z in Model.Zones)
                         {
                             <option value="@z.Id" selected="@(z.Id == Model.CurrentTimeZone)">@z.Id</option>
