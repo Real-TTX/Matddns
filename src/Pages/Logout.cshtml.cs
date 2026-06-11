@@ -10,7 +10,7 @@ public class LogoutModel : PageModel
     public async Task<IActionResult> OnGetAsync()
     {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return Redirect("/Login");
+        return Redirect("/"); // anon dashboard on -> shows it; off -> Index guard redirects to /Login
     }
 
     public Task<IActionResult> OnPostAsync() => OnGetAsync();
