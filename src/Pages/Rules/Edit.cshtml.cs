@@ -60,13 +60,12 @@ public class EditModel : PageModel
     }
 
     public IActionResult OnPostCreate(bool OnChange, int IntervalSeconds, string DomainEntryRef,
-        bool ValidatePing, bool ValidateTcp, int ValidationPort, string[]? SourceEntryIdsInOrder)
+        bool ValidatePing, bool ValidateTcp, int ValidationPort)
     {
         if (string.IsNullOrWhiteSpace(DomainEntryRef)) { Error = "Domain required"; return RedirectToPage("Edit"); }
         var parts = DomainEntryRef.Split(':', 2);
         if (parts.Length != 2) { Error = "Invalid selection"; return RedirectToPage("Edit"); }
 
-        var picked = (SourceEntryIdsInOrder ?? Array.Empty<string>()).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
         var rule = new Rule
         {
             OnChange = OnChange,
@@ -75,13 +74,11 @@ public class EditModel : PageModel
             ValidateTcp = ValidateTcp,
             ValidationPort = ValidationPort is < 1 or > 65535 ? 443 : ValidationPort,
             DomainGroupId = parts[0],
-            DomainEntryId = parts[1],
-            SourceEntryIdsInOrder = picked,
-            CnameTargets = picked.Select(_ => "").ToList()
+            DomainEntryId = parts[1]
         };
         if (!rule.OnChange && rule.IntervalSeconds <= 0) rule.OnChange = true; // keep at least one trigger active
         _config.Mutate(c => c.Rules.Add(rule));
-        Notice = picked.Count > 0 ? "Rule created" : "Rule created – add failover sources below";
+        Notice = "Rule created – now add failover sources in order";
         return RedirectToPage("Edit", new { id = rule.Id });
     }
 
