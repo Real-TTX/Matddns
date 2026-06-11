@@ -169,7 +169,7 @@ else
             </form>
 
             <form method="post" asp-page-handler="AddSource" class="inline-form" style="margin-top:16px;">
-                <input type="hidden" name="Id" value="@r.Id" />
+                <input type="hidden" name="Id" value="@r!.Id" />
                 <div class="col">
                     <label>Add source</label>
                     <select name="SourceEntryId" required>
