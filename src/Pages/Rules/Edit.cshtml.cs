@@ -60,7 +60,7 @@ public class EditModel : PageModel
     }
 
     public IActionResult OnPostCreate(bool OnChange, int IntervalSeconds, string DomainEntryRef,
-        RuleValidation Validation, int ValidationPort, string[]? SourceEntryIdsInOrder)
+        bool ValidatePing, bool ValidateTcp, int ValidationPort, string[]? SourceEntryIdsInOrder)
     {
         if (string.IsNullOrWhiteSpace(DomainEntryRef)) { Error = "Domain required"; return RedirectToPage("Edit"); }
         var parts = DomainEntryRef.Split(':', 2);
@@ -71,7 +71,8 @@ public class EditModel : PageModel
         {
             OnChange = OnChange,
             IntervalSeconds = IntervalSeconds <= 0 ? 0 : Math.Max(15, IntervalSeconds),
-            Validation = Validation,
+            ValidatePing = ValidatePing,
+            ValidateTcp = ValidateTcp,
             ValidationPort = ValidationPort is < 1 or > 65535 ? 443 : ValidationPort,
             DomainGroupId = parts[0],
             DomainEntryId = parts[1],
@@ -85,7 +86,7 @@ public class EditModel : PageModel
     }
 
     public IActionResult OnPostSave(string Id, bool OnChange, int IntervalSeconds, bool Enabled, string DomainEntryRef,
-        RuleValidation Validation, int ValidationPort)
+        bool ValidatePing, bool ValidateTcp, int ValidationPort)
     {
         var parts = (DomainEntryRef ?? "").Split(':', 2);
         _config.Mutate(c =>
@@ -96,7 +97,8 @@ public class EditModel : PageModel
             r.IntervalSeconds = IntervalSeconds <= 0 ? 0 : Math.Max(15, IntervalSeconds);
             if (!r.OnChange && r.IntervalSeconds <= 0) r.OnChange = true; // keep at least one trigger active
             r.Enabled = Enabled;
-            r.Validation = Validation;
+            r.ValidatePing = ValidatePing;
+            r.ValidateTcp = ValidateTcp;
             if (ValidationPort is >= 1 and <= 65535) r.ValidationPort = ValidationPort;
             if (parts.Length == 2) { r.DomainGroupId = parts[0]; r.DomainEntryId = parts[1]; }
         });

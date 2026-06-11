@@ -252,11 +252,13 @@ public class UpdaterService : BackgroundService
                 candidateValue = familyIp;
             }
 
-            // failover validation: only accept the source if its address passes the reachability check.
-            if (rule.Validation != RuleValidation.None)
+            // failover validation: accept the source only if it passes ALL enabled checks (ping and/or TCP).
+            if (rule.ValidatePing || rule.ValidateTcp)
             {
-                var reachable = await _reach.CheckAsync(rule.Validation, familyIp!, rule.ValidationPort, ct);
-                var how = rule.Validation == RuleValidation.TcpPort ? $"TCP:{rule.ValidationPort}" : "Ping";
+                var reachable = true;
+                if (rule.ValidatePing && !await _reach.PingAsync(familyIp!)) reachable = false;
+                if (reachable && rule.ValidateTcp && !await _reach.TcpAsync(familyIp!, rule.ValidationPort, ct)) reachable = false;
+                var how = string.Join("+", new[] { rule.ValidatePing ? "Ping" : null, rule.ValidateTcp ? $"TCP:{rule.ValidationPort}" : null }.Where(x => x != null));
                 _log.Log(LogLevel.Debug, $"rule:{RuleDesc(rule, cfg)}",
                     $"check {resolved.Entry.Label} {familyIp} ({how}) -> {(reachable ? "ok" : "fail")}");
                 if (!reachable) continue;
