@@ -42,15 +42,15 @@
                 @if (isNew)
                 {
                     <select name="Kind" id="kindSelect">
-                        <option value="PublicIp">Public IP (of the container)</option>
-                        <option value="Unifi">Unifi (UDM / UGW)</option>
-                        <option value="Static">Static IP (fixed value)</option>
-                        <option value="Push">DynDNS receiver (push)</option>
+                        <option value="PublicIp">Public IP</option>
+                        <option value="Unifi">Unifi</option>
+                        <option value="Static">Static IP</option>
+                        <option value="Push">Push</option>
                     </select>
                 }
                 else
                 {
-                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi (UDM / UGW)", SourceKind.Static => "Static IP (fixed value)", SourceKind.Push => "DynDNS receiver (push)", _ => "Public IP (of the container)" };
+                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static IP", SourceKind.Push => "Push", _ => "Public IP" };
                     <input type="text" value="@typeLabel" disabled />
                     <div class="hint">Type cannot be changed after creation.</div>
                 }

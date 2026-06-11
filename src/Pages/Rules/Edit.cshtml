@@ -78,7 +78,7 @@ else
                     <label>Failover validation</label>
                     <select name="Validation" data-validation>
                         <option value="None" selected="@(r == null || r.Validation == RuleValidation.None)">IP present only</option>
-                        <option value="Ping" selected="@(r != null && r.Validation == RuleValidation.Ping)">Ping (ICMP)</option>
+                        <option value="Ping" selected="@(r != null && r.Validation == RuleValidation.Ping)">Ping</option>
                         <option value="TcpPort" selected="@(r != null && r.Validation == RuleValidation.TcpPort)">TCP port open</option>
                     </select>
                     <div class="hint">A source counts as "reachable" only if the check of its IP passes.</div>
