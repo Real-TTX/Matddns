@@ -109,6 +109,38 @@ else
             </div>
         </div>
 
+        @if (isNew)
+        {
+            <div class="section-title"><h2>Failover sources</h2></div>
+            <div class="card">
+                @if (Model.AllSources.SelectMany(s => s.Entries).Any())
+                {
+                    <p class="muted-small" style="margin-top:0;">Add sources in priority order — the first reachable one wins. (Optional; you can also add them after creating.)</p>
+                    <div id="newSrcList" class="failover-list"></div>
+                    <div class="inline-form" style="margin-top:10px;">
+                        <div class="col">
+                            <select id="newSrcSelect">
+                                <option value="">— select source —</option>
+                                @foreach (var sg in Model.AllSources)
+                                {
+                                    foreach (var se in sg.Entries)
+                                    {
+                                        var lbl = $"{sg.Name} · {se.Label}" + (se.InterfaceName != null ? $" ({se.InterfaceName})" : "");
+                                        <option value="@se.Id" data-label="@lbl">@lbl</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div><button type="button" id="newSrcAdd">+ Add</button></div>
+                    </div>
+                }
+                else
+                {
+                    <p class="muted-small" style="margin-top:0;">No sources yet — <a href="/Sources/Edit">add a source</a> first.</p>
+                }
+            </div>
+        }
+
         <div class="actions">
             <button type="submit">@(isNew ? "Create" : "Save")</button>
             <a class="button ghost" href="/Rules">Cancel</a>
@@ -205,5 +237,44 @@ else
         function sync() { portField.style.display = tcp.checked ? '' : 'none'; }
         tcp.addEventListener('change', sync);
         sync();
+    })();
+
+    // ordered failover-source picker on the new-rule form
+    (function () {
+        var sel = document.getElementById('newSrcSelect');
+        var add = document.getElementById('newSrcAdd');
+        var list = document.getElementById('newSrcList');
+        if (!sel || !add || !list) return;
+        var items = [];
+        function swap(i, j) { var t = items[i]; items[i] = items[j]; items[j] = t; render(); }
+        function render() {
+            list.innerHTML = '';
+            items.forEach(function (it, i) {
+                var row = document.createElement('div');
+                row.className = 'failover-row';
+                var idx = document.createElement('span'); idx.className = 'idx'; idx.textContent = '#' + (i + 1);
+                var name = document.createElement('div'); name.textContent = it.label;
+                var spacer = document.createElement('div');
+                var moves = document.createElement('div'); moves.className = 'move-btns';
+                var up = document.createElement('button'); up.type = 'button'; up.textContent = '↑'; up.disabled = i === 0;
+                up.addEventListener('click', function () { swap(i, i - 1); });
+                var down = document.createElement('button'); down.type = 'button'; down.textContent = '↓'; down.disabled = i === items.length - 1;
+                down.addEventListener('click', function () { swap(i, i + 1); });
+                moves.appendChild(up); moves.appendChild(down);
+                var rm = document.createElement('button'); rm.type = 'button'; rm.className = 'danger'; rm.textContent = '✕';
+                rm.addEventListener('click', function () { items.splice(i, 1); render(); });
+                var hid = document.createElement('input'); hid.type = 'hidden'; hid.name = 'SourceEntryIdsInOrder'; hid.value = it.id;
+                [idx, name, spacer, moves, rm, hid].forEach(function (el) { row.appendChild(el); });
+                list.appendChild(row);
+            });
+        }
+        add.addEventListener('click', function () {
+            var v = sel.value;
+            if (!v || items.some(function (x) { return x.id === v; })) return;
+            var opt = sel.options[sel.selectedIndex];
+            items.push({ id: v, label: opt.getAttribute('data-label') || opt.text });
+            sel.value = '';
+            render();
+        });
     })();
 </script>
