@@ -774,7 +774,7 @@ table.dtable tbody.dt-group.clickable:hover { background: var(--panel-2); }
 /* monitoring API table: keep endpoint column from wrapping the URLs */
 .api-table td:first-child, .api-table th:first-child { white-space: nowrap; width: 1%; padding-right: 22px; }
 
-@@media (max-width: 760px) {
+@media (max-width: 760px) {
     .stat-grid { grid-template-columns: repeat(2, 1fr); }
     .table-toolbar select { flex: 1 1 100%; }
     .table-toolbar .dt-count { display: none; }
