@@ -785,6 +785,8 @@ table.dtable tbody.dt-group.clickable:hover { background: var(--panel-2); }
     .form-grid { grid-template-columns: 1fr; }
     .page-header { align-items: stretch; }
     .card { overflow-x: auto; }
+    .hide-sm { display: none; }
+    th, td { padding: 8px 8px; }
 
     /* burger menu */
     .navtoggle { display: flex; }
