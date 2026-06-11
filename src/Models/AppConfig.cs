@@ -22,6 +22,7 @@ public class AppSettings
     public Matddns.Services.LogLevel MinLogLevel { get; set; } = Matddns.Services.LogLevel.Info;
     public int LogRetentionDays { get; set; } = 14; // 0 = unlimited
     public string TimeZone { get; set; } = ""; // IANA id (e.g. Europe/Berlin); empty = UTC. Applies to UI times except the log.
+    public bool AnonymousDashboard { get; set; } = false; // show the dashboard (read-only) without a login
 }
 
 public class AuthSection
