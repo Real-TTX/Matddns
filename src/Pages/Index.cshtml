@@ -13,18 +13,14 @@
     <form method="get"><button type="submit" class="ghost">Refresh</button></form>
 </div>
 
-<div class="status-banner @(s.Ok ? "ok" : "bad")">
-    <span class="status-dot @(s.Ok ? "ok" : "err")"></span>
-    <strong>@(s.Ok ? "All systems OK" : "Attention needed")</strong>
-    <span class="muted-small">@s.Sources.Errors source error(s) · @s.Rules.Issues rule issue(s)</span>
-</div>
-
 <div class="stat-grid">
     <div class="stat-card">
+        <span class="stat-dot @(s.Sources.Errors == 0 ? "ok" : "err")" title="@(s.Sources.Errors) source error(s)"></span>
         <div class="stat-num">@s.Sources.Ok<span class="stat-den">/@s.Sources.Entries</span></div>
         <div class="stat-label">Source IPs OK</div>
     </div>
     <div class="stat-card">
+        <span class="stat-dot @(s.Rules.Issues == 0 ? "ok" : "err")" title="@(s.Rules.Issues) rule issue(s)"></span>
         <div class="stat-num">@s.Rules.Ok<span class="stat-den">/@s.Rules.Total</span></div>
         <div class="stat-label">Rules OK</div>
     </div>

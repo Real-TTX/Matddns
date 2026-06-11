@@ -5,11 +5,8 @@
 }
 
 <div class="page-header">
-    <div>
-        <h1>Sources</h1>
-        <p>Sources provide current IPs. A Unifi group creates one entry per WAN / LTE failover.</p>
-    </div>
-    <a class="button" href="/Sources/Edit">+ New source group</a>
+    <div><h1>Sources</h1></div>
+    <a class="button" href="/Sources/Edit">+ New source</a>
 </div>
 
 @if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
@@ -22,35 +19,70 @@
         <a class="button" style="margin-top:12px;" href="/Sources/Edit">Create the first source</a>
     </div>
 }
-
-@foreach (var g in Model.Groups)
+else
 {
-    var hasErr = g.Entries.Any(e => e.LastError != null);
-    var hasIp = g.Entries.Any(e => !string.IsNullOrEmpty(e.CurrentIp) || !string.IsNullOrEmpty(e.CurrentIpv6));
-    var dot = hasErr ? "err" : (hasIp ? "ok" : "warn");
-    var lastChecked = g.Entries.Where(e => e.LastChecked != null).Select(e => e.LastChecked!.Value).DefaultIfEmpty().Max();
-    var kindLabel = g.Kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static", SourceKind.Push => "Push", _ => "Public IP" };
-    var schedule = g.Kind == SourceKind.Push ? "Push-driven" : (g.IntervalSeconds > 0 ? $"Interval {g.IntervalSeconds}s" : "No polling");
-    <a class="list-item" href="/Sources/Edit?id=@g.Id">
-        <div class="li-main">
-            <span class="li-title">@g.Name</span>
-            <span class="li-sub">
-                @if (g.Kind == SourceKind.Unifi)
-                {
-                    @(string.Join(" · ", g.Entries.Select(e => $"{e.Label}={(string.IsNullOrEmpty(e.CurrentIp) ? "–" : e.CurrentIp)}{(string.IsNullOrEmpty(e.CurrentIpv6) ? "" : " / " + e.CurrentIpv6)}")))
-                }
-                else
-                {
-                    @($"{kindLabel} = {g.Entries.FirstOrDefault()?.CurrentIp ?? "–"}{(string.IsNullOrEmpty(g.Entries.FirstOrDefault()?.CurrentIpv6) ? "" : " · IPv6 " + g.Entries.FirstOrDefault()!.CurrentIpv6)}")
-                }
-            </span>
-            <span class="li-sub">
-                @schedule · last update: @(lastChecked == default(DateTime) ? "—" : Tz.Format(lastChecked))
-            </span>
+    <div data-dt>
+        <div class="table-toolbar">
+            <div class="dt-search">
+                <span class="ico">⌕</span>
+                <input type="text" data-dt-search placeholder="Search sources, IPs…" autocomplete="off" />
+            </div>
+            <select data-dt-filter="kind" aria-label="Filter by type">
+                <option value="">All types</option>
+                <option value="publicip">Public IP</option>
+                <option value="unifi">Unifi</option>
+                <option value="static">Static</option>
+                <option value="push">Push</option>
+            </select>
+            <span class="dt-count" data-dt-count></span>
         </div>
-        <div class="li-side">
-            <span class="status-pill"><span class="status-dot @dot"></span>@kindLabel</span>
-            <span class="muted">›</span>
+        <div class="dtable-wrap">
+            <table class="dtable">
+                <thead>
+                    <tr><th>Name</th><th>Type</th><th>IPv4</th><th>IPv6</th><th>Status</th><th></th></tr>
+                </thead>
+                @foreach (var g in Model.Groups)
+                {
+                    var hasErr = g.Entries.Any(e => e.LastError != null);
+                    var hasIp = g.Entries.Any(e => !string.IsNullOrEmpty(e.CurrentIp) || !string.IsNullOrEmpty(e.CurrentIpv6));
+                    var dot = hasErr ? "err" : (hasIp ? "ok" : "warn");
+                    var statusText = hasErr ? "error" : (hasIp ? "ok" : "pending");
+                    var kindLabel = g.Kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static", SourceKind.Push => "Push", _ => "Public IP" };
+                    var kindKey = g.Kind.ToString().ToLowerInvariant();
+                    var schedule = g.Kind == SourceKind.Push ? "push-driven" : (g.IntervalSeconds > 0 ? $"every {g.IntervalSeconds}s" : "no polling");
+                    var entries = g.Entries.ToList();
+                    var multi = entries.Count > 1;
+                    var first = entries.FirstOrDefault();
+                    var search = $"{g.Name} {kindLabel} {string.Join(' ', entries.Select(e => $"{e.Label} {e.CurrentIp} {e.CurrentIpv6}"))}";
+                    <tbody class="dt-group" data-search="@search" data-kind="@kindKey" data-href="/Sources/Edit?id=@g.Id">
+                        <tr class="dt-parent @(multi ? "has-children" : "")">
+                            <td class="dt-name">@g.Name</td>
+                            <td><span class="badge info">@kindLabel</span> <span class="muted-small">@schedule</span></td>
+                            <td class="mono">@(multi ? "" : (first?.CurrentIp ?? "—"))</td>
+                            <td class="mono">@(multi ? "" : (first?.CurrentIpv6 ?? "—"))</td>
+                            <td><span class="status-pill"><span class="status-dot @dot"></span>@statusText</span></td>
+                            <td class="dt-go">›</td>
+                        </tr>
+                        @if (multi)
+                        {
+                            for (int i = 0; i < entries.Count; i++)
+                            {
+                                var e = entries[i];
+                                var est = e.LastError != null ? "err" : ((!string.IsNullOrEmpty(e.CurrentIp) || !string.IsNullOrEmpty(e.CurrentIpv6)) ? "ok" : "warn");
+                                <tr class="dt-child @(i == entries.Count - 1 ? "last" : "")">
+                                    <td><span class="dt-sub">@e.Label</span></td>
+                                    <td></td>
+                                    <td class="mono cell-muted">@(e.CurrentIp ?? "—")</td>
+                                    <td class="mono cell-muted">@(e.CurrentIpv6 ?? "—")</td>
+                                    <td><span class="status-pill"><span class="status-dot @est"></span>@(e.LastError ?? "ok")</span></td>
+                                    <td></td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                }
+                <tbody class="dt-empty" hidden><tr><td colspan="6">No sources match your search.</td></tr></tbody>
+            </table>
         </div>
-    </a>
+    </div>
 }
