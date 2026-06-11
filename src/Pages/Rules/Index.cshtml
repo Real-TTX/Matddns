@@ -38,7 +38,7 @@ else
         <div class="dtable-wrap">
             <table class="dtable">
                 <thead>
-                    <tr><th>Record</th><th>Failover source</th><th>IP</th><th>Status</th><th></th></tr>
+                    <tr><th>Record</th><th>Source</th><th>IP</th><th>Status</th><th></th></tr>
                 </thead>
                 @foreach (var r in Model.Rules)
                 {
@@ -59,13 +59,16 @@ else
                         _ => "manual"
                     };
                     var recordText = de != null ? de.Display : "(domain missing)";
+                    var activeLabel = !string.IsNullOrEmpty(r.LastUsedSourceId) && Model.SourceLookup.TryGetValue(r.LastUsedSourceId, out var av)
+                        ? av.Entry.Label
+                        : (sourceIds.Count > 0 ? Model.SourceLabel(sourceIds[0]) : null);
                     var search = $"{recordText} {dg?.Name} {string.Join(' ', sourceLabels)} {r.LastValue} {statusKey}";
                     <tbody class="dt-group" data-search="@search" data-status="@statusKey" data-href="/Rules/Edit?id=@r.Id">
                         <tr class="dt-parent @(sourceIds.Count > 0 ? "has-children" : "")">
                             <td class="dt-name mono">@recordText</td>
-                            <td class="cell-muted">@(dg?.Name ?? "—") <span class="muted-small">· @triggerText</span></td>
+                            <td class="cell-muted">@(activeLabel ?? "no sources")</td>
                             <td class="mono">@(!string.IsNullOrEmpty(r.LastValue) ? r.LastValue : "—")</td>
-                            <td><span class="status-pill"><span class="status-dot @dot"></span>@statusKey</span></td>
+                            <td><span class="status-pill"><span class="status-dot @dot"></span>@statusKey</span> <span class="muted-small">· @triggerText</span></td>
                             <td class="dt-go">›</td>
                         </tr>
                         @if (sourceIds.Count > 0)
