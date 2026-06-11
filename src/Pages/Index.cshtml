@@ -38,7 +38,7 @@
 <div class="section-title"><h2>Sources</h2><a class="muted-small" href="/Sources">manage →</a></div>
 <div class="card">
     <table>
-        <thead><tr><th>Source</th><th>Entry</th><th>IPv4</th><th>IPv6</th><th>Last check</th><th>Status</th></tr></thead>
+        <thead><tr><th class="hide-sm">Source</th><th>Entry</th><th>IPv4</th><th class="hide-sm">IPv6</th><th class="hide-sm">Last check</th><th>Status</th></tr></thead>
         <tbody>
         @foreach (var src in s.SourceList)
         {
@@ -47,11 +47,11 @@
                 var noIp = string.IsNullOrEmpty(e.Ip) && string.IsNullOrEmpty(e.Ipv6);
                 var st = e.Error != null ? "err" : (noIp ? "warn" : "ok");
                 <tr>
-                    <td>@src.Name <span class="muted-small">(@(src.Kind == "Push" ? "DynDNS Server" : src.Kind))</span></td>
+                    <td class="hide-sm">@src.Name <span class="muted-small">(@(src.Kind == "Push" ? "DynDNS Server" : src.Kind))</span></td>
                     <td>@e.Label</td>
                     <td class="mono">@(e.Ip ?? "—")</td>
-                    <td class="mono">@(e.Ipv6 ?? "—")</td>
-                    <td><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
+                    <td class="mono hide-sm">@(e.Ipv6 ?? "—")</td>
+                    <td class="hide-sm"><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
                     <td><span class="status-pill"><span class="status-dot @st"></span>@(e.Error ?? (noIp ? "pending" : "ok"))</span></td>
                 </tr>
             }
@@ -67,17 +67,17 @@
 <div class="section-title"><h2>Rules</h2><a class="muted-small" href="/Rules">manage →</a></div>
 <div class="card">
     <table>
-        <thead><tr><th>Target</th><th>Group</th><th>Last set</th><th>When</th><th>Status</th></tr></thead>
+        <thead><tr><th>Target</th><th class="hide-sm">Group</th><th>Last set</th><th class="hide-sm">When</th><th>Status</th></tr></thead>
         <tbody>
         @foreach (var r in s.RuleList)
         {
             var st = !r.Enabled ? "muted" : (r.Issue ? "err" : (r.Ok ? "ok" : "warn"));
             <tr>
                 <td><span class="badge info">@r.Type</span> <span class="mono">@r.Target</span></td>
-                <td class="muted-small">@(r.Group ?? "—")</td>
+                <td class="muted-small hide-sm">@(r.Group ?? "—")</td>
                 <td class="mono">@(r.LastValue ?? "—")</td>
-                <td><span class="muted-small">@Tz.Format(r.LastChange, "yyyy-MM-dd HH:mm")</span></td>
-                <td><span class="status-pill"><span class="status-dot @st"></span>@(!r.Enabled ? "disabled" : (r.LastResult ?? "pending"))</span></td>
+                <td class="hide-sm"><span class="muted-small">@Tz.Format(r.LastChange, "yyyy-MM-dd HH:mm")</span></td>
+                <td><span class="status-pill"><span class="status-dot @st"></span>@(!r.Enabled ? "disabled" : (r.Issue ? "issue" : (r.Ok ? "ok" : "pending")))</span></td>
             </tr>
         }
         @if (s.RuleList.Count == 0)
@@ -91,14 +91,14 @@
 <div class="section-title"><h2>Recent IP changes</h2><a class="muted-small" href="/Log?Level=Update">full log →</a></div>
 <div class="card">
     <table>
-        <thead><tr><th>Time</th><th>Target</th><th>Detail</th></tr></thead>
+        <thead><tr><th>Time</th><th>Target</th><th class="hide-sm">Detail</th></tr></thead>
         <tbody>
         @foreach (var c in s.IpChanges.Recent)
         {
             <tr>
                 <td class="mono">@Tz.Format(c.Time)</td>
                 <td class="mono">@c.Target</td>
-                <td class="muted-small">@c.Detail</td>
+                <td class="muted-small hide-sm">@c.Detail</td>
             </tr>
         }
         @if (s.IpChanges.Recent.Count == 0)
