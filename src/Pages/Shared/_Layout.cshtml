@@ -22,11 +22,14 @@
                 <span class="title">Matddns</span>
             </a>
             <nav>
-                <a class="@(Starts("/Sources") ? "active" : "")" href="/Sources">Sources</a>
-                <a class="@(DomainsActive() ? "active" : "")" href="/Domains">Domains</a>
-                <a class="@(Starts("/Rules") ? "active" : "")" href="/Rules">Rules</a>
-                <a class="@(Starts("/System") ? "active" : "")" href="/System">System</a>
-                <a class="@(Starts("/Log") ? "active" : "")" href="/Log">Log</a>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <a class="@(Starts("/Sources") ? "active" : "")" href="/Sources">Sources</a>
+                    <a class="@(DomainsActive() ? "active" : "")" href="/Domains">Domains</a>
+                    <a class="@(Starts("/Rules") ? "active" : "")" href="/Rules">Rules</a>
+                    <a class="@(Starts("/System") ? "active" : "")" href="/System">System</a>
+                    <a class="@(Starts("/Log") ? "active" : "")" href="/Log">Log</a>
+                }
             </nav>
             @if (User.Identity?.IsAuthenticated == true)
             {
