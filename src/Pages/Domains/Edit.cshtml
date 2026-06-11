@@ -12,7 +12,6 @@
 <div class="page-header">
     <div>
         <h1>@(isNew ? "New domain group" : g!.Name)</h1>
-        <p>@(isNew ? "Pick a type – the matching fields appear automatically." : "Credentials and records of this group.")</p>
     </div>
 </div>
 
@@ -40,8 +39,7 @@
                 }
                 else
                 {
-                    <input type="text" value="@(kind == DomainKind.Netcup ? "Netcup DNS API" : "DynDNS (update URL)")" disabled />
-                    <div class="hint">Type cannot be changed after creation.</div>
+                    <input type="text" value="@(kind == DomainKind.Netcup ? "Netcup" : "DynDNS")" disabled />
                 }
             </div>
         </div>
@@ -61,12 +59,10 @@
                         <option value="strato">Strato</option>
                         <option value="desec">deSEC</option>
                     </select>
-                    <div class="hint">Fills the update URL below. Adjust if your provider differs.</div>
                 </div>
                 <div class="field full">
                     <label>Update URL</label>
                     <input type="text" id="dynUrlInput" name="DynUrl" value="@(g?.DynDns?.UpdateUrl ?? "")" placeholder="https://example.org/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}" />
-                    <div class="hint">Placeholders: {hostname}, {ipv4}, {ipv6}, {user}, {password} (also {ip} = whichever family the record uses). Empty ones are dropped automatically, so one URL covers both A and AAAA records.</div>
                 </div>
                 <div class="field">
                     <label>Username</label>
@@ -159,7 +155,6 @@
                 <div class="field">
                     <label>Record / subdomain</label>
                     <input type="text" name="RecordName" placeholder="@@, www or home1" />
-                    <div class="hint">@@ = root domain (apex). Otherwise the host part, e.g. home1.</div>
                 </div>
                 <div class="field">
                     <label>Domain / zone</label>

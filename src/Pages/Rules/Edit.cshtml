@@ -20,7 +20,6 @@
                 <span class="mono">@(de?.Hostname ?? "(target missing)")</span>
             }
         </h1>
-        <p>@(isNew ? "Pick the target record and trigger – failover sources are added after creation." : "Target, trigger and failover order of this rule.")</p>
     </div>
 </div>
 
@@ -103,9 +102,6 @@ else
                     <input type="number" name="ValidationPort" value="@(r?.ValidationPort ?? 443)" min="1" max="65535" />
                 </div>
 
-                <div class="field full">
-                    <div class="hint">With <strong>Ping</strong> or <strong>TCP port</strong>, also set a re-check interval — a source going down does <em>not</em> change its IP, so only the periodic re-check can trigger failover. <span class="mono">0</span> = no periodic check (react on IP change only).</div>
-                </div>
             </div>
         </div>
 
@@ -115,7 +111,6 @@ else
             <div class="card">
                 @if (Model.AllSources.SelectMany(s => s.Entries).Any())
                 {
-                    <p class="muted-small" style="margin-top:0;">Add sources in priority order — the first reachable one wins. (Optional; you can also add them after creating.)</p>
                     <div id="newSrcList" class="failover-list"></div>
                     <div class="inline-form" style="margin-top:10px;">
                         <div class="col">
@@ -156,10 +151,6 @@ else
     {
         <div class="section-title"><h2>Failover order</h2></div>
         <div class="card">
-            <div class="muted-small" style="margin-bottom:12px;">
-                First reachable source (with IP) wins. @(isCname ? "CNAME: set the target hostname per source." : "A/AAAA: the source's IP is written.")
-            </div>
-
             <form method="post" asp-page-handler="SaveSources">
                 <input type="hidden" name="Id" value="@r!.Id" />
 
@@ -185,7 +176,6 @@ else
                             else
                             {
                                 <input type="hidden" name="CnameTargets" value="@cname" />
-                                <span class="muted-small">(IP is set automatically)</span>
                             }
                         </div>
                         <div class="move-btns">
