@@ -232,6 +232,53 @@ button.danger:hover {
     border-color: var(--err);
 }
 
+button.sm, .button.sm { padding: 5px 11px; font-size: 12.5px; }
+
+/* ---- modal dialog ---- */
+dialog.modal {
+    margin: auto;
+    width: calc(100% - 32px);
+    max-width: 560px;
+    padding: 0;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+dialog.modal::backdrop { background: rgba(0, 0, 0, 0.55); }
+
+.modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-head strong { font-size: 15px; }
+.modal-body { padding: 16px 18px; }
+.modal-body label { margin-top: 14px; }
+.modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+}
+
+.modal-x {
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 6px;
+}
+
+.modal-x:hover { color: var(--text); background: transparent; }
+
 .actions {
     display: flex;
     gap: 8px;

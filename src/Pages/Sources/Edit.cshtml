@@ -132,35 +132,34 @@
                     <div class="field full">
                         <label>Update URL</label>
                         <input type="text" value="@($"{baseUrl}/api/update?token={token}&ipv4=<your-ipv4>&ipv6=<your-ipv6>")" readonly onclick="this.select()" />
-                        <div class="hint">Call this from your device or script. Send <span class="mono">ipv4</span>, <span class="mono">ipv6</span>, or both — the other family stays untouched; omit them to use the caller's IP. Returns JSON, updates on push (no interval). Use a host reachable from your device (not localhost).</div>
+                        <button type="button" class="ghost sm" style="margin-top:8px;" onclick="document.getElementById('pushDocs').showModal()">Documentation</button>
                     </div>
                     <div class="field full">
                         <label>Token</label>
                         <input type="text" value="@token" readonly onclick="this.select()" />
                     </div>
                 </div>
-                <div class="dim-section">
-                    <label style="margin-bottom:8px;">Router / device setup (dyndns2)</label>
-                    <p class="muted-small" style="margin-top:0; margin-bottom:10px;">For routers/devices that only speak the legacy <strong>dyndns2</strong> protocol. The token is already included in the URLs below — no separate password needed.</p>
 
-                    <details class="collapsible" style="margin-bottom:8px;">
-                        <summary>FRITZ!Box</summary>
-                        <div style="margin-top:10px;">
-                            <label>Update URL</label>
-                            <input type="text" value="@($"{baseUrl}/nic/update?token={token}&ipv4=<ipaddr>&ipv6=<ip6addr>")" readonly onclick="this.select()" />
-                            <div class="hint">Internet → Permit Access → DynDNS → <em>custom provider</em>. Paste this as the <span class="mono">Update URL</span>; domain name, user name and password can be anything. FRITZ!Box substitutes <span class="mono">&lt;ipaddr&gt;</span> / <span class="mono">&lt;ip6addr&gt;</span> itself.</div>
-                        </div>
-                    </details>
+                <dialog id="pushDocs" class="modal">
+                    <div class="modal-head">
+                        <strong>DynDNS Server — setup</strong>
+                        <button type="button" class="modal-x" aria-label="Close" onclick="this.closest('dialog').close()">✕</button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="muted-small" style="margin-top:0;">The update URL takes <span class="mono">ipv4</span>, <span class="mono">ipv6</span>, or both — the other family stays untouched; omit them to use the caller's IP. It returns JSON and updates on push (no interval). The token is already baked into every URL here. Use a host reachable from the device (not localhost).</p>
 
-                    <details class="collapsible">
-                        <summary>UniFi (UDM / UGW)</summary>
-                        <div style="margin-top:10px;">
-                            <label>Server</label>
-                            <input type="text" value="@($"{host}/nic/update?token={token}&ipv4=%i")" readonly onclick="this.select()" />
-                            <div class="hint">Settings → Internet → Dynamic DNS → <em>Create New</em>. Service = <span class="mono">custom</span>; hostname / username / password = anything; paste the above into the <span class="mono">Server</span> field. UniFi replaces <span class="mono">%i</span> with the WAN IP.</div>
-                        </div>
-                    </details>
-                </div>
+                        <label>FRITZ!Box — Update URL</label>
+                        <input type="text" value="@($"{baseUrl}/nic/update?token={token}&ipv4=<ipaddr>&ipv6=<ip6addr>")" readonly onclick="this.select()" />
+                        <p class="muted-small" style="margin:6px 0 0;">Internet → Permit Access → DynDNS → <em>custom provider</em>. Domain / user / password can be anything; FRITZ!Box fills <span class="mono">&lt;ipaddr&gt;</span> / <span class="mono">&lt;ip6addr&gt;</span>.</p>
+
+                        <label style="margin-top:16px;">UniFi (UDM / UGW) — Server</label>
+                        <input type="text" value="@($"{host}/nic/update?token={token}&ipv4=%i")" readonly onclick="this.select()" />
+                        <p class="muted-small" style="margin:6px 0 0;">Settings → Internet → Dynamic DNS → <em>Create New</em>. Service = <span class="mono">custom</span>; hostname / username / password = anything; paste into <span class="mono">Server</span>. UniFi replaces <span class="mono">%i</span> with the WAN IP.</p>
+                    </div>
+                    <div class="modal-foot">
+                        <button type="button" onclick="this.closest('dialog').close()">Close</button>
+                    </div>
+                </dialog>
             }
         </div>
 
