@@ -65,8 +65,8 @@
                 </div>
                 <div class="field full">
                     <label>Update URL</label>
-                    <input type="text" id="dynUrlInput" name="DynUrl" value="@(g?.DynDns?.UpdateUrl ?? "")" placeholder="https://members.dyndns.org/v3/update?hostname={hostname}&myip={ip}" />
-                    <div class="hint">Placeholders: {hostname}, {ip}, {user}, {password}</div>
+                    <input type="text" id="dynUrlInput" name="DynUrl" value="@(g?.DynDns?.UpdateUrl ?? "")" placeholder="https://example.org/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}" />
+                    <div class="hint">Placeholders: {hostname}, {ipv4}, {ipv6}, {user}, {password} (also {ip} = whichever family the record uses). Empty ones are dropped automatically, so one URL covers both A and AAAA records.</div>
                 </div>
                 <div class="field">
                     <label>Username</label>
@@ -209,13 +209,13 @@
         var url = document.getElementById('dynUrlInput');
         if (!prov || !url) return;
         var presets = {
-            matddns: '@Model.BaseUrl/api/update?token={password}&ip={ip}',
-            duckdns: 'https://www.duckdns.org/update?domains={hostname}&token={password}&ip={ip}',
-            noip: 'https://dynupdate.no-ip.com/nic/update?hostname={hostname}&myip={ip}',
-            dynu: 'https://api.dynu.com/nic/update?hostname={hostname}&myip={ip}',
-            dyndns: 'https://members.dyndns.org/v3/update?hostname={hostname}&myip={ip}',
-            strato: 'https://dyndns.strato.com/nic/update?hostname={hostname}&myip={ip}',
-            desec: 'https://update.dedyn.io/?hostname={hostname}&myipv4={ip}'
+            matddns: '@Model.BaseUrl/api/update?token={password}&ipv4={ipv4}&ipv6={ipv6}',
+            duckdns: 'https://www.duckdns.org/update?domains={hostname}&token={password}&ip={ipv4}&ipv6={ipv6}',
+            noip: 'https://dynupdate.no-ip.com/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
+            dynu: 'https://api.dynu.com/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
+            dyndns: 'https://members.dyndns.org/v3/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
+            strato: 'https://dyndns.strato.com/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
+            desec: 'https://update.dedyn.io/?hostname={hostname}&myipv4={ipv4}&myipv6={ipv6}'
         };
         prov.addEventListener('change', function () {
             if (presets[prov.value]) url.value = presets[prov.value];

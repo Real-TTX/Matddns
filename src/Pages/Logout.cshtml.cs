@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Matddns.Pages;
 
+// Logout is a harmless action; skip antiforgery so it works even from a stale tab.
+[IgnoreAntiforgeryToken]
 public class LogoutModel : PageModel
 {
     public async Task<IActionResult> OnGetAsync()
