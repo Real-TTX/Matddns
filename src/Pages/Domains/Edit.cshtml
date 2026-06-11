@@ -53,6 +53,7 @@
                     <label>Provider preset</label>
                     <select id="dynProvider">
                         <option value="">Custom / manual</option>
+                        <option value="matddns">Matddns (another instance)</option>
                         <option value="duckdns">DuckDNS</option>
                         <option value="noip">No-IP</option>
                         <option value="dynu">Dynu</option>
@@ -208,6 +209,7 @@
         var url = document.getElementById('dynUrlInput');
         if (!prov || !url) return;
         var presets = {
+            matddns: '@Model.BaseUrl/api/update?token={password}&ip={ip}',
             duckdns: 'https://www.duckdns.org/update?domains={hostname}&token={password}&ip={ip}',
             noip: 'https://dynupdate.no-ip.com/nic/update?hostname={hostname}&myip={ip}',
             dynu: 'https://api.dynu.com/nic/update?hostname={hostname}&myip={ip}',
