@@ -12,12 +12,14 @@ public class EditModel : PageModel
 
     public DomainGroup? Group { get; private set; }
     public bool IsNew => Group == null;
+    public string BaseUrl { get; private set; } = "";
 
     [TempData] public string? Notice { get; set; }
     [TempData] public string? Error { get; set; }
 
     public IActionResult OnGet(string? id)
     {
+        BaseUrl = $"{Request.Scheme}://{Request.Host}";
         if (!string.IsNullOrEmpty(id))
         {
             Group = _config.Read(c => c.Domains.FirstOrDefault(g => g.Id == id));
