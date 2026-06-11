@@ -22,7 +22,9 @@ jobs:
       - name: Compute version & build metadata
         id: ver
         run: |
-          echo "version=0.1.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          # Bump MAJOR_MINOR when the config schema changes (see ConfigService.CurrentSchemaVersion).
+          MAJOR_MINOR=0.2
+          echo "version=${MAJOR_MINOR}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
       - name: Lowercase image name
