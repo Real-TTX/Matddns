@@ -30,7 +30,7 @@
             </nav>
             @if (User.Identity?.IsAuthenticated == true)
             {
-                <form method="post" action="/Logout" class="logout">
+                <form method="post" asp-page="/Logout" class="logout">
                     <button type="submit" class="ghost">Logout</button>
                 </form>
             }
