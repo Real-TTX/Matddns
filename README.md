@@ -190,7 +190,11 @@ curl http://localhost:4060/api/health   # point your monitor here and alert on n
 
 ## Versioning
 
-Release images carry a monotonic version (`0.1.<run_number>`) injected at build time; the footer shows version · build · date. Local builds show `local · build local`. The same token cache-busts static assets so UI changes always reach the browser.
+Release images carry a monotonic version (`0.2.<run_number>`) injected at build time; the footer shows version · build · date. Local builds show `local · build local`. The same token cache-busts static assets so UI changes always reach the browser. The minor (`0.2`) is bumped whenever the config schema changes.
+
+### Config schema &amp; migrations
+
+`config.json` carries a `schemaVersion`. On startup `ConfigService` runs every ordered migration between the stored version and `CurrentSchemaVersion`, then stamps the new version (and saves). A fresh install is born at the current version; an older config is upgraded in place. To evolve the data shape: bump `CurrentSchemaVersion`, append a `MigrateVXToVY` step to the `Migrations` array (append-only, never reorder), and bump the release minor. Migrations are idempotent and run once per version step.
 
 ## Tech stack
 

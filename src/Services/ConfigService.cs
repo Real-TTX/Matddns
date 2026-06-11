@@ -27,22 +27,30 @@ public class ConfigService
         get { lock (_lock) return CloneFrom(_config); }
     }
 
+    /// <summary>Latest config schema version. Bump this and append a step to <see cref="Migrations"/> when the data shape changes.</summary>
+    public const int CurrentSchemaVersion = 1;
+
     public void EnsureLoaded()
     {
         lock (_lock)
         {
+            var loaded = false;
             if (File.Exists(_paths.ConfigFile))
             {
                 try
                 {
                     var json = File.ReadAllText(_paths.ConfigFile);
                     var cfg = JsonSerializer.Deserialize<AppConfig>(json, JsonOpts);
-                    if (cfg != null) _config = cfg;
+                    if (cfg != null) { _config = cfg; loaded = true; }
                 }
                 catch { /* corrupt — keep defaults */ }
             }
 
-            var changed = MigrateConfig(_config);
+            // A brand-new config is born at the current schema (nothing to migrate). An existing config
+            // written before schema versioning deserializes to SchemaVersion 0 and is migrated up.
+            if (!loaded) _config.SchemaVersion = CurrentSchemaVersion;
+
+            var changed = RunMigrations(_config);
 
             // migrate the legacy single Auth account into the Users list
             if (_config.Users.Count == 0 && !string.IsNullOrEmpty(_config.Auth.PasswordHash))
@@ -66,16 +74,33 @@ public class ConfigService
         }
     }
 
-    /// <summary>One-time data fixes for legacy data. Returns true if anything changed.</summary>
-    private static bool MigrateConfig(AppConfig cfg)
+    // Migrations[i] upgrades a config from schema version i to i+1. Append-only — never reorder or remove.
+    private static readonly Action<AppConfig>[] Migrations =
     {
-        bool changed = false;
+        MigrateV0ToV1,
+    };
+
+    /// <summary>
+    /// Applies every schema migration between the config's stored version and <see cref="CurrentSchemaVersion"/>,
+    /// in order, then stamps the new version. Returns true if anything was applied.
+    /// </summary>
+    private static bool RunMigrations(AppConfig cfg)
+    {
+        if (cfg.SchemaVersion < 0) cfg.SchemaVersion = 0;
+        if (cfg.SchemaVersion >= CurrentSchemaVersion) return false; // already current (or newer, e.g. after a downgrade)
+        for (var from = cfg.SchemaVersion; from < CurrentSchemaVersion; from++)
+            Migrations[from](cfg);
+        cfg.SchemaVersion = CurrentSchemaVersion;
+        return true;
+    }
+
+    /// <summary>v0 → v1: pre-versioning data fixes (FQDN/zone split, push interval reset, independent rule triggers).</summary>
+    private static void MigrateV0ToV1(AppConfig cfg)
+    {
         foreach (var g in cfg.Domains)
-        {
             foreach (var e in g.Entries)
             {
-                // Legacy: the subdomain was in the RecordName override while Hostname was only the zone.
-                // -> reconstruct the real FQDN and set the zone so display/update are correct.
+                // the subdomain used to live in the RecordName override while Hostname held only the zone
                 if (string.IsNullOrWhiteSpace(e.Domain)
                     && !string.IsNullOrWhiteSpace(e.RecordName)
                     && e.RecordName is not ("@" or "*")
@@ -85,32 +110,16 @@ public class ConfigService
                 {
                     e.Domain = e.Hostname;
                     e.Hostname = $"{e.RecordName}.{e.Hostname}";
-                    changed = true;
                 }
             }
-        }
-        // Push sources are push-driven (never polled): a leftover interval is meaningless -> 0.
+
+        // Push sources are push-driven (never polled): a leftover interval is meaningless
         foreach (var s in cfg.Sources)
-        {
-            if (s.Kind == SourceKind.Push && s.IntervalSeconds != 0)
-            {
-                s.IntervalSeconds = 0;
-                changed = true;
-            }
-        }
-        // Legacy rule trigger -> independent OnChange/Interval. An old "Interval" rule was
-        // not change-driven, so disable OnChange; "OnChange" rules keep the default (true).
-        // Neutralize Trigger afterwards so this runs only once and never clobbers later edits.
+            if (s.Kind == SourceKind.Push) s.IntervalSeconds = 0;
+
+        // legacy single trigger -> independent OnChange/Interval; an old "Interval" rule wasn't change-driven
         foreach (var r in cfg.Rules)
-        {
-            if (r.Trigger == RuleTrigger.Interval)
-            {
-                r.OnChange = false;
-                r.Trigger = RuleTrigger.OnChange;
-                changed = true;
-            }
-        }
-        return changed;
+            if (r.Trigger == RuleTrigger.Interval) { r.OnChange = false; r.Trigger = RuleTrigger.OnChange; }
     }
 
     public void Mutate(Action<AppConfig> mutator)

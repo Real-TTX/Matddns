@@ -2,6 +2,7 @@ namespace Matddns.Models;
 
 public class AppConfig
 {
+    public int SchemaVersion { get; set; }                   // config schema version; migrated up on load (see ConfigService)
     public AuthSection Auth { get; set; } = new();           // legacy single account; migrated into Users on load
     public List<UserAccount> Users { get; set; } = new();
     public AppSettings Settings { get; set; } = new();
