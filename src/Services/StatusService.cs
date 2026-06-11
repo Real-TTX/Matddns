@@ -66,11 +66,13 @@ public class StatusService
         var ruleIssues = rules.Count(r => r.Issue);
 
         var updates = _log.EntriesOfLevel(LogLevel.Update, 1000);
+        var errors24h = _log.EntriesOfLevel(LogLevel.Error, 1000).Count(e => e.Timestamp >= now.AddHours(-24));
 
         return new StatusSnapshot
         {
             Ok = sourceErrors == 0 && ruleIssues == 0,
             Time = now,
+            ErrorsLast24h = errors24h,
             Sources = new CountSummary
             {
                 Total = cfg.Sources.Count,
@@ -108,6 +110,7 @@ public class StatusSnapshot
 {
     public bool Ok { get; set; }
     public DateTime Time { get; set; }
+    public int ErrorsLast24h { get; set; }
     public CountSummary Sources { get; set; } = new();
     public RuleCountSummary Rules { get; set; } = new();
     public IpChangeStats IpChanges { get; set; } = new();
