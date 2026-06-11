@@ -127,6 +127,7 @@
             {
                 var baseUrl = Model.BaseUrl;
                 var token = g!.Push?.Token ?? "";
+                var host = baseUrl.Replace("https://", "").Replace("http://", "");
                 <div class="form-grid" style="margin-top:16px;">
                     <div class="field full">
                         <label>Update URL</label>
@@ -139,9 +140,26 @@
                     </div>
                 </div>
                 <div class="dim-section">
-                    <label style="margin-bottom:6px;">Using a router instead? (FRITZ!Box &amp; co.)</label>
-                    <p class="muted-small" style="margin-top:0; margin-bottom:8px;">Routers that only speak the legacy <strong>dyndns2</strong> protocol can use this URL instead — username = anything, password = the token above.</p>
-                    <input type="text" value="@($"{baseUrl}/nic/update?ipv4=<ipaddr>&ipv6=<ip6addr>")" readonly onclick="this.select()" />
+                    <label style="margin-bottom:8px;">Router / device setup (dyndns2)</label>
+                    <p class="muted-small" style="margin-top:0; margin-bottom:10px;">For routers/devices that only speak the legacy <strong>dyndns2</strong> protocol. The token is already included in the URLs below — no separate password needed.</p>
+
+                    <details class="collapsible" style="margin-bottom:8px;">
+                        <summary>FRITZ!Box</summary>
+                        <div style="margin-top:10px;">
+                            <label>Update URL</label>
+                            <input type="text" value="@($"{baseUrl}/nic/update?token={token}&ipv4=<ipaddr>&ipv6=<ip6addr>")" readonly onclick="this.select()" />
+                            <div class="hint">Internet → Permit Access → DynDNS → <em>custom provider</em>. Paste this as the <span class="mono">Update URL</span>; domain name, user name and password can be anything. FRITZ!Box substitutes <span class="mono">&lt;ipaddr&gt;</span> / <span class="mono">&lt;ip6addr&gt;</span> itself.</div>
+                        </div>
+                    </details>
+
+                    <details class="collapsible">
+                        <summary>UniFi (UDM / UGW)</summary>
+                        <div style="margin-top:10px;">
+                            <label>Server</label>
+                            <input type="text" value="@($"{host}/nic/update?token={token}&ipv4=%i")" readonly onclick="this.select()" />
+                            <div class="hint">Settings → Internet → Dynamic DNS → <em>Create New</em>. Service = <span class="mono">custom</span>; hostname / username / password = anything; paste the above into the <span class="mono">Server</span> field. UniFi replaces <span class="mono">%i</span> with the WAN IP.</div>
+                        </div>
+                    </details>
                 </div>
             }
         </div>
