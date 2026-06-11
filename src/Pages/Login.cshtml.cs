@@ -28,9 +28,13 @@ public class LoginModel : PageModel
 
     public IActionResult OnGet(string? returnUrl = null)
     {
-        if (User.Identity?.IsAuthenticated == true) return Redirect(returnUrl ?? "/");
+        if (User.Identity?.IsAuthenticated == true) return SafeRedirect(returnUrl);
         return Page();
     }
+
+    // Only follow local return URLs — never an absolute/foreign one (open-redirect guard).
+    private IActionResult SafeRedirect(string? returnUrl)
+        => !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? Redirect(returnUrl) : Redirect("/");
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {
@@ -45,7 +49,7 @@ public class LoginModel : PageModel
                 new ClaimsPrincipal(identity),
                 new AuthenticationProperties { IsPersistent = true });
             _log.Log(Services.LogLevel.Info, "auth", $"login ok: {Username}");
-            return Redirect(string.IsNullOrEmpty(returnUrl) ? "/" : returnUrl);
+            return SafeRedirect(returnUrl);
         }
 
         _log.Log(Services.LogLevel.Warn, "auth", $"login failed: {Username}");
