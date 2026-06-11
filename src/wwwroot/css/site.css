@@ -37,7 +37,7 @@ body.login {
 
 .topbar {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     padding: 0 24px;
     height: 56px;
     background: var(--panel);
@@ -64,27 +64,32 @@ a.brand:hover .title { color: var(--accent); }
 
 .topbar nav {
     display: flex;
-    gap: 4px;
+    gap: 2px;
     flex: 1;
 }
 
 .topbar nav a {
+    display: inline-flex;
+    align-items: center;
     color: var(--muted);
     text-decoration: none;
-    padding: 8px 14px;
-    border-radius: var(--radius);
-    transition: all 0.15s;
+    padding: 0 14px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
 }
 
-.topbar nav a:hover {
-    color: var(--text);
-    background: var(--panel-2);
-}
+.topbar nav a:hover { color: var(--text); }
 
 .topbar nav a.active {
     color: var(--text);
-    background: var(--panel-2);
-    box-shadow: inset 0 -2px 0 var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.logout {
+    display: flex;
+    align-items: center;
 }
 
 .logout button {

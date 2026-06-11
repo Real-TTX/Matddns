@@ -65,22 +65,28 @@
 </div>
 
 <div class="tab-panel" id="tab-users" hidden>
-    <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-        <a class="button" href="/Users/Edit">+ New user</a>
+    <div data-dt>
+        <div class="dtable-wrap">
+            <table class="dtable">
+                <thead><tr><th>User</th><th></th></tr></thead>
+                @foreach (var u in Model.Users)
+                {
+                    <tbody class="dt-group" data-href="/Users/Edit?name=@u">
+                        <tr class="dt-parent">
+                            <td class="dt-name mono">
+                                @u
+                                @if (string.Equals(u, User.Identity?.Name, StringComparison.OrdinalIgnoreCase)) { <span class="badge muted">you</span> }
+                            </td>
+                            <td class="dt-go">›</td>
+                        </tr>
+                    </tbody>
+                }
+            </table>
+        </div>
+        <div class="actions" style="margin-top:14px;">
+            <a class="button" href="/Users/Edit">+ New user</a>
+        </div>
     </div>
-    @foreach (var u in Model.Users)
-    {
-        <a class="list-item" href="/Users/Edit?name=@u">
-            <div class="li-main">
-                <span class="li-title">
-                    <span class="mono">@u</span>
-                    @if (string.Equals(u, User.Identity?.Name, StringComparison.OrdinalIgnoreCase)) { <span class="muted-small">(you)</span> }
-                </span>
-                <span class="li-sub">Edit password or delete</span>
-            </div>
-            <div class="li-side"><span class="muted">›</span></div>
-        </a>
-    }
 </div>
 
 <div class="tab-panel" id="tab-api" hidden>

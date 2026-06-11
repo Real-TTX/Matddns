@@ -29,8 +29,9 @@
         <div class="stat-label">IP changes (24h)</div>
     </div>
     <div class="stat-card">
-        <div class="stat-num">@s.IpChanges.Last7d</div>
-        <div class="stat-label">IP changes (7d)</div>
+        <span class="stat-dot @(s.ErrorsLast24h == 0 ? "ok" : "err")" title="@s.ErrorsLast24h error(s) in 24h"></span>
+        <div class="stat-num">@s.ErrorsLast24h</div>
+        <div class="stat-label">Errors (24h)</div>
     </div>
 </div>
 
