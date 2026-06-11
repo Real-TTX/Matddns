@@ -129,22 +129,19 @@
                 var token = g!.Push?.Token ?? "";
                 <div class="form-grid" style="margin-top:16px;">
                     <div class="field full">
-                        <label>Update URL (JSON API)</label>
+                        <label>Update URL</label>
                         <input type="text" value="@($"{baseUrl}/api/update?token={token}&ipv4=<your-ipv4>&ipv6=<your-ipv6>")" readonly onclick="this.select()" />
-                        <div class="hint">Separate parameters per family: <span class="mono">ipv4</span> sets the A source, <span class="mono">ipv6</span> the AAAA source. Send either or both. Omit both (or use <span class="mono">&amp;ip=</span> auto-detect) to fall back to the caller's IP. Returns JSON (<span class="mono">{"status":"ok","changed":true,…}</span>) with a proper HTTP status. Use a host reachable from your device (not localhost).</div>
+                        <div class="hint">Call this from your device or script. Send <span class="mono">ipv4</span>, <span class="mono">ipv6</span>, or both — the other family stays untouched; omit them to use the caller's IP. Returns JSON, updates on push (no interval). Use a host reachable from your device (not localhost).</div>
                     </div>
                     <div class="field full">
-                        <label>dyndns2 (routers / FRITZ!Box)</label>
-                        <input type="text" value="@($"{baseUrl}/nic/update?ipv4=<ipaddr>&ipv6=<ip6addr>")" readonly onclick="this.select()" />
-                        <div class="hint">Update URL for routers; username = anything; password = the token below. <span class="mono">ipv4</span> = IPv4, <span class="mono">ipv6</span> = IPv6 (drop the one your router doesn't send). FRITZ!Box fills <span class="mono">&lt;ipaddr&gt;</span>/<span class="mono">&lt;ip6addr&gt;</span> itself.</div>
-                    </div>
-                    <div class="field full">
-                        <label>Token (password)</label>
+                        <label>Token</label>
                         <input type="text" value="@token" readonly onclick="this.select()" />
                     </div>
-                    <div class="field full">
-                        <div class="hint">Supports IPv4 <strong>and</strong> IPv6 in a single call (<span class="mono">ipv4</span> + <span class="mono">ipv6</span>), or one family at a time. Each value is stored under the matching A / AAAA source. No interval – updates happen on push.</div>
-                    </div>
+                </div>
+                <div class="dim-section">
+                    <label style="margin-bottom:6px;">Using a router instead? (FRITZ!Box &amp; co.)</label>
+                    <p class="muted-small" style="margin-top:0; margin-bottom:8px;">Routers that only speak the legacy <strong>dyndns2</strong> protocol can use this URL instead — username = anything, password = the token above.</p>
+                    <input type="text" value="@($"{baseUrl}/nic/update?ipv4=<ipaddr>&ipv6=<ip6addr>")" readonly onclick="this.select()" />
                 </div>
             }
         </div>

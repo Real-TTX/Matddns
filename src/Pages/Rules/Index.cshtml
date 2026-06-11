@@ -5,10 +5,7 @@
 }
 
 <div class="page-header">
-    <div>
-        <h1>Rules</h1>
-        <p>Each rule writes a record from an ordered failover source list. First reachable source wins.</p>
-    </div>
+    <div><h1>Rules</h1></div>
     <a class="button" href="/Rules/Edit">+ New rule</a>
 </div>
 
@@ -22,44 +19,62 @@
         <a class="button" style="margin-top:12px;" href="/Rules/Edit">Create the first rule</a>
     </div>
 }
-
-@foreach (var r in Model.Rules)
+else
 {
-    var dg = Model.AllDomains.FirstOrDefault(d => d.Id == r.DomainGroupId);
-    var de = dg?.Entries.FirstOrDefault(e => e.Id == r.DomainEntryId);
-    var sources = r.SourceEntryIdsInOrder.Select(Model.SourceLabel).ToList();
-    var statusCls = string.IsNullOrEmpty(r.LastResult) ? "muted"
-        : r.LastResult.StartsWith("ok", StringComparison.OrdinalIgnoreCase) ? "ok"
-        : r.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase) ? "err" : "warn";
-    var valLabel = r.Validation switch
-    {
-        RuleValidation.Ping => "✓ Ping",
-        RuleValidation.TcpPort => $"✓ TCP:{r.ValidationPort}",
-        _ => null
-    };
-
-    <a class="list-item" href="/Rules/Edit?id=@r.Id">
-        <div class="li-main">
-            <span class="li-title mono">@(de != null ? de.Display : "(domain missing)")</span>
-            <span class="li-sub">
-                @(dg?.Name ?? "—") · @(sources.Count > 0 ? string.Join(" → ", sources) : "no sources")
-            </span>
-            <span class="li-sub">
-                @if (!string.IsNullOrEmpty(r.LastValue) && r.LastChange != null)
-                {
-                    <text>last set: <span class="mono">@r.LastValue</span> · @Tz.Format(r.LastChange, "yyyy-MM-dd HH:mm")</text>
-                }
-                else
-                {
-                    <text>not set yet</text>
-                }
-            </span>
+    <div data-dt>
+        <div class="table-toolbar">
+            <div class="dt-search">
+                <span class="ico">⌕</span>
+                <input type="text" data-dt-search placeholder="Search rules…" autocomplete="off" />
+            </div>
+            <select data-dt-filter="status" aria-label="Filter by status">
+                <option value="">All states</option>
+                <option value="ok">OK</option>
+                <option value="issue">Issues</option>
+                <option value="disabled">Disabled</option>
+            </select>
+            <span class="dt-count" data-dt-count></span>
         </div>
-        <div class="li-side">
-            @if (valLabel != null) { <span class="badge info">@valLabel</span> }
-            <span class="status-pill"><span class="status-dot @statusCls"></span>@(r.Trigger == RuleTrigger.OnChange ? "on IP change" : $"every {r.IntervalSeconds}s")</span>
-            @if (!r.Enabled) { <span class="badge muted">disabled</span> }
-            <span class="muted">›</span>
+        <div class="dtable-wrap">
+            <table class="dtable">
+                <thead>
+                    <tr><th>Record</th><th>Group</th><th>Failover</th><th>Last set</th><th>Status</th><th></th></tr>
+                </thead>
+                @foreach (var r in Model.Rules)
+                {
+                    var dg = Model.AllDomains.FirstOrDefault(d => d.Id == r.DomainGroupId);
+                    var de = dg?.Entries.FirstOrDefault(e => e.Id == r.DomainEntryId);
+                    var sources = r.SourceEntryIdsInOrder.Select(Model.SourceLabel).ToList();
+                    var statusKey = !r.Enabled ? "disabled"
+                        : (!string.IsNullOrEmpty(r.LastResult) && r.LastResult.StartsWith("ok", StringComparison.OrdinalIgnoreCase)) ? "ok"
+                        : (!string.IsNullOrEmpty(r.LastResult) && (r.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase) || r.LastResult == "no source" || r.LastResult == "target missing")) ? "issue"
+                        : "pending";
+                    var dot = statusKey switch { "ok" => "ok", "issue" => "err", "disabled" => "muted", _ => "warn" };
+                    var triggerText = r.Trigger == RuleTrigger.OnChange ? "on IP change" : $"every {r.IntervalSeconds}s";
+                    var recordText = de != null ? de.Display : "(domain missing)";
+                    var search = $"{recordText} {dg?.Name} {string.Join(' ', sources)} {r.LastValue} {statusKey}";
+                    <tbody class="dt-group" data-search="@search" data-status="@statusKey" data-href="/Rules/Edit?id=@r.Id">
+                        <tr class="dt-parent">
+                            <td class="dt-name mono">@recordText</td>
+                            <td class="cell-muted">@(dg?.Name ?? "—")</td>
+                            <td class="cell-muted">@(sources.Count > 0 ? string.Join(" → ", sources) : "no sources") <span class="muted-small">· @triggerText</span></td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(r.LastValue) && r.LastChange != null)
+                                {
+                                    <span class="mono">@r.LastValue</span> <span class="muted-small">@Tz.Format(r.LastChange, "MM-dd HH:mm")</span>
+                                }
+                                else
+                                {
+                                    <span class="cell-muted">—</span>
+                                }
+                            </td>
+                            <td><span class="status-pill"><span class="status-dot @dot"></span>@statusKey</span></td>
+                            <td class="dt-go">›</td>
+                        </tr>
+                    </tbody>
+                }
+                <tbody class="dt-empty" hidden><tr><td colspan="6">No rules match your search.</td></tr></tbody>
+            </table>
         </div>
-    </a>
+    </div>
 }
