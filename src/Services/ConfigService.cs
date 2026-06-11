@@ -98,6 +98,18 @@ public class ConfigService
                 changed = true;
             }
         }
+        // Legacy rule trigger -> independent OnChange/Interval. An old "Interval" rule was
+        // not change-driven, so disable OnChange; "OnChange" rules keep the default (true).
+        // Neutralize Trigger afterwards so this runs only once and never clobbers later edits.
+        foreach (var r in cfg.Rules)
+        {
+            if (r.Trigger == RuleTrigger.Interval)
+            {
+                r.OnChange = false;
+                r.Trigger = RuleTrigger.OnChange;
+                changed = true;
+            }
+        }
         return changed;
     }
 

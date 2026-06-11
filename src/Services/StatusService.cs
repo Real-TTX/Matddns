@@ -13,6 +13,15 @@ public class StatusService
         _log = log;
     }
 
+    // "on change", "every 300s", "on change + every 300s", or "manual"
+    private static string ScheduleText(Rule r)
+    {
+        var parts = new List<string>();
+        if (r.OnChange) parts.Add("on change");
+        if (r.IntervalSeconds > 0) parts.Add($"every {r.IntervalSeconds}s");
+        return parts.Count > 0 ? string.Join(" + ", parts) : "manual";
+    }
+
     public StatusSnapshot Build(int recentChanges = 20)
     {
         var cfg = _config.Current;
@@ -51,7 +60,7 @@ public class StatusService
                 Type = (de?.Type ?? DnsRecordType.A).ToString(),
                 Group = dg?.Name,
                 Enabled = r.Enabled,
-                Trigger = r.Trigger.ToString(),
+                Trigger = ScheduleText(r),
                 LastResult = r.LastResult,
                 LastValue = r.LastValue,
                 LastChange = r.LastChange,

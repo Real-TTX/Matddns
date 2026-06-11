@@ -62,6 +62,11 @@ a.brand:hover .title { color: var(--accent); }
     font-size: 20px;
 }
 
+.brand .title {
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
 .topbar nav {
     display: flex;
     gap: 2px;
