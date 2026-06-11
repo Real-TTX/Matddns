@@ -86,13 +86,16 @@ else
                     <input type="number" name="IntervalSeconds" value="@(r?.IntervalSeconds ?? 300)" min="0" max="86400" />
                 </div>
 
-                <div class="field">
+                <div class="field full">
                     <label>Failover validation</label>
-                    <select name="Validation" data-validation>
-                        <option value="None" selected="@(r == null || r.Validation == RuleValidation.None)">IP present only</option>
-                        <option value="Ping" selected="@(r != null && r.Validation == RuleValidation.Ping)">Ping</option>
-                        <option value="TcpPort" selected="@(r != null && r.Validation == RuleValidation.TcpPort)">TCP port open</option>
-                    </select>
+                    <label class="checkbox-row">
+                        <input type="checkbox" name="ValidatePing" value="true" checked="@(r != null && r.ValidatePing)" />
+                        <span>Ping (ICMP)</span>
+                    </label>
+                    <label class="checkbox-row">
+                        <input type="checkbox" name="ValidateTcp" value="true" data-validation checked="@(r != null && r.ValidateTcp)" />
+                        <span>TCP port open</span>
+                    </label>
                 </div>
 
                 <div class="field validation-port-field">
@@ -222,16 +225,12 @@ else
 }
 
 <script>
-    function bindToggle(selector, fieldClass, matchValue) {
-        document.querySelectorAll(selector).forEach(function (sel) {
-            function sync() {
-                var form = sel.closest('form');
-                var f = form ? form.querySelector(fieldClass) : null;
-                if (f) f.style.display = (sel.value === matchValue) ? '' : 'none';
-            }
-            sel.addEventListener('change', sync);
-            sync();
-        });
-    }
-    bindToggle('select[data-validation]', '.validation-port-field', 'TcpPort');
+    (function () {
+        var tcp = document.querySelector('input[data-validation]');
+        var portField = document.querySelector('.validation-port-field');
+        if (!tcp || !portField) return;
+        function sync() { portField.style.display = tcp.checked ? '' : 'none'; }
+        tcp.addEventListener('change', sync);
+        sync();
+    })();
 </script>

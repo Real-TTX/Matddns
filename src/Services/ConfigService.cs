@@ -28,7 +28,7 @@ public class ConfigService
     }
 
     /// <summary>Latest config schema version. Bump this and append a step to <see cref="Migrations"/> when the data shape changes.</summary>
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     public void EnsureLoaded()
     {
@@ -78,6 +78,7 @@ public class ConfigService
     private static readonly Action<AppConfig>[] Migrations =
     {
         MigrateV0ToV1,
+        MigrateV1ToV2,
     };
 
     /// <summary>
@@ -120,6 +121,17 @@ public class ConfigService
         // legacy single trigger -> independent OnChange/Interval; an old "Interval" rule wasn't change-driven
         foreach (var r in cfg.Rules)
             if (r.Trigger == RuleTrigger.Interval) { r.OnChange = false; r.Trigger = RuleTrigger.OnChange; }
+    }
+
+    /// <summary>v1 → v2: single Validation enum -> independent ValidatePing / ValidateTcp checkboxes.</summary>
+    private static void MigrateV1ToV2(AppConfig cfg)
+    {
+        foreach (var r in cfg.Rules)
+        {
+            if (r.Validation == RuleValidation.Ping) r.ValidatePing = true;
+            else if (r.Validation == RuleValidation.TcpPort) r.ValidateTcp = true;
+            r.Validation = RuleValidation.None; // neutralize so this only applies once
+        }
     }
 
     public void Mutate(Action<AppConfig> mutator)

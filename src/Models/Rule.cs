@@ -28,8 +28,13 @@ public class Rule
     // Legacy single trigger; migrated into OnChange/IntervalSeconds on load, then unused.
     public RuleTrigger Trigger { get; set; } = RuleTrigger.OnChange;
 
-    public RuleValidation Validation { get; set; } = RuleValidation.None;
+    // Failover validation: a source is only accepted if it passes ALL enabled checks.
+    public bool ValidatePing { get; set; }
+    public bool ValidateTcp { get; set; }
     public int ValidationPort { get; set; } = 443;
+
+    // Legacy single validation; migrated into ValidatePing/ValidateTcp on load, then unused.
+    public RuleValidation Validation { get; set; } = RuleValidation.None;
     public string DomainGroupId { get; set; } = "";
     public string DomainEntryId { get; set; } = "";
     public List<string> SourceEntryIdsInOrder { get; set; } = new();
