@@ -538,6 +538,23 @@ td.mono, .mono {
 .checkbox-field input { width: auto; height: auto; }
 .checkbox-field label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
 
+.source-pick { display: flex; flex-direction: column; gap: 2px; }
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin: 0;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 14px;
+    color: var(--text);
+}
+.checkbox-row:hover { background: var(--panel-2); }
+.checkbox-row input { width: auto; height: auto; margin: 0; }
+
 .type-fields { display: none; }
 .type-fields.active { display: block; }
 
