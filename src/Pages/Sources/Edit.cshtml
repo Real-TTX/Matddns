@@ -12,7 +12,6 @@
 <div class="page-header">
     <div>
         <h1>@(isNew ? "New source group" : g!.Name)</h1>
-        <p>@(isNew ? "Pick a type – the matching fields appear automatically." : "Configuration and entries of this source.")</p>
     </div>
 </div>
 
@@ -52,7 +51,6 @@
                 {
                     var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static IP", SourceKind.Push => "DynDNS Server", _ => "Public IP" };
                     <input type="text" value="@typeLabel" disabled />
-                    <div class="hint">Type cannot be changed after creation.</div>
                 }
             </div>
 
@@ -71,7 +69,6 @@
                 <div class="field">
                     <label>Base URL</label>
                     <input type="text" name="UniUrl" value="@(g?.Unifi?.BaseUrl ?? "")" placeholder="https://10.10.0.1" />
-                    <div class="hint">Without a scheme, https:// is added automatically.</div>
                 </div>
                 <div class="field">
                     <label>Site</label>
@@ -80,7 +77,6 @@
                 <div class="field">
                     <label>Username</label>
                     <input type="text" name="UniUser" value="@(g?.Unifi?.Username ?? "")" autocomplete="off" />
-                    <div class="hint">Local UniFi account (no Ubiquiti cloud login), 2FA off.</div>
                 </div>
                 <div class="field">
                     <label>Password</label>
@@ -89,16 +85,14 @@
                 <div class="field full">
                     <div class="checkbox-field">
                         <input type="checkbox" id="UniIgnoreCert" name="UniIgnoreCert" value="true" @(g?.Unifi?.IgnoreCertificate != false ? "checked" : "") />
-                        <label for="UniIgnoreCert">Ignore self-signed certificate (recommended for UDM)</label>
+                        <label for="UniIgnoreCert">Ignore self-signed certificate</label>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Public IP fields -->
-        <div class="type-fields @(kind == SourceKind.PublicIp ? "active" : "")" data-kind="PublicIp">
-            <p class="muted" style="margin-top:16px;">No further configuration needed – the container's public IP is detected automatically.</p>
-        </div>
+        <div class="type-fields @(kind == SourceKind.PublicIp ? "active" : "")" data-kind="PublicIp"></div>
 
         <!-- Static fields -->
         <div class="type-fields @(kind == SourceKind.Static ? "active" : "")" data-kind="Static">
@@ -111,19 +105,12 @@
                     <label>Static IPv6</label>
                     <input type="text" name="StaticIpv6" value="@(g?.Static?.Ipv6 ?? "")" placeholder="2001:db8::1" />
                 </div>
-                <div class="field full">
-                    <div class="hint">Either or both. Rules pick IPv4 for A records and IPv6 for AAAA – e.g. a known server or fallback.</div>
-                </div>
             </div>
         </div>
 
         <!-- Push / DynDNS receiver fields -->
         <div class="type-fields @(kind == SourceKind.Push ? "active" : "")" data-kind="Push">
-            @if (isNew)
-            {
-                <p class="muted" style="margin-top:16px;">A secret token and update URL are generated after creating. Point your router/device/script at it; rules then propagate the pushed IP to your DNS targets.</p>
-            }
-            else
+            @if (!isNew)
             {
                 var baseUrl = Model.BaseUrl;
                 var token = g!.Push?.Token ?? "";
@@ -228,11 +215,6 @@
             }
             </tbody>
         </table>
-
-        @if (kind == SourceKind.Unifi)
-        {
-            <div class="muted-small" style="margin-top:12px;">Entries are discovered automatically from the UDM – one per WAN. No manual entries.</div>
-        }
     </div>
 }
 
