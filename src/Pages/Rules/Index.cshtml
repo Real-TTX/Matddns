@@ -38,7 +38,7 @@ else
         <div class="dtable-wrap">
             <table class="dtable">
                 <thead>
-                    <tr><th>Record</th><th>Source</th><th>IP</th><th>Status</th><th></th></tr>
+                    <tr><th>Record</th><th class="hide-sm">Source</th><th>IP</th><th>Status</th><th></th></tr>
                 </thead>
                 @foreach (var r in Model.Rules)
                 {
@@ -66,9 +66,9 @@ else
                     <tbody class="dt-group" data-search="@search" data-status="@statusKey" data-href="/Rules/Edit?id=@r.Id">
                         <tr class="dt-parent @(sourceIds.Count > 0 ? "has-children" : "")">
                             <td class="dt-name mono">@recordText</td>
-                            <td class="cell-muted">@(activeLabel ?? "no sources")</td>
+                            <td class="cell-muted hide-sm">@(activeLabel ?? "no sources")</td>
                             <td class="mono">@(!string.IsNullOrEmpty(r.LastValue) ? r.LastValue : "—")</td>
-                            <td><span class="status-pill"><span class="status-dot @dot"></span>@statusKey</span> <span class="muted-small">· @triggerText</span></td>
+                            <td><span class="status-pill"><span class="status-dot @dot"></span>@statusKey</span> <span class="muted-small hide-sm">· @triggerText</span></td>
                             <td class="dt-go">›</td>
                         </tr>
                         @if (sourceIds.Count > 0)
@@ -86,7 +86,7 @@ else
                                 var cstate = isActive ? "active" : (hasIp ? "standby" : "no ip");
                                 <tr class="dt-child @(i == sourceIds.Count - 1 ? "last" : "")">
                                     <td><span class="dt-sub">#@(i + 1) @label</span></td>
-                                    <td class="cell-muted">@grp</td>
+                                    <td class="cell-muted hide-sm">@grp</td>
                                     <td class="mono cell-muted">@(sip ?? "—")</td>
                                     <td><span class="status-pill"><span class="status-dot @cdot"></span>@cstate</span></td>
                                     <td></td>

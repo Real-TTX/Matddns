@@ -37,7 +37,7 @@ else
         <div class="dtable-wrap">
             <table class="dtable">
                 <thead>
-                    <tr><th>Name</th><th>Provider</th><th>Record</th><th>Type</th><th></th></tr>
+                    <tr><th>Name</th><th class="hide-sm">Provider</th><th>Record</th><th>Type</th><th></th></tr>
                 </thead>
                 @foreach (var g in Model.Groups)
                 {
@@ -48,7 +48,7 @@ else
                     <tbody class="dt-group" data-search="@search" data-kind="@kindKey" data-href="/Domains/Edit?id=@g.Id">
                         <tr class="dt-parent @(entries.Count > 0 ? "has-children" : "")">
                             <td class="dt-name">@g.Name</td>
-                            <td><span class="badge @(g.Kind == DomainKind.Netcup ? "update" : "info")">@kindLabel</span></td>
+                            <td class="hide-sm"><span class="badge @(g.Kind == DomainKind.Netcup ? "update" : "info")">@kindLabel</span></td>
                             <td class="cell-muted">@entries.Count record@(entries.Count == 1 ? "" : "s")</td>
                             <td></td>
                             <td class="dt-go">›</td>
@@ -58,7 +58,7 @@ else
                             var e = entries[i];
                             <tr class="dt-child @(i == entries.Count - 1 ? "last" : "")">
                                 <td></td>
-                                <td></td>
+                                <td class="hide-sm"></td>
                                 <td class="mono"><span class="dt-sub">@e.Hostname</span></td>
                                 <td><span class="badge muted">@e.Type</span></td>
                                 <td></td>
