@@ -54,8 +54,20 @@
         apply();
     }
 
+    function initNav() {
+        var toggle = document.getElementById('navToggle');
+        var menu = document.getElementById('topbarMenu');
+        if (!toggle || !menu) return;
+        toggle.addEventListener('click', function () {
+            var open = menu.classList.toggle('open');
+            toggle.classList.toggle('open', open);
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    }
+
     function initAll() {
         Array.prototype.slice.call(document.querySelectorAll('[data-dt]')).forEach(initTable);
+        initNav();
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initAll);

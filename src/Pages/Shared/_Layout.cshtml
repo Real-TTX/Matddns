@@ -21,26 +21,31 @@
                 <span class="logo">◈</span>
                 <span class="title">Matddns</span>
             </a>
-            <nav>
+            <button type="button" class="navtoggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">
+                <span></span><span></span><span></span>
+            </button>
+            <div class="topbar-menu" id="topbarMenu">
+                <nav>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <a class="@(Starts("/Sources") ? "active" : "")" href="/Sources">Sources</a>
+                        <a class="@(DomainsActive() ? "active" : "")" href="/Domains">Domains</a>
+                        <a class="@(Starts("/Rules") ? "active" : "")" href="/Rules">Rules</a>
+                        <a class="@(Starts("/System") ? "active" : "")" href="/System">System</a>
+                        <a class="@(Starts("/Log") ? "active" : "")" href="/Log">Log</a>
+                    }
+                </nav>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
-                    <a class="@(Starts("/Sources") ? "active" : "")" href="/Sources">Sources</a>
-                    <a class="@(DomainsActive() ? "active" : "")" href="/Domains">Domains</a>
-                    <a class="@(Starts("/Rules") ? "active" : "")" href="/Rules">Rules</a>
-                    <a class="@(Starts("/System") ? "active" : "")" href="/System">System</a>
-                    <a class="@(Starts("/Log") ? "active" : "")" href="/Log">Log</a>
+                    <form method="post" asp-page="/Logout" class="logout">
+                        <button type="submit" class="ghost">Logout</button>
+                    </form>
                 }
-            </nav>
-            @if (User.Identity?.IsAuthenticated == true)
-            {
-                <form method="post" asp-page="/Logout" class="logout">
-                    <button type="submit" class="ghost">Logout</button>
-                </form>
-            }
-            else
-            {
-                <div class="logout"><a class="button ghost" href="/Login">Login</a></div>
-            }
+                else
+                {
+                    <div class="logout"><a class="button ghost" href="/Login">Login</a></div>
+                }
+            </div>
         </header>
         <main class="container">
             @RenderBody()
