@@ -109,33 +109,6 @@ else
             </div>
         </div>
 
-        @if (isNew)
-        {
-            <div class="section-title"><h2>Failover sources</h2></div>
-            <div class="card">
-                @if (Model.AllSources.SelectMany(s => s.Entries).Any())
-                {
-                    <p class="muted-small" style="margin-top:0;">Pick the sources to fail over through — the first reachable one wins. You can reorder them after creating.</p>
-                    <div class="source-pick">
-                        @foreach (var sg in Model.AllSources)
-                        {
-                            foreach (var se in sg.Entries)
-                            {
-                                <label class="checkbox-row">
-                                    <input type="checkbox" name="SourceEntryIdsInOrder" value="@se.Id" />
-                                    <span><span class="mono">@sg.Name</span> · @se.Label @(se.InterfaceName != null ? $"({se.InterfaceName})" : "")</span>
-                                </label>
-                            }
-                        }
-                    </div>
-                }
-                else
-                {
-                    <p class="muted-small" style="margin-top:0;">No sources yet — <a href="/Sources/Edit">add a source</a> first.</p>
-                }
-            </div>
-        }
-
         <div class="actions">
             <button type="submit">@(isNew ? "Create" : "Save")</button>
             <a class="button ghost" href="/Rules">Cancel</a>

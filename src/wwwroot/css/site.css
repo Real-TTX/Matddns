@@ -538,7 +538,6 @@ td.mono, .mono {
 .checkbox-field input { width: auto; height: auto; }
 .checkbox-field label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
 
-.source-pick { display: flex; flex-direction: column; gap: 2px; }
 .checkbox-row {
     display: flex;
     align-items: center;
