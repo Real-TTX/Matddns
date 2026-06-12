@@ -5,7 +5,8 @@ public enum SourceKind
     PublicIp,
     Unifi,
     Static,
-    Push
+    Push,
+    Dns
 }
 
 public class SourceGroup
@@ -17,7 +18,13 @@ public class SourceGroup
     public UnifiSettings? Unifi { get; set; }
     public StaticSettings? Static { get; set; }
     public PushSettings? Push { get; set; }
+    public DnsSettings? Dns { get; set; }
     public List<SourceEntry> Entries { get; set; } = new();
+}
+
+public class DnsSettings
+{
+    public string Hostname { get; set; } = "";   // resolved to A/AAAA, e.g. xxxxxxxx.myfritz.net
 }
 
 public class StaticSettings

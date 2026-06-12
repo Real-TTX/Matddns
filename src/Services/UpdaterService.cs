@@ -7,6 +7,7 @@ public class UpdaterService : BackgroundService
     private readonly ConfigService _config;
     private readonly LogService _log;
     private readonly PublicIpClient _publicIp;
+    private readonly DnsLookupClient _dns;
     private readonly UnifiClient _unifi;
     private readonly DynDnsClient _dyndns;
     private readonly NetcupClient _netcup;
@@ -17,6 +18,7 @@ public class UpdaterService : BackgroundService
         ConfigService config,
         LogService log,
         PublicIpClient publicIp,
+        DnsLookupClient dns,
         UnifiClient unifi,
         DynDnsClient dyndns,
         NetcupClient netcup,
@@ -26,6 +28,7 @@ public class UpdaterService : BackgroundService
         _config = config;
         _log = log;
         _publicIp = publicIp;
+        _dns = dns;
         _unifi = unifi;
         _dyndns = dyndns;
         _netcup = netcup;
@@ -157,6 +160,29 @@ public class UpdaterService : BackgroundService
                     entry.LastChecked = DateTime.UtcNow;
                     entry.LastError = (string.IsNullOrWhiteSpace(ip) && string.IsNullOrWhiteSpace(ipv6)) ? "no IP configured" : null;
                 });
+            }
+            else if (group.Kind == SourceKind.Dns)
+            {
+                var host = group.Dns?.Hostname ?? "";
+                var (v4, v6) = await _dns.ResolveAsync(host, ct);
+                _config.Mutate(c =>
+                {
+                    var g = c.Sources.FirstOrDefault(x => x.Id == group.Id);
+                    if (g == null) return;
+                    if (g.Entries.Count == 0) g.Entries.Add(new SourceEntry());
+                    var entry = g.Entries[0];
+                    entry.Label = string.IsNullOrWhiteSpace(host) ? "DNS lookup" : host;
+                    entry.CurrentIp = v4;
+                    entry.CurrentIpv6 = v6;
+                    entry.LastChecked = DateTime.UtcNow;
+                    entry.LastError = (v4 == null && v6 == null)
+                        ? (string.IsNullOrWhiteSpace(host) ? "no hostname configured" : "could not resolve")
+                        : null;
+                });
+                if (v4 != null || v6 != null)
+                    _log.Log(LogLevel.Debug, $"src:{group.Name}", $"DNS {host} v4={v4 ?? "-"} v6={v6 ?? "-"}");
+                else
+                    _log.Log(LogLevel.Warn, $"src:{group.Name}", $"could not resolve {host}");
             }
         }
     }

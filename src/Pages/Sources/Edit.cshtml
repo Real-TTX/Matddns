@@ -45,11 +45,12 @@
                         <option value="Unifi">Unifi</option>
                         <option value="Static">Static IP</option>
                         <option value="Push">DynDNS Server</option>
+                        <option value="Dns">DNS lookup</option>
                     </select>
                 }
                 else
                 {
-                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static IP", SourceKind.Push => "DynDNS Server", _ => "Public IP" };
+                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static IP", SourceKind.Push => "DynDNS Server", SourceKind.Dns => "DNS lookup", _ => "Public IP" };
                     <input type="text" value="@typeLabel" disabled />
                 }
             </div>
@@ -104,6 +105,16 @@
                 <div class="field">
                     <label>Static IPv6</label>
                     <input type="text" name="StaticIpv6" value="@(g?.Static?.Ipv6 ?? "")" placeholder="2001:db8::1" />
+                </div>
+            </div>
+        </div>
+
+        <!-- DNS lookup fields -->
+        <div class="type-fields @(kind == SourceKind.Dns ? "active" : "")" data-kind="Dns">
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="field full">
+                    <label>Hostname</label>
+                    <input type="text" name="DnsHost" value="@(g?.Dns?.Hostname ?? "")" placeholder="xxxxxxxx.myfritz.net" />
                 </div>
             </div>
         </div>
@@ -175,7 +186,7 @@
             <a class="button ghost" href="/Sources">Cancel</a>
             @if (!isNew)
             {
-                @if (kind == SourceKind.Unifi || kind == SourceKind.PublicIp)
+                @if (kind == SourceKind.Unifi || kind == SourceKind.PublicIp || kind == SourceKind.Dns)
                 {
                     <button type="submit" class="ghost" asp-page-handler="Test" name="Id" value="@g!.Id">Test connection</button>
                 }
