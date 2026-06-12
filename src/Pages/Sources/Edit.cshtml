@@ -154,10 +154,11 @@
                                         <tr><td>Hostname</td><td>any FQDN, label only — e.g. <span class="mono">wan.example.com</span></td></tr>
                                         <tr><td>Username</td><td class="mono">matddns</td></tr>
                                         <tr><td>Password</td><td class="mono">@token</td></tr>
-                                        <tr><td>Server</td><td class="mono">@($"{host}/nic/update?myip=%i")</td></tr>
+                                        <tr><td>Server</td><td class="mono">@($"{host}/update?token=%p&ipv4=%i")</td></tr>
                                     </tbody>
                                 </table>
-                                <p class="muted-small" style="margin:8px 0 0;"><strong>Server: no <span class="mono">http://</span> / <span class="mono">https://</span></strong> — bare host only, or UniFi's client tries to resolve the scheme as a hostname and never sends. The token goes in <strong>Password</strong> (UniFi drops URL parameters that have no placeholder). It fills <span class="mono">%i</span> with the WAN IP and connects over HTTPS.</p>
+                                <p class="muted-small" style="margin:8px 0 0;"><strong>Server: no <span class="mono">http://</span> / <span class="mono">https://</span></strong> — bare host only, or UniFi's client tries to resolve the scheme as a hostname and never sends. Fill <strong>Password</strong> with the token; <span class="mono">%p</span> mirrors it into the URL and <span class="mono">%i</span> becomes the WAN IPv4 (both are placeholders — UniFi keeps those, drops plain text). Connects over HTTPS.</p>
+                                <p class="muted-small" style="margin:6px 0 0;"><strong>IPv4 only:</strong> UniFi has no IPv6 placeholder, so one entry tracks the WAN IPv4. For dual‑stack use the FRITZ!Box section (separate <span class="mono">&lt;ip6addr&gt;</span>).</p>
                                 <p class="muted-small" style="margin:6px 0 0;"><strong>Same‑network gotcha:</strong> if the UDM's DDNS host resolves to its own public IP, the request loops back to the UDM (NAT hairpin). Add a local DNS record so <span class="mono">@host</span> resolves to this server's internal IP.</p>
                             </div>
                         </details>
