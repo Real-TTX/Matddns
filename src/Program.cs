@@ -111,9 +111,10 @@ app.MapGet("/api/update", (HttpContext ctx, PushReceiver push) =>
     };
 }).AllowAnonymous();
 
-// dyndns2-compatible (routers / FRITZ!Box): /nic/update?ipv4=<v4>&ipv6=<v6>  with HTTP Basic auth (password = token).
-// Keeps the dyndns2 plain-text protocol (good/nochg/badauth/nohost) that routers expect.
-app.MapGet("/nic/update", (HttpContext ctx, PushReceiver push) =>
+// dyndns2-compatible (routers / FRITZ!Box / UniFi): /nic/update and the shorter /update alias.
+// Token via HTTP Basic auth password or ?token= (literal, or a client placeholder like %p); ipv4/ipv6 (or myip) set the address(es).
+// Keeps the dyndns2 plain-text protocol (good/nochg/badauth/nohost) these clients expect.
+IResult DynDns2Update(HttpContext ctx, PushReceiver push)
 {
     var q = ctx.Request.Query;
     var token = PushReceiver.BasicAuthPassword(ctx.Request.Headers.Authorization.FirstOrDefault())
@@ -131,7 +132,9 @@ app.MapGet("/nic/update", (HttpContext ctx, PushReceiver push) =>
         _ => $"{(r.Changed ? "good" : "nochg")} {string.Join(" ", new[] { r.Ipv4, r.Ipv6 }.Where(x => x != null))}".Trim(),
     };
     return Results.Text(body, "text/plain", statusCode: 200); // dyndns2 carries status in the body
-}).AllowAnonymous();
+}
+app.MapGet("/nic/update", DynDns2Update).AllowAnonymous();
+app.MapGet("/update", DynDns2Update).AllowAnonymous();
 
 app.Services.GetRequiredService<ConfigService>().EnsureLoaded();
 
