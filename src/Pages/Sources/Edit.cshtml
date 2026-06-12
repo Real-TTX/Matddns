@@ -133,25 +133,34 @@
                         <button type="button" class="modal-x" aria-label="Close" onclick="this.closest('dialog').close()">✕</button>
                     </div>
                     <div class="modal-body">
-                        <p class="muted-small" style="margin-top:0;">The update URL takes <span class="mono">ipv4</span>, <span class="mono">ipv6</span>, or both — the other family stays untouched; omit them to use the caller's IP. It updates on push (no interval). The token is already filled in below. Use a host reachable from the device (not localhost).</p>
+                        <p class="muted-small" style="margin-top:0;">The token is pre‑filled below. Use a host reachable from the device — not localhost.</p>
 
-                        <label>FRITZ!Box — Update URL</label>
-                        <input type="text" value="@($"{baseUrl}/nic/update?token={token}&ipv4=<ipaddr>&ipv6=<ip6addr>")" readonly onclick="this.select()" />
-                        <p class="muted-small" style="margin:6px 0 0;">Internet → Permit Access → DynDNS → <em>custom provider</em>. Domain / user / password can be anything; FRITZ!Box fills <span class="mono">&lt;ipaddr&gt;</span> / <span class="mono">&lt;ip6addr&gt;</span>.</p>
+                        <details name="pushdocs" class="acc">
+                            <summary>FRITZ!Box</summary>
+                            <div class="acc-body">
+                                <label>Update URL</label>
+                                <input type="text" value="@($"{baseUrl}/nic/update?token={token}&ipv4=<ipaddr>&ipv6=<ip6addr>")" readonly onclick="this.select()" />
+                                <p class="muted-small" style="margin:6px 0 0;">Internet → Permit Access → DynDNS → <em>custom provider</em>. Domain / user / password can be anything; FRITZ!Box fills <span class="mono">&lt;ipaddr&gt;</span> / <span class="mono">&lt;ip6addr&gt;</span>.</p>
+                            </div>
+                        </details>
 
-                        <label style="margin-top:16px;">UniFi (UDM / UGW)</label>
-                        <p class="muted-small" style="margin:6px 0 8px;">Settings → Internet → <em>your WAN</em> → Dynamic DNS → <strong>Create New</strong></p>
-                        <table class="api-table">
-                            <tbody>
-                                <tr><td>Service</td><td class="mono">custom</td></tr>
-                                <tr><td>Hostname</td><td>any FQDN, label only — e.g. <span class="mono">wan.example.com</span></td></tr>
-                                <tr><td>Username</td><td class="mono">matddns</td></tr>
-                                <tr><td>Password</td><td class="mono">@token</td></tr>
-                                <tr><td>Server</td><td class="mono">@($"{host}/nic/update?myip=%i")</td></tr>
-                            </tbody>
-                        </table>
-                        <p class="muted-small" style="margin:8px 0 0;"><strong>Server: no <span class="mono">http://</span> / <span class="mono">https://</span></strong> — bare host only, or UniFi's client tries to resolve the scheme as a hostname and never sends. The token goes in <strong>Password</strong> (UniFi drops URL parameters that have no placeholder). It fills <span class="mono">%i</span> with the WAN IP and connects over HTTPS.</p>
-                        <p class="muted-small" style="margin:6px 0 0;"><strong>Same‑network gotcha:</strong> if the UDM's DDNS host resolves to its own public IP, the request loops back to the UDM (NAT hairpin). Add a local DNS record so <span class="mono">@host</span> resolves to this server's internal IP.</p>
+                        <details name="pushdocs" class="acc">
+                            <summary>UniFi (UDM / UGW)</summary>
+                            <div class="acc-body">
+                                <p class="muted-small" style="margin:10px 0 8px;">Settings → Internet → <em>your WAN</em> → Dynamic DNS → <strong>Create New</strong></p>
+                                <table class="api-table">
+                                    <tbody>
+                                        <tr><td>Service</td><td class="mono">custom</td></tr>
+                                        <tr><td>Hostname</td><td>any FQDN, label only — e.g. <span class="mono">wan.example.com</span></td></tr>
+                                        <tr><td>Username</td><td class="mono">matddns</td></tr>
+                                        <tr><td>Password</td><td class="mono">@token</td></tr>
+                                        <tr><td>Server</td><td class="mono">@($"{host}/nic/update?myip=%i")</td></tr>
+                                    </tbody>
+                                </table>
+                                <p class="muted-small" style="margin:8px 0 0;"><strong>Server: no <span class="mono">http://</span> / <span class="mono">https://</span></strong> — bare host only, or UniFi's client tries to resolve the scheme as a hostname and never sends. The token goes in <strong>Password</strong> (UniFi drops URL parameters that have no placeholder). It fills <span class="mono">%i</span> with the WAN IP and connects over HTTPS.</p>
+                                <p class="muted-small" style="margin:6px 0 0;"><strong>Same‑network gotcha:</strong> if the UDM's DDNS host resolves to its own public IP, the request loops back to the UDM (NAT hairpin). Add a local DNS record so <span class="mono">@host</span> resolves to this server's internal IP.</p>
+                            </div>
+                        </details>
                     </div>
                     <div class="modal-foot">
                         <button type="button" onclick="this.closest('dialog').close()">Close</button>
