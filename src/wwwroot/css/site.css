@@ -302,6 +302,35 @@ dialog.modal::backdrop { background: rgba(0, 0, 0, 0.55); }
 
 .modal-x:hover { color: var(--text); background: transparent; }
 
+/* collapsible provider docs in the DynDNS setup dialog */
+.modal-body details.acc {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-top: 12px;
+    background: var(--panel-2);
+}
+.modal-body details.acc > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 11px 13px;
+    font-weight: 500;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+}
+.modal-body details.acc > summary::-webkit-details-marker { display: none; }
+.modal-body details.acc > summary::after {
+    content: "▾";
+    color: var(--muted);
+    transition: transform 0.15s ease;
+}
+.modal-body details.acc[open] > summary::after { transform: rotate(180deg); }
+.modal-body details.acc > summary:hover { color: var(--accent); }
+.modal-body details.acc[open] > summary { border-bottom: 1px solid var(--border); }
+.modal-body .acc-body { padding: 2px 13px 13px; }
+
 .actions {
     display: flex;
     gap: 8px;
