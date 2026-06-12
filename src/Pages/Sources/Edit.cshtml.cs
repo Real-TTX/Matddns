@@ -10,12 +10,14 @@ public class EditModel : PageModel
     private readonly ConfigService _config;
     private readonly UnifiClient _unifi;
     private readonly PublicIpClient _publicIp;
+    private readonly DnsLookupClient _dns;
 
-    public EditModel(ConfigService config, UnifiClient unifi, PublicIpClient publicIp)
+    public EditModel(ConfigService config, UnifiClient unifi, PublicIpClient publicIp, DnsLookupClient dns)
     {
         _config = config;
         _unifi = unifi;
         _publicIp = publicIp;
+        _dns = dns;
     }
 
     public SourceGroup? Group { get; private set; }
@@ -40,7 +42,7 @@ public class EditModel : PageModel
 
     public IActionResult OnPostCreate(string Name, SourceKind Kind, int IntervalSeconds,
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
-        string? StaticIp = null, string? StaticIpv6 = null)
+        string? StaticIp = null, string? StaticIpv6 = null, string? DnsHost = null)
     {
         if (string.IsNullOrWhiteSpace(Name)) { Error = "Name missing"; return RedirectToPage("Edit"); }
 
@@ -81,6 +83,12 @@ public class EditModel : PageModel
             g.Push = new PushSettings { Token = PushReceiver.NewToken() };
             g.Entries.Add(new SourceEntry { Label = "Pushed IP" });
         }
+        else if (Kind == SourceKind.Dns)
+        {
+            var host = (DnsHost ?? "").Trim();
+            g.Dns = new DnsSettings { Hostname = host };
+            g.Entries.Add(new SourceEntry { Label = string.IsNullOrEmpty(host) ? "DNS lookup" : host });
+        }
         else
         {
             g.Entries.Add(new SourceEntry { Label = "Public IP" });
@@ -108,7 +116,7 @@ public class EditModel : PageModel
 
     public IActionResult OnPostSave(string Id, string Name, int IntervalSeconds,
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
-        string? StaticIp = null, string? StaticIpv6 = null)
+        string? StaticIp = null, string? StaticIpv6 = null, string? DnsHost = null)
     {
         _config.Mutate(c =>
         {
@@ -137,6 +145,15 @@ public class EditModel : PageModel
                 e.CurrentIpv6 = string.IsNullOrEmpty(g.Static.Ipv6) ? null : g.Static.Ipv6;
                 e.LastChecked = DateTime.UtcNow;
                 e.LastError = null;
+            }
+            else if (g.Kind == SourceKind.Dns)
+            {
+                g.Dns ??= new DnsSettings();
+                g.Dns.Hostname = (DnsHost ?? "").Trim();
+                var e = g.Entries.FirstOrDefault();
+                if (e == null) { e = new SourceEntry(); g.Entries.Add(e); }
+                e.Label = string.IsNullOrEmpty(g.Dns.Hostname) ? "DNS lookup" : g.Dns.Hostname;
+                e.LastChecked = null; // force a re-resolve on the next poll
             }
         });
         Notice = "Saved";
@@ -200,7 +217,8 @@ public class EditModel : PageModel
     }
 
     public async Task<IActionResult> OnPostTestAsync(string Id, CancellationToken ct,
-        string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false)
+        string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
+        string? DnsHost = null)
     {
         var g = _config.Read(c => c.Sources.FirstOrDefault(x => x.Id == Id));
         if (g == null) { Error = "Group not found"; return RedirectToPage("Index"); }
@@ -231,6 +249,15 @@ public class EditModel : PageModel
                         string.Join(", ", wans.Select(w =>
                             $"{(string.IsNullOrEmpty(w.DisplayName) ? w.Name : w.DisplayName)} [{w.Name}{(string.IsNullOrEmpty(w.Ifname) ? "" : "/" + w.Ifname)}]={(w.Up ? (w.Ip ?? "no lease") : "down")}"));
                 }
+            }
+            else if (g.Kind == SourceKind.Dns)
+            {
+                var host = string.IsNullOrWhiteSpace(DnsHost) ? (g.Dns?.Hostname ?? "") : DnsHost.Trim();
+                var (v4, v6) = await _dns.ResolveAsync(host, ct);
+                TestOk = v4 != null || v6 != null;
+                TestResult = TestOk
+                    ? $"OK – {host} → {string.Join(" / ", new[] { v4, v6 }.Where(x => x != null))}"
+                    : (string.IsNullOrWhiteSpace(host) ? "Enter a hostname first." : $"Could not resolve {host}.");
             }
             else
             {
