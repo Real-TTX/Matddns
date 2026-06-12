@@ -30,12 +30,18 @@ public class PushReceiver
     public PushOutcome Update(string? token, string? ipv4, string? ipv6, string? ipAuto, string? callerIp)
     {
         if (string.IsNullOrWhiteSpace(token))
+        {
+            _log.Log(LogLevel.Warn, "push", $"rejected: no token supplied (from {callerIp ?? "?"})");
             return new PushOutcome(401, "unauthorized", false, null, null);
+        }
 
         var grp = _config.Read(c => c.Sources.FirstOrDefault(s =>
             s.Kind == SourceKind.Push && s.Push != null && s.Push.Token == token));
         if (grp == null)
+        {
+            _log.Log(LogLevel.Warn, "push", $"rejected: token matches no DynDNS Server source (from {callerIp ?? "?"})");
             return new PushOutcome(401, "unauthorized", false, null, null);
+        }
 
         string? newV4 = null, newV6 = null;
         void Consider(string? s)
@@ -53,7 +59,10 @@ public class PushReceiver
         if (newV4 == null && newV6 == null) Consider(callerIp); // no explicit IP -> use the caller's
 
         if (newV4 == null && newV6 == null)
+        {
+            _log.Log(LogLevel.Warn, $"src:{grp.Name}", $"push had no usable IP address (from {callerIp ?? "?"})");
             return new PushOutcome(400, "no-ip", false, null, null);
+        }
 
         var changed = false;
         _config.Mutate(c =>
@@ -71,7 +80,7 @@ public class PushReceiver
         });
 
         var joined = string.Join(" ", new[] { newV4, newV6 }.Where(x => x != null));
-        _log.Log(LogLevel.Debug, $"src:{grp.Name}", $"push update: {joined}{(changed ? " (changed)" : "")}");
+        _log.Log(LogLevel.Info, $"src:{grp.Name}", $"push from {callerIp ?? "?"}: {joined}{(changed ? " (changed)" : " (unchanged)")}");
         return new PushOutcome(200, "ok", changed, newV4, newV6);
     }
 
