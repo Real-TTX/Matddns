@@ -52,7 +52,7 @@
                     <td class="mono">@(e.Ip ?? "—")</td>
                     <td class="mono hide-sm">@(e.Ipv6 ?? "—")</td>
                     <td class="hide-sm"><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
-                    <td><span class="status-pill"><span class="status-dot @st"></span><span class="hide-sm">@(e.Error ?? (noIp ? "pending" : "ok"))</span></span></td>
+                    <td><span class="status-pill" title="@(e.Error ?? "")"><span class="status-dot @st"></span><span class="hide-sm">@(e.Error != null ? "error" : (noIp ? "pending" : "ok"))</span></span></td>
                 </tr>
             }
         }

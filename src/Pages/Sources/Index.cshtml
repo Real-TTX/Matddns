@@ -75,7 +75,7 @@ else
                                     <td class="hide-sm"></td>
                                     <td class="mono cell-muted">@(e.CurrentIp ?? "—")</td>
                                     <td class="mono cell-muted hide-sm">@(e.CurrentIpv6 ?? "—")</td>
-                                    <td><span class="status-pill"><span class="status-dot @est"></span>@(e.LastError ?? "ok")</span></td>
+                                    <td><span class="status-pill" title="@(e.LastError ?? "")"><span class="status-dot @est"></span>@(e.LastError != null ? "error" : "ok")</span></td>
                                     <td></td>
                                 </tr>
                             }
