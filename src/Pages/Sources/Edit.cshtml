@@ -43,6 +43,7 @@
                     <select name="Kind" id="kindSelect">
                         <option value="PublicIp">Public IP</option>
                         <option value="Unifi">Unifi</option>
+                        <option value="UnifiCloud">UniFi Cloud</option>
                         <option value="Static">Static IP</option>
                         <option value="Push">DynDNS Server</option>
                         <option value="Dns">DNS lookup</option>
@@ -51,7 +52,7 @@
                 }
                 else
                 {
-                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static IP", SourceKind.Push => "DynDNS Server", SourceKind.Dns => "DNS lookup", SourceKind.Fritzbox => "FRITZ!Box", _ => "Public IP" };
+                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.UnifiCloud => "UniFi Cloud", SourceKind.Static => "Static IP", SourceKind.Push => "DynDNS Server", SourceKind.Dns => "DNS lookup", SourceKind.Fritzbox => "FRITZ!Box", _ => "Public IP" };
                     <input type="text" value="@typeLabel" disabled />
                 }
             </div>
@@ -140,6 +141,16 @@
                         <input type="checkbox" id="FbIgnoreCert" name="FbIgnoreCert" value="true" @(g?.Fritzbox?.IgnoreCertificate == true ? "checked" : "") />
                         <label for="FbIgnoreCert">Ignore self-signed certificate (MyFRITZ! TLS)</label>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- UniFi Cloud fields -->
+        <div class="type-fields @(kind == SourceKind.UnifiCloud ? "active" : "")" data-kind="UnifiCloud">
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="field full">
+                    <label>API key</label>
+                    <input type="password" name="UcKey" placeholder="@(isNew ? "Site Manager key (unifi.ui.com → API)" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
                 </div>
             </div>
         </div>
@@ -255,7 +266,7 @@
     </form>
 </div>
 
-@if (!isNew)
+@if (!isNew && kind != SourceKind.UnifiCloud)
 {
     <div class="section-title"><h2>Entries</h2></div>
     <div class="card">
@@ -297,6 +308,75 @@
             }
             </tbody>
         </table>
+    </div>
+}
+
+@if (!isNew && kind == SourceKind.UnifiCloud)
+{
+    <div class="section-title"><h2>Gateways</h2></div>
+    <div class="card">
+        <table>
+            <thead><tr><th>Gateway</th><th>IPv4</th><th>IPv6</th><th>Last check</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var e in g!.Entries)
+            {
+                var noIp = string.IsNullOrEmpty(e.CurrentIp) && string.IsNullOrEmpty(e.CurrentIpv6);
+                var status = e.LastError == null ? (noIp ? "warn" : "ok") : "err";
+                <tr>
+                    <td>@e.Label</td>
+                    <td class="mono">@(e.CurrentIp ?? "—")</td>
+                    <td class="mono">@(e.CurrentIpv6 ?? "—")</td>
+                    <td><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
+                    <td><span class="status-pill" title="@(e.LastError ?? "")"><span class="status-dot @status"></span>@(e.LastError != null ? "error" : (noIp ? "pending" : "ok"))</span></td>
+                    <td style="text-align:right">
+                        <form method="post" asp-page-handler="DeleteEntry" style="display:inline">
+                            <input type="hidden" name="Id" value="@g.Id" />
+                            <input type="hidden" name="EntryId" value="@e.Id" />
+                            <button type="submit" class="danger" onclick="return confirm('Remove gateway?');">×</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            @if (g.Entries.Count == 0)
+            {
+                <tr><td colspan="6" class="muted">No gateways added yet — pick from the list below.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section-title"><h2>Add gateway</h2></div>
+    <div class="card">
+        @if (!string.IsNullOrEmpty(Model.GatewayError))
+        {
+            <div class="alert err">@Model.GatewayError</div>
+        }
+        else if (Model.AvailableGateways.Count == 0)
+        {
+            <p class="muted">@(g!.Entries.Count > 0 ? "All visible gateways are already added." : "No gateways visible for this key.")</p>
+        }
+        else
+        {
+            <form method="post" asp-page-handler="AddGateway" class="form-grid">
+                <input type="hidden" name="Id" value="@g!.Id" />
+                <div class="field">
+                    <label>Gateway</label>
+                    <select name="HostId" required>
+                        @foreach (var h in Model.AvailableGateways)
+                        {
+                            <option value="@h.Id">@h.Name — @(h.Ipv4 ?? h.Ipv6 ?? "no IP")</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Alias name</label>
+                    <input type="text" name="Alias" placeholder="optional — defaults to the gateway name" autocomplete="off" />
+                </div>
+                <div class="field full">
+                    <button type="submit">+ Add gateway</button>
+                </div>
+            </form>
+        }
     </div>
 }
 

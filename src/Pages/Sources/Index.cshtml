@@ -31,6 +31,7 @@ else
                 <option value="">All types</option>
                 <option value="publicip">Public IP</option>
                 <option value="unifi">Unifi</option>
+                <option value="unificloud">UniFi Cloud</option>
                 <option value="static">Static</option>
                 <option value="push">DynDNS Server</option>
                 <option value="dns">DNS lookup</option>
@@ -49,7 +50,7 @@ else
                     var hasIp = g.Entries.Any(e => !string.IsNullOrEmpty(e.CurrentIp) || !string.IsNullOrEmpty(e.CurrentIpv6));
                     var dot = hasErr ? "err" : (hasIp ? "ok" : "warn");
                     var statusText = hasErr ? "error" : (hasIp ? "ok" : "pending");
-                    var kindLabel = g.Kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static", SourceKind.Push => "DynDNS Server", SourceKind.Dns => "DNS lookup", SourceKind.Fritzbox => "FRITZ!Box", _ => "Public IP" };
+                    var kindLabel = g.Kind switch { SourceKind.Unifi => "Unifi", SourceKind.UnifiCloud => "UniFi Cloud", SourceKind.Static => "Static", SourceKind.Push => "DynDNS Server", SourceKind.Dns => "DNS lookup", SourceKind.Fritzbox => "FRITZ!Box", _ => "Public IP" };
                     var kindKey = g.Kind.ToString().ToLowerInvariant();
                     var schedule = g.Kind == SourceKind.Push ? "push-driven" : (g.IntervalSeconds > 0 ? $"every {g.IntervalSeconds}s" : "no polling");
                     var entries = g.Entries.ToList();

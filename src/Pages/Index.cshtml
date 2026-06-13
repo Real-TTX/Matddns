@@ -41,7 +41,7 @@
         <thead><tr><th>Source</th><th>IPv4</th><th class="hide-sm">IPv6</th><th class="hide-sm">Last check</th><th>Status</th></tr></thead>
         @foreach (var src in s.SourceList)
         {
-            var kindLabel = src.Kind == "Push" ? "DynDNS Server" : src.Kind == "Dns" ? "DNS lookup" : src.Kind == "Fritzbox" ? "FRITZ!Box" : src.Kind;
+            var kindLabel = src.Kind == "Push" ? "DynDNS Server" : src.Kind == "Dns" ? "DNS lookup" : src.Kind == "Fritzbox" ? "FRITZ!Box" : src.Kind == "UnifiCloud" ? "UniFi Cloud" : src.Kind;
             var entries = src.Entries;
             var multi = entries.Count > 1;
             var first = entries.FirstOrDefault();

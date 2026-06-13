@@ -12,14 +12,16 @@ public class EditModel : PageModel
     private readonly PublicIpClient _publicIp;
     private readonly DnsLookupClient _dns;
     private readonly FritzboxClient _fritz;
+    private readonly UnifiCloudClient _unifiCloud;
 
-    public EditModel(ConfigService config, UnifiClient unifi, PublicIpClient publicIp, DnsLookupClient dns, FritzboxClient fritz)
+    public EditModel(ConfigService config, UnifiClient unifi, PublicIpClient publicIp, DnsLookupClient dns, FritzboxClient fritz, UnifiCloudClient unifiCloud)
     {
         _config = config;
         _unifi = unifi;
         _publicIp = publicIp;
         _dns = dns;
         _fritz = fritz;
+        _unifiCloud = unifiCloud;
     }
 
     public SourceGroup? Group { get; private set; }
@@ -27,12 +29,16 @@ public class EditModel : PageModel
     public string BaseUrl { get; private set; } = "";
     public Rule? DynamicRule { get; private set; }   // a dynamic rule pointing at this source, if any
 
+    // UniFi-cloud gateway picker: all gateways the key can see, minus the ones already added.
+    public List<UnifiCloudClient.HostInfo> AvailableGateways { get; private set; } = new();
+    public string? GatewayError { get; private set; }
+
     [TempData] public string? Notice { get; set; }
     [TempData] public string? Error { get; set; }
     [TempData] public string? TestResult { get; set; }
     [TempData] public bool TestOk { get; set; }
 
-    public IActionResult OnGet(string? id)
+    public async Task<IActionResult> OnGetAsync(string? id, CancellationToken ct)
     {
         BaseUrl = $"{Request.Scheme}://{Request.Host}";
         if (!string.IsNullOrEmpty(id))
@@ -40,6 +46,17 @@ public class EditModel : PageModel
             Group = _config.Read(c => c.Sources.FirstOrDefault(g => g.Id == id));
             if (Group == null) { Error = "Group not found"; return RedirectToPage("Index"); }
             DynamicRule = _config.Read(c => c.Rules.FirstOrDefault(r => r.Dynamic && r.DynamicSourceId == id));
+
+            if (Group.Kind == SourceKind.UnifiCloud && !string.IsNullOrWhiteSpace(Group.UnifiCloud?.ApiKey))
+            {
+                try
+                {
+                    var added = Group.Entries.Select(e => e.InterfaceName).Where(x => x != null).ToHashSet();
+                    var all = await _unifiCloud.ListHostsAsync(Group.UnifiCloud!.ApiKey, ct);
+                    AvailableGateways = all.Where(h => !added.Contains(h.Id)).ToList();
+                }
+                catch (Exception ex) { GatewayError = ex.Message; }
+            }
         }
         return Page();
     }
@@ -47,7 +64,8 @@ public class EditModel : PageModel
     public IActionResult OnPostCreate(string Name, SourceKind Kind, int IntervalSeconds,
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
         string? StaticIp = null, string? StaticIpv6 = null, string? DnsHost = null,
-        string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false)
+        string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false,
+        string? UcKey = null)
     {
         if (string.IsNullOrWhiteSpace(Name)) { Error = "Name missing"; return RedirectToPage("Edit"); }
 
@@ -105,6 +123,11 @@ public class EditModel : PageModel
             };
             g.Entries.Add(new SourceEntry { Label = "FRITZ!Box WAN" });
         }
+        else if (Kind == SourceKind.UnifiCloud)
+        {
+            g.UnifiCloud = new UnifiCloudSettings { ApiKey = (UcKey ?? "").Trim() };
+            // gateways are added on the edit page after the key is saved.
+        }
         else
         {
             g.Entries.Add(new SourceEntry { Label = "Public IP" });
@@ -113,6 +136,7 @@ public class EditModel : PageModel
         Notice = Kind switch
         {
             SourceKind.Unifi => "Created – use \"Test connection\"; the WAN entries appear automatically on first fetch.",
+            SourceKind.UnifiCloud => "Created – pick the gateways to track below.",
             SourceKind.Push => "Created – configure the update URL shown below in your device/router.",
             _ => "Created."
         };
@@ -133,7 +157,8 @@ public class EditModel : PageModel
     public IActionResult OnPostSave(string Id, string Name, int IntervalSeconds,
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
         string? StaticIp = null, string? StaticIpv6 = null, string? DnsHost = null,
-        string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false)
+        string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false,
+        string? UcKey = null)
     {
         _config.Mutate(c =>
         {
@@ -182,6 +207,12 @@ public class EditModel : PageModel
                 var e = g.Entries.FirstOrDefault();
                 if (e != null) e.LastChecked = null; // re-fetch on next poll
             }
+            else if (g.Kind == SourceKind.UnifiCloud)
+            {
+                g.UnifiCloud ??= new UnifiCloudSettings();
+                if (!string.IsNullOrEmpty(UcKey)) g.UnifiCloud.ApiKey = UcKey.Trim(); // empty = unchanged
+                foreach (var en in g.Entries) en.LastChecked = null; // re-fetch on next poll
+            }
         });
         Notice = "Saved";
         return RedirectToPage("Edit", new { id = Id });
@@ -215,6 +246,41 @@ public class EditModel : PageModel
             g?.Entries.Add(new SourceEntry { Label = Label.Trim(), InterfaceName = InterfaceName.Trim() });
         });
         Notice = "Entry added";
+        return RedirectToPage("Edit", new { id = Id });
+    }
+
+    public async Task<IActionResult> OnPostAddGatewayAsync(string Id, string HostId, string? Alias, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(HostId)) { Error = "No gateway selected"; return RedirectToPage("Edit", new { id = Id }); }
+        var g = _config.Read(c => c.Sources.FirstOrDefault(x => x.Id == Id));
+        if (g == null) { Error = "Group not found"; return RedirectToPage("Index"); }
+        if (g.Entries.Any(e => e.InterfaceName == HostId)) { Notice = "Gateway already added"; return RedirectToPage("Edit", new { id = Id }); }
+
+        // resolve the current name + IP so the entry shows immediately; the updater keeps the IP fresh afterwards
+        var label = (Alias ?? "").Trim();
+        string? v4 = null, v6 = null;
+        try
+        {
+            var h = (await _unifiCloud.ListHostsAsync(g.UnifiCloud?.ApiKey ?? "", ct)).FirstOrDefault(x => x.Id == HostId);
+            if (h != null) { if (string.IsNullOrEmpty(label)) label = h.Name; v4 = h.Ipv4; v6 = h.Ipv6; }
+        }
+        catch { /* key/connectivity issue — add anyway, the updater fills it in */ }
+        if (string.IsNullOrEmpty(label)) label = HostId;
+
+        _config.Mutate(c =>
+        {
+            var grp = c.Sources.FirstOrDefault(x => x.Id == Id);
+            if (grp == null || grp.Entries.Any(e => e.InterfaceName == HostId)) return;
+            grp.Entries.Add(new SourceEntry
+            {
+                InterfaceName = HostId,
+                Label = label,
+                CurrentIp = v4,
+                CurrentIpv6 = v6,
+                LastChecked = DateTime.UtcNow
+            });
+        });
+        Notice = "Gateway added";
         return RedirectToPage("Edit", new { id = Id });
     }
 

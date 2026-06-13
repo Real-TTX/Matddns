@@ -1,5 +1,14 @@
 @page
 @model Matddns.Pages.Rules.EditModel
+@functions {
+    // uniform source-picker label: "Source · Entry — <current IP>" (interface id is never shown — it can be very long, e.g. UniFi Cloud host ids)
+    static string SrcOption(Matddns.Models.SourceGroup sg, Matddns.Models.SourceEntry se)
+    {
+        var ip = !string.IsNullOrEmpty(se.CurrentIp) ? se.CurrentIp
+               : (!string.IsNullOrEmpty(se.CurrentIpv6) ? se.CurrentIpv6 : null);
+        return $"{sg.Name} · {se.Label}" + (ip != null ? $" — {ip}" : "");
+    }
+}
 @{
     var r = Model.RuleItem;
     var isNew = Model.IsNew;
@@ -120,7 +129,7 @@ else
                                 {
                                     foreach (var se in sg.Entries)
                                     {
-                                        var lbl = $"{sg.Name} · {se.Label}" + (se.InterfaceName != null ? $" ({se.InterfaceName})" : "");
+                                        var lbl = SrcOption(sg, se);
                                         <option value="@se.Id" data-label="@lbl">@lbl</option>
                                     }
                                 }
@@ -208,7 +217,7 @@ else
                             foreach (var se in sg.Entries)
                             {
                                 if (r.SourceEntryIdsInOrder.Contains(se.Id)) continue;
-                                <option value="@se.Id">@sg.Name · @se.Label @(se.InterfaceName != null ? $"({se.InterfaceName})" : "")</option>
+                                <option value="@se.Id">@SrcOption(sg, se)</option>
                             }
                         }
                     </select>

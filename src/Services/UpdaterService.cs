@@ -10,6 +10,7 @@ public class UpdaterService : BackgroundService
     private readonly DnsLookupClient _dns;
     private readonly FritzboxClient _fritz;
     private readonly UnifiClient _unifi;
+    private readonly UnifiCloudClient _unifiCloud;
     private readonly DynDnsClient _dyndns;
     private readonly NetcupClient _netcup;
     private readonly SourceResolver _resolver;
@@ -22,6 +23,7 @@ public class UpdaterService : BackgroundService
         DnsLookupClient dns,
         FritzboxClient fritz,
         UnifiClient unifi,
+        UnifiCloudClient unifiCloud,
         DynDnsClient dyndns,
         NetcupClient netcup,
         SourceResolver resolver,
@@ -33,6 +35,7 @@ public class UpdaterService : BackgroundService
         _dns = dns;
         _fritz = fritz;
         _unifi = unifi;
+        _unifiCloud = unifiCloud;
         _dyndns = dyndns;
         _netcup = netcup;
         _resolver = resolver;
@@ -117,34 +120,50 @@ public class UpdaterService : BackgroundService
                     continue;
                 }
 
+                WriteWanEntries(group.Id, wans);
+                _log.Log(LogLevel.Debug, $"src:{group.Name}",
+                    $"Unifi WANs: {string.Join(", ", wans.Select(w => $"{(string.IsNullOrEmpty(w.DisplayName) ? w.Name : w.DisplayName)} [{w.Name}]={(w.Up ? (w.Ip ?? "no-ip") : "down")}"))}");
+            }
+            else if (group.Kind == SourceKind.UnifiCloud && group.UnifiCloud != null)
+            {
+                if (group.Entries.Count == 0) continue; // no gateways selected yet — nothing to poll
+                List<UnifiCloudClient.HostInfo> hosts;
+                try { hosts = await _unifiCloud.ListHostsAsync(group.UnifiCloud.ApiKey, ct); }
+                catch (Exception ex)
+                {
+                    _log.Log(LogLevel.Error, $"src:{group.Name}", $"Unifi cloud: {ex.Message}");
+                    _config.Mutate(c =>
+                    {
+                        var g = c.Sources.FirstOrDefault(x => x.Id == group.Id);
+                        if (g == null) return;
+                        foreach (var e in g.Entries) { e.LastChecked = DateTime.UtcNow; e.LastError = ex.Message; }
+                    });
+                    continue;
+                }
+                var byId = hosts.ToDictionary(h => h.Id, h => h, StringComparer.Ordinal);
                 _config.Mutate(c =>
                 {
                     var g = c.Sources.FirstOrDefault(x => x.Id == group.Id);
                     if (g == null) return;
-
-                    foreach (var wan in wans)
+                    foreach (var e in g.Entries)
                     {
-                        var match = g.Entries.FirstOrDefault(e =>
-                            e.InterfaceName != null &&
-                            e.InterfaceName.Equals(wan.Name, StringComparison.OrdinalIgnoreCase));
-                        if (match == null)
+                        if (e.InterfaceName != null && byId.TryGetValue(e.InterfaceName, out var h))
                         {
-                            match = new SourceEntry { InterfaceName = wan.Name };
-                            g.Entries.Add(match);
+                            // keep the user's alias (Label) — only refresh the IPs
+                            e.CurrentIp = h.Ipv4;
+                            e.CurrentIpv6 = h.Ipv6;
+                            e.LastChecked = DateTime.UtcNow;
+                            e.LastError = (h.Ipv4 == null && h.Ipv6 == null) ? "no public IP" : null;
                         }
-                        // take the display name from Unifi (label follows the Unifi configuration)
-                        if (!string.IsNullOrWhiteSpace(wan.DisplayName))
-                            match.Label = wan.DisplayName!;
-                        else if (string.IsNullOrWhiteSpace(match.Label))
-                            match.Label = wan.Name.ToUpperInvariant();
-                        match.CurrentIp = wan.Ip;
-                        match.CurrentIpv6 = wan.Ipv6;
-                        match.LastChecked = DateTime.UtcNow;
-                        match.LastError = wan.Up ? (string.IsNullOrEmpty(wan.Ip) && string.IsNullOrEmpty(wan.Ipv6) ? "no lease" : null) : "down";
+                        else
+                        {
+                            e.LastChecked = DateTime.UtcNow;
+                            e.LastError = "gateway not found";
+                        }
                     }
                 });
                 _log.Log(LogLevel.Debug, $"src:{group.Name}",
-                    $"Unifi WANs: {string.Join(", ", wans.Select(w => $"{(string.IsNullOrEmpty(w.DisplayName) ? w.Name : w.DisplayName)} [{w.Name}]={(w.Up ? (w.Ip ?? "no-ip") : "down")}"))}");
+                    $"Unifi cloud: {string.Join(", ", group.Entries.Select(e => $"{e.Label}={(byId.TryGetValue(e.InterfaceName ?? "", out var h) ? (h.Ipv4 ?? h.Ipv6 ?? "no-ip") : "missing")}"))}");
             }
             else if (group.Kind == SourceKind.Static)
             {
@@ -207,6 +226,36 @@ public class UpdaterService : BackgroundService
                 else _log.Log(LogLevel.Error, $"src:{group.Name}", $"FRITZ!Box: {ferr}");
             }
         }
+    }
+
+    // Upsert one source entry per WAN (matched by interface group name). Shared by the local Unifi and Unifi-cloud sources.
+    private void WriteWanEntries(string groupId, List<UnifiClient.WanInfo> wans)
+    {
+        _config.Mutate(c =>
+        {
+            var g = c.Sources.FirstOrDefault(x => x.Id == groupId);
+            if (g == null) return;
+            foreach (var wan in wans)
+            {
+                var match = g.Entries.FirstOrDefault(e =>
+                    e.InterfaceName != null &&
+                    e.InterfaceName.Equals(wan.Name, StringComparison.OrdinalIgnoreCase));
+                if (match == null)
+                {
+                    match = new SourceEntry { InterfaceName = wan.Name };
+                    g.Entries.Add(match);
+                }
+                // take the display name from Unifi (label follows the Unifi configuration)
+                if (!string.IsNullOrWhiteSpace(wan.DisplayName))
+                    match.Label = wan.DisplayName!;
+                else if (string.IsNullOrWhiteSpace(match.Label))
+                    match.Label = wan.Name.ToUpperInvariant();
+                match.CurrentIp = wan.Ip;
+                match.CurrentIpv6 = wan.Ipv6;
+                match.LastChecked = DateTime.UtcNow;
+                match.LastError = wan.Up ? (string.IsNullOrEmpty(wan.Ip) && string.IsNullOrEmpty(wan.Ipv6) ? "no lease" : null) : "down";
+            }
+        });
     }
 
     private async Task RunRulesAsync(CancellationToken ct)

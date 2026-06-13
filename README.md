@@ -1,6 +1,6 @@
 # Matddns
 
-A universal DynDNS updater with a web UI. Pull an IP from one or more sources (the container's public IP, UniFi WANs, a static value, or a value pushed in) and keep one or more DNS records in sync, with failover to the first reachable source.
+A universal DynDNS updater with a web UI. Pull an IP from one or more sources (the container's public IP, UniFi WANs — locally or via the UniFi cloud, a FRITZ!Box, a DNS lookup, a static value, or a value pushed in) and keep one or more DNS records in sync, with failover to the first reachable source.
 
 [![Build & Publish](https://github.com/Real-TTX/Matddns/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/Real-TTX/Matddns/actions/workflows/docker-publish.yml)
 [![GHCR image](https://img.shields.io/badge/ghcr.io-real--ttx%2Fmatddns-2496ED?logo=docker&logoColor=white)](https://github.com/Real-TTX/Matddns/pkgs/container/matddns)
@@ -23,7 +23,7 @@ A universal DynDNS updater with a web UI. Pull an IP from one or more sources (t
 
 ## Features
 
-- Several source types: the container's own public IP, UniFi UDM/UGW WANs (read from the controller, including LTE failover), a static value, or a value pushed in by a device.
+- Several source types: the container's own public IP; UniFi UDM/UGW WANs read locally from the controller (including LTE failover) or from the UniFi Site Manager cloud; a FRITZ!Box over TR-064; a DNS lookup of any hostname; a static value; or a value pushed in by a device.
 - Several targets: generic DynDNS update URLs (presets for Matddns, DuckDNS, No-IP, Dynu, DynDNS.org, Strato, deSEC) and the Netcup DNS API.
 - Failover rules: a DNS record is bound to an ordered list of sources; the first reachable one wins.
 - Reachability validation: a source is only accepted if its IP answers a ping or a TCP-port check.
@@ -89,7 +89,10 @@ There are three building blocks.
 | Kind | What it provides |
 |------|------------------|
 | Public IP | the container's own outbound IPv4/IPv6 |
-| UniFi | one entry per WAN read from a UDM/UGW (name, IPv4, global IPv6), including LTE failover; entries appear automatically |
+| UniFi | one entry per WAN read from a local UDM/UGW (name, IPv4, global IPv6), including LTE failover; entries appear automatically |
+| UniFi Cloud | gateways read from the UniFi Site Manager cloud API — one key, pick the gateways to track (with an optional alias); each keeps its current public IP |
+| FRITZ!Box | the WAN IPv4/IPv6 read from a FRITZ!Box over TR-064 (locally via `fritz.box`, or remotely via MyFRITZ!) |
+| DNS lookup | resolves any hostname to its A/AAAA (e.g. a MyFRITZ! address) |
 | Static IP | a fixed value you type in (a known server, a fallback) |
 | DynDNS server | an external device or router pushes its IP to a token URL; see [DynDNS server (incoming)](#dyndns-server-incoming) |
 
@@ -124,11 +127,13 @@ A source counts as reachable only when its current IP passes the rule's validati
 
 ## IPv6 / dual-stack
 
-Every source entry holds an optional IPv4 and IPv6 address (IPv6-only is supported). Public IP and UniFi read both families (UniFi keeps only globally routable v6); static and incoming-push carry both too. Rules pick by record type (A uses IPv4, AAAA uses IPv6) and skip a source that lacks the needed family. The UI shows v4 and v6 everywhere.
+Every source entry holds an optional IPv4 and IPv6 address (IPv6-only is supported). Public IP, UniFi (local and cloud) and FRITZ!Box read both families (only globally routable v6 is kept); static, DNS lookup and incoming-push carry both too. Rules pick by record type (A uses IPv4, AAAA uses IPv6) and skip a source that lacks the needed family. The UI shows v4 and v6 everywhere.
 
 ## DynDNS server (incoming)
 
 A DynDNS-server source lets a device report its IP to a token-protected URL (shown on the source's page, with copy-ready FRITZ!Box and UniFi examples). Both URLs take separate `ipv4`/`ipv6` parameters; send either or both, and the other family is left untouched.
+
+A **dynamic receiver** (a dynamic rule binding a DynDNS-server source to a Netcup zone) lets one token manage many records under a namespace: the device sends `&hostname=<name>.<zone>` and that record is created/updated on the fly. Auto-creating records is opt-in per Netcup zone ("Allow dynamic records").
 
 JSON API, for scripts and devices:
 
@@ -177,7 +182,7 @@ The `/api/*` and `/nic/update` endpoints are unauthenticated by design, so they 
 
 ## Versioning and schema
 
-Release images carry a monotonic version (`0.3.<run_number>`) injected at build time; the footer shows version, build, and date. Local builds show `local · build local`. The same token cache-busts static assets so UI changes reach the browser.
+Release images carry a monotonic version (`0.4.<run_number>`) injected at build time; the footer shows version, build, and date. Local builds show `local · build local`. The same token cache-busts static assets so UI changes reach the browser.
 
 `config.json` carries a `schemaVersion`. On startup, `ConfigService` runs every ordered migration between the stored version and `CurrentSchemaVersion`, then stamps the new version and saves. A fresh install starts at the current version; an older config is upgraded in place. To change the data shape: raise `CurrentSchemaVersion`, append a `MigrateVXToVY` step to the `Migrations` array (append-only, never reordered), and raise the release minor. Migrations are idempotent and run once per step.
 

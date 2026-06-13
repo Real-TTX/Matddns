@@ -23,7 +23,7 @@ jobs:
         id: ver
         run: |
           # Bump MAJOR_MINOR when the config schema changes (see ConfigService.CurrentSchemaVersion).
-          MAJOR_MINOR=0.3
+          MAJOR_MINOR=0.4
           echo "version=${MAJOR_MINOR}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 

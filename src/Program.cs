@@ -24,6 +24,7 @@ builder.Services.AddSingleton<PublicIpClient>();
 builder.Services.AddSingleton<DnsLookupClient>();
 builder.Services.AddSingleton<FritzboxClient>();
 builder.Services.AddSingleton<UnifiClient>();
+builder.Services.AddSingleton<UnifiCloudClient>();
 builder.Services.AddSingleton<NetcupClient>();
 builder.Services.AddSingleton<DynDnsClient>();
 builder.Services.AddSingleton<SourceResolver>();

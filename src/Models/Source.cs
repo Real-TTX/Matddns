@@ -7,7 +7,8 @@ public enum SourceKind
     Static,
     Push,
     Dns,
-    Fritzbox
+    Fritzbox,
+    UnifiCloud
 }
 
 public class SourceGroup
@@ -21,7 +22,14 @@ public class SourceGroup
     public PushSettings? Push { get; set; }
     public DnsSettings? Dns { get; set; }
     public FritzboxSettings? Fritzbox { get; set; }
+    public UnifiCloudSettings? UnifiCloud { get; set; }
     public List<SourceEntry> Entries { get; set; } = new();
+}
+
+public class UnifiCloudSettings
+{
+    public string ApiKey { get; set; } = "";   // UniFi Site Manager key (X-API-KEY), api.ui.com
+    // selected gateways are stored as SourceEntry rows (InterfaceName = host id, Label = gateway name)
 }
 
 public class FritzboxSettings
