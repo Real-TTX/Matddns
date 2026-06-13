@@ -6,7 +6,10 @@
 
 <div class="page-header">
     <div><h1>Rules</h1></div>
-    <a class="button" href="/Rules/Edit">+ New rule</a>
+    <div class="actions" style="margin:0;">
+        <a class="button ghost" href="/Rules/Dynamic">+ Dynamic rule</a>
+        <a class="button" href="/Rules/Edit">+ New rule</a>
+    </div>
 </div>
 
 @if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
@@ -42,6 +45,23 @@ else
                 </thead>
                 @foreach (var r in Model.Rules)
                 {
+                    if (r.Dynamic)
+                    {
+                        var dsrc = Model.AllSources.FirstOrDefault(s => s.Id == r.DynamicSourceId);
+                        var dzone = Model.AllDomains.FirstOrDefault(d => d.Id == r.DomainGroupId);
+                        var dstatus = r.Enabled ? "ok" : "disabled";
+                        var ddot = r.Enabled ? "ok" : "muted";
+                        <tbody class="dt-group" data-search="@($"{r.DynamicBaseFqdn} {dsrc?.Name} {dzone?.Name} dynamic {dstatus}")" data-status="@dstatus" data-href="/Rules/Dynamic?id=@r.Id">
+                            <tr class="dt-parent">
+                                <td class="dt-name mono">*.@r.DynamicBaseFqdn</td>
+                                <td class="cell-muted hide-sm">@(dsrc?.Name ?? "?") <span class="badge info">dynamic</span></td>
+                                <td class="mono">→ @(dzone?.Name ?? "?")</td>
+                                <td><span class="status-pill"><span class="status-dot @ddot"></span>@dstatus</span></td>
+                                <td class="dt-go">›</td>
+                            </tr>
+                        </tbody>
+                        continue;
+                    }
                     var dg = Model.AllDomains.FirstOrDefault(d => d.Id == r.DomainGroupId);
                     var de = dg?.Entries.FirstOrDefault(e => e.Id == r.DomainEntryId);
                     var sourceIds = r.SourceEntryIdsInOrder;

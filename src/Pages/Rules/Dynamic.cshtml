@@ -1,0 +1,80 @@
+@page
+@model Matddns.Pages.Rules.DynamicModel
+@{
+    var r = Model.RuleItem;
+    var isNew = Model.IsNew;
+    ViewData["Title"] = (isNew ? "New dynamic rule" : "Dynamic rule") + " – Matddns";
+    var src = isNew ? null : Model.PushSources.FirstOrDefault(s => s.Id == r!.DynamicSourceId);
+}
+
+<a class="back-link" href="/Rules">‹ back to Rules</a>
+<div class="page-header"><div><h1>@(isNew ? "New dynamic rule" : "Dynamic rule")</h1></div></div>
+
+@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
+@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert err">@Model.Error</div> }
+
+@if (isNew && (Model.PushSources.Count == 0 || Model.NetcupGroups.Count == 0))
+{
+    <div class="alert err">Needs at least one DynDNS Server source and one Netcup domain group.</div>
+}
+
+<div class="card">
+    <form method="post" asp-page-handler="@(isNew ? "Create" : "Save")">
+        @if (!isNew) { <input type="hidden" name="Id" value="@r!.Id" /> }
+        <div class="form-grid">
+            <div class="field">
+                <label>Receiver (DynDNS Server)</label>
+                <select name="DynamicSourceId">
+                    @foreach (var s in Model.PushSources)
+                    {
+                        <option value="@s.Id" selected="@(r?.DynamicSourceId == s.Id)">@s.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label>Target zone (Netcup)</label>
+                <select name="DomainGroupId">
+                    @foreach (var d in Model.NetcupGroups)
+                    {
+                        <option value="@d.Id" selected="@(r?.DomainGroupId == d.Id)">@d.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label>Zone</label>
+                <input type="text" name="DynamicZone" value="@(r?.DynamicZone ?? "")" placeholder="h5x.de" />
+            </div>
+            <div class="field">
+                <label>Namespace prefix</label>
+                <input type="text" name="DynamicPrefix" value="@(r?.DynamicPrefix ?? "")" placeholder="dynamic" />
+            </div>
+            @if (!isNew)
+            {
+                <div class="field full checkbox-field">
+                    <input type="checkbox" name="Enabled" value="true" id="en" @(r!.Enabled ? "checked" : "") />
+                    <label for="en">Enabled</label>
+                </div>
+            }
+        </div>
+        <div class="actions">
+            <button type="submit">@(isNew ? "Create" : "Save")</button>
+            <a class="button ghost" href="/Rules">Cancel</a>
+            @if (!isNew)
+            {
+                <button type="submit" class="danger" asp-page-handler="Delete" name="Id" value="@r!.Id" onclick="return confirm('Delete this dynamic rule?');">Delete</button>
+            }
+        </div>
+    </form>
+</div>
+
+@if (!isNew)
+{
+    <div class="section-title"><h2>Namespace</h2></div>
+    <div class="card">
+        <p class="muted-small" style="margin-top:0;">Pushes to this receiver may set any record under <span class="mono">*.@r!.DynamicBaseFqdn</span> — others are rejected. The device sends <span class="mono">&amp;hostname=&lt;name&gt;.@r.DynamicBaseFqdn</span>.</p>
+        @if (src != null)
+        {
+            <p class="muted-small" style="margin-bottom:0;">Token &amp; update URL on the receiver: <a href="/Sources/Edit?id=@src.Id">@src.Name</a></p>
+        }
+    </div>
+}

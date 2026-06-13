@@ -36,15 +36,6 @@ public class StaticSettings
 public class PushSettings
 {
     public string Token { get; set; } = "";   // secret in the update URL / dyndns2 basic-auth password
-
-    // Dynamic (wildcard) receiver: pushes carry a hostname; records under the namespace are created/updated on demand.
-    public bool Dynamic { get; set; }
-    public string TargetDomainGroupId { get; set; } = ""; // a Netcup group with AllowDynamic
-    public string Zone { get; set; } = "";                // the Netcup zone, e.g. h5x.de
-    public string Prefix { get; set; } = "";              // sub-namespace under the zone, e.g. "dynamic" (empty = whole zone)
-
-    /// <summary>Full base of the namespace, e.g. "dynamic.h5x.de" (or just the zone when no prefix).</summary>
-    public string BaseFqdn => string.IsNullOrWhiteSpace(Prefix) ? Zone : $"{Prefix.Trim('.')}.{Zone}";
 }
 
 public class UnifiSettings

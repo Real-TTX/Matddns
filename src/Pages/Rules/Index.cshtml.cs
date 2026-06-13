@@ -16,6 +16,7 @@ public class IndexModel : PageModel
 
     public List<Rule> Rules { get; private set; } = new();
     public List<DomainGroup> AllDomains { get; private set; } = new();
+    public List<SourceGroup> AllSources { get; private set; } = new();
     public Dictionary<string, SourceResolver.ResolvedEntry> SourceLookup { get; private set; } = new();
 
     [Microsoft.AspNetCore.Mvc.TempData] public string? Notice { get; set; }
@@ -26,6 +27,7 @@ public class IndexModel : PageModel
         var cfg = _config.Current;
         Rules = cfg.Rules.ToList();
         AllDomains = cfg.Domains.ToList();
+        AllSources = cfg.Sources.ToList();
         SourceLookup = _resolver.AllEntries(cfg).ToDictionary(r => r.Entry.Id);
     }
 

@@ -46,7 +46,7 @@ public class StatusService
             }).ToList()
         }).ToList();
 
-        var rules = cfg.Rules.Select(r =>
+        var rules = cfg.Rules.Where(r => !r.Dynamic).Select(r =>
         {
             var dg = cfg.Domains.FirstOrDefault(d => d.Id == r.DomainGroupId);
             var de = dg?.Entries.FirstOrDefault(e => e.Id == r.DomainEntryId);
@@ -91,10 +91,10 @@ public class StatusService
             },
             Rules = new RuleCountSummary
             {
-                Total = cfg.Rules.Count,
+                Total = cfg.Rules.Count(r => !r.Dynamic),
                 Ok = rules.Count(r => r.Ok),
                 Issues = ruleIssues,
-                Disabled = cfg.Rules.Count(r => !r.Enabled)
+                Disabled = cfg.Rules.Count(r => !r.Dynamic && !r.Enabled)
             },
             IpChanges = new IpChangeStats
             {
