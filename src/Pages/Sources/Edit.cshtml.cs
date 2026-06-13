@@ -23,6 +23,7 @@ public class EditModel : PageModel
     public SourceGroup? Group { get; private set; }
     public bool IsNew => Group == null;
     public string BaseUrl { get; private set; } = "";
+    public List<DomainGroup> NetcupGroups { get; private set; } = new();
 
     [TempData] public string? Notice { get; set; }
     [TempData] public string? Error { get; set; }
@@ -32,6 +33,7 @@ public class EditModel : PageModel
     public IActionResult OnGet(string? id)
     {
         BaseUrl = $"{Request.Scheme}://{Request.Host}";
+        NetcupGroups = _config.Read(c => c.Domains.Where(d => d.Kind == DomainKind.Netcup).ToList());
         if (!string.IsNullOrEmpty(id))
         {
             Group = _config.Read(c => c.Sources.FirstOrDefault(g => g.Id == id));
@@ -116,7 +118,8 @@ public class EditModel : PageModel
 
     public IActionResult OnPostSave(string Id, string Name, int IntervalSeconds,
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
-        string? StaticIp = null, string? StaticIpv6 = null, string? DnsHost = null)
+        string? StaticIp = null, string? StaticIpv6 = null, string? DnsHost = null,
+        bool PushDynamic = false, string? PushTargetGroup = null, string? PushZone = null, string? PushPrefix = null)
     {
         _config.Mutate(c =>
         {
@@ -154,6 +157,14 @@ public class EditModel : PageModel
                 if (e == null) { e = new SourceEntry(); g.Entries.Add(e); }
                 e.Label = string.IsNullOrEmpty(g.Dns.Hostname) ? "DNS lookup" : g.Dns.Hostname;
                 e.LastChecked = null; // force a re-resolve on the next poll
+            }
+            else if (g.Kind == SourceKind.Push)
+            {
+                g.Push ??= new PushSettings { Token = PushReceiver.NewToken() };
+                g.Push.Dynamic = PushDynamic;
+                g.Push.TargetDomainGroupId = PushTargetGroup ?? "";
+                g.Push.Zone = (PushZone ?? "").Trim().Trim('.');
+                g.Push.Prefix = (PushPrefix ?? "").Trim().Trim('.');
             }
         });
         Notice = "Saved";
