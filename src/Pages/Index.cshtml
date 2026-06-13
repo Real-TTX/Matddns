@@ -138,25 +138,41 @@
 
 <div class="section-title"><h2>Rules</h2><a class="muted-small" href="/Rules">manage →</a></div>
 <div class="card">
-    <table>
+    <table class="dtable">
         <thead><tr><th>Target</th><th class="hide-sm">Group</th><th>Last set</th><th class="hide-sm">When</th><th>Status</th></tr></thead>
-        <tbody>
         @foreach (var r in s.RuleList)
         {
             var st = !r.Enabled ? "muted" : (r.Issue ? "err" : (r.Ok ? "ok" : "warn"));
-            <tr>
-                <td><span class="badge info">@r.Type</span> <span class="mono">@r.Target</span></td>
-                <td class="muted-small hide-sm">@(r.Group ?? "—")</td>
-                <td class="mono">@(r.LastValue ?? "—")</td>
-                <td class="hide-sm"><span class="muted-small">@Tz.Format(r.LastChange, "yyyy-MM-dd HH:mm")</span></td>
-                <td><span class="status-pill"><span class="status-dot @st"></span><span class="hide-sm">@(!r.Enabled ? "disabled" : (r.Issue ? "issue" : (r.Ok ? "ok" : "pending")))</span></span></td>
-            </tr>
+            var hasSrc = r.Sources.Count > 0;
+            <tbody class="dt-group">
+                <tr class="dt-parent @(hasSrc ? "has-children" : "")">
+                    <td class="dt-name"><span class="badge info">@r.Type</span> <span class="mono">@r.Target</span></td>
+                    <td class="muted-small hide-sm">@(r.Group ?? "—")</td>
+                    <td class="mono">@(r.LastValue ?? "—")</td>
+                    <td class="hide-sm"><span class="muted-small">@Tz.Format(r.LastChange, "yyyy-MM-dd HH:mm")</span></td>
+                    <td><span class="status-pill"><span class="status-dot @st"></span><span class="hide-sm">@(!r.Enabled ? "disabled" : (r.Issue ? "issue" : (r.Ok ? "ok" : "pending")))</span></span></td>
+                </tr>
+                @for (int i = 0; i < r.Sources.Count; i++)
+                {
+                    var src = r.Sources[i];
+                    var sip = src.Ip ?? src.Ipv6;
+                    var sdot = src.Missing ? "err" : (src.Active ? "ok" : (string.IsNullOrEmpty(sip) ? "warn" : "muted"));
+                    <tr class="dt-child @(i == r.Sources.Count - 1 ? "last" : "")">
+                        <td><span class="dt-sub">#@(i + 1) @src.Name</span></td>
+                        <td class="hide-sm"></td>
+                        <td class="mono cell-muted">@(sip ?? "—")</td>
+                        <td class="hide-sm"></td>
+                        <td>
+                            <span class="status-pill"><span class="status-dot @sdot"></span><span class="hide-sm">@(src.Missing ? "missing" : (src.Active ? "active" : ""))</span></span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
         }
         @if (s.RuleList.Count == 0)
         {
-            <tr><td colspan="5" class="muted">No rules configured. <a href="/Rules/Edit">Add one</a>.</td></tr>
+            <tbody><tr><td colspan="5" class="muted">No rules configured. <a href="/Rules/Edit">Add one</a>.</td></tr></tbody>
         }
-        </tbody>
     </table>
 </div>
 

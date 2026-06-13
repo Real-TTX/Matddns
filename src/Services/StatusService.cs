@@ -54,6 +54,20 @@ public class StatusService
             var issue = r.Enabled && (
                 (r.LastResult != null && r.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase))
                 || r.LastResult is "no source" or "target missing");
+            var failover = r.SourceEntryIdsInOrder.Select(sid =>
+            {
+                var grp = cfg.Sources.FirstOrDefault(s => s.Entries.Any(e => e.Id == sid));
+                var ent = grp?.Entries.FirstOrDefault(e => e.Id == sid);
+                return new RuleSourceItem
+                {
+                    Name = ent != null ? $"{grp!.Name} · {ent.Label}" : "(unknown source)",
+                    Ip = ent?.CurrentIp,
+                    Ipv6 = ent?.CurrentIpv6,
+                    Active = r.LastUsedSourceId == sid,
+                    Missing = ent == null
+                };
+            }).ToList();
+
             return new RuleStatus
             {
                 Target = de?.Hostname ?? "(missing)",
@@ -66,7 +80,8 @@ public class StatusService
                 LastChange = r.LastChange,
                 LastRun = r.LastRun,
                 Ok = resultOk,
-                Issue = issue
+                Issue = issue,
+                Sources = failover
             };
         }).ToList();
 
@@ -191,4 +206,14 @@ public class RuleStatus
     public DateTime? LastRun { get; set; }
     public bool Ok { get; set; }
     public bool Issue { get; set; }
+    public List<RuleSourceItem> Sources { get; set; } = new();
+}
+
+public class RuleSourceItem
+{
+    public string Name { get; set; } = "";   // "SourceGroup · EntryLabel"
+    public string? Ip { get; set; }
+    public string? Ipv6 { get; set; }
+    public bool Active { get; set; }          // the source currently written (failover winner)
+    public bool Missing { get; set; }         // the source/entry no longer exists
 }
