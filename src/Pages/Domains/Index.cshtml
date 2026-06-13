@@ -44,11 +44,13 @@ else
                     var kindKey = g.Kind == DomainKind.Netcup ? "netcup" : "dyndns";
                     var kindLabel = g.Kind == DomainKind.Netcup ? "Netcup API" : "DynDNS";
                     var entries = g.Entries.ToList();
-                    var search = $"{g.Name} {kindLabel} {string.Join(' ', entries.Select(e => $"{e.Hostname} {e.Type}"))}";
+                    var dynForZone = Model.DynamicRules.Where(r => r.DomainGroupId == g.Id).ToList();
+                    var childCount = entries.Count + dynForZone.Count;
+                    var search = $"{g.Name} {kindLabel} {string.Join(' ', entries.Select(e => $"{e.Hostname} {e.Type}"))} {string.Join(' ', dynForZone.Select(r => r.DynamicBaseFqdn))}";
                     <tbody class="dt-group" data-search="@search" data-kind="@kindKey" data-href="/Domains/Edit?id=@g.Id">
-                        <tr class="dt-parent @(entries.Count > 0 ? "has-children" : "")">
+                        <tr class="dt-parent @(childCount > 0 ? "has-children" : "")">
                             <td class="dt-name">@g.Name</td>
-                            <td class="hide-sm"><span class="badge @(g.Kind == DomainKind.Netcup ? "update" : "info")">@kindLabel</span></td>
+                            <td class="hide-sm"><span class="badge @(g.Kind == DomainKind.Netcup ? "update" : "info")">@kindLabel</span> @if (dynForZone.Count > 0) { <span class="badge info">dynamic</span> }</td>
                             <td class="cell-muted">@entries.Count record@(entries.Count == 1 ? "" : "s")</td>
                             <td></td>
                             <td class="dt-go">›</td>
@@ -56,11 +58,22 @@ else
                         @for (int i = 0; i < entries.Count; i++)
                         {
                             var e = entries[i];
-                            <tr class="dt-child @(i == entries.Count - 1 ? "last" : "")">
+                            <tr class="dt-child @(i == childCount - 1 ? "last" : "")">
                                 <td></td>
                                 <td class="hide-sm"></td>
                                 <td class="mono"><span class="dt-sub">@e.Hostname</span></td>
                                 <td><span class="badge muted">@e.Type</span></td>
+                                <td></td>
+                            </tr>
+                        }
+                        @for (int j = 0; j < dynForZone.Count; j++)
+                        {
+                            var dr = dynForZone[j];
+                            <tr class="dt-child @(entries.Count + j == childCount - 1 ? "last" : "")">
+                                <td></td>
+                                <td class="hide-sm"></td>
+                                <td class="mono"><span class="dt-sub">*.@dr.DynamicBaseFqdn</span></td>
+                                <td><span class="badge info">dynamic</span></td>
                                 <td></td>
                             </tr>
                         }

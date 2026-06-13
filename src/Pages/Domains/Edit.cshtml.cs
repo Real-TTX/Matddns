@@ -99,7 +99,7 @@ public class EditModel : PageModel
         {
             zone = (DomainZone ?? "").Trim().TrimEnd('.');
             rec = string.IsNullOrWhiteSpace(RecordName) ? "@" : RecordName.Trim().TrimEnd('.');
-            if (string.IsNullOrEmpty(zone)) { Error = "Domain/zone missing (e.g. h5x.de)"; return RedirectToPage("Edit", new { id = Id }); }
+            if (string.IsNullOrEmpty(zone)) { Error = "Domain/zone missing (e.g. example.com)"; return RedirectToPage("Edit", new { id = Id }); }
             fqdn = (rec is "@" or "*" or "") ? zone : $"{rec}.{zone}";
         }
         else

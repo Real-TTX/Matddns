@@ -10,8 +10,14 @@ public class IndexModel : PageModel
     public IndexModel(ConfigService config) => _config = config;
 
     public List<DomainGroup> Groups { get; private set; } = new();
+    public List<Rule> DynamicRules { get; private set; } = new();
     [Microsoft.AspNetCore.Mvc.TempData] public string? Notice { get; set; }
     [Microsoft.AspNetCore.Mvc.TempData] public string? Error { get; set; }
 
-    public void OnGet() => Groups = _config.Read(c => c.Domains.ToList());
+    public void OnGet()
+    {
+        var cfg = _config.Current;
+        Groups = cfg.Domains.ToList();
+        DynamicRules = cfg.Rules.Where(r => r.Dynamic).ToList();
+    }
 }
