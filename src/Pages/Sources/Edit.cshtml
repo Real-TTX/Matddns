@@ -126,10 +126,16 @@
                 var baseUrl = Model.BaseUrl;
                 var token = g!.Push?.Token ?? "";
                 var host = baseUrl.Replace("https://", "").Replace("http://", "");
+                var isDyn = g.Push?.Dynamic == true;
+                var baseFqdn = g.Push?.BaseFqdn ?? "";
                 <div class="form-grid" style="margin-top:16px;">
                     <div class="field full">
                         <label>Update URL</label>
-                        <input type="text" value="@($"{baseUrl}/api/update?token={token}&ipv4=<your-ipv4>&ipv6=<your-ipv6>")" readonly onclick="this.select()" />
+                        <input type="text" value="@(isDyn ? $"{baseUrl}/update?token={token}&hostname=<name>.{baseFqdn}&myip=%i" : $"{baseUrl}/api/update?token={token}&ipv4=<your-ipv4>&ipv6=<your-ipv6>")" readonly onclick="this.select()" />
+                        @if (isDyn)
+                        {
+                            <p class="muted-small" style="margin:6px 0 0;">Dynamic receiver: the device sends <span class="mono">&amp;hostname=&lt;name&gt;.@baseFqdn</span> (its own name under the namespace) — that record is created/updated.</p>
+                        }
                         <button type="button" class="ghost sm" style="margin-top:8px;" onclick="document.getElementById('pushDocs').showModal()">Documentation</button>
                     </div>
                     <div class="field full">
@@ -178,8 +184,15 @@
                             <summary>FRITZ!Box</summary>
                             <div class="acc-body">
                                 <label>Update URL</label>
-                                <input type="text" value="@($"{baseUrl}/nic/update?token={token}&ipv4=<ipaddr>&ipv6=<ip6addr>")" readonly onclick="this.select()" />
-                                <p class="muted-small" style="margin:6px 0 0;">Internet → Permit Access → DynDNS → <em>custom provider</em>. Domain / user / password can be anything; FRITZ!Box fills <span class="mono">&lt;ipaddr&gt;</span> / <span class="mono">&lt;ip6addr&gt;</span>.</p>
+                                <input type="text" value="@(isDyn ? $"{baseUrl}/nic/update?token={token}&hostname=<domain>&ipv4=<ipaddr>&ipv6=<ip6addr>" : $"{baseUrl}/nic/update?token={token}&ipv4=<ipaddr>&ipv6=<ip6addr>")" readonly onclick="this.select()" />
+                                @if (isDyn)
+                                {
+                                    <p class="muted-small" style="margin:6px 0 0;">Internet → Permit Access → DynDNS → <em>custom provider</em>. Set <strong>Domainname</strong> = <span class="mono">&lt;name&gt;.@baseFqdn</span> — FRITZ!Box sends it as <span class="mono">&lt;domain&gt;</span>; user / password can be anything.</p>
+                                }
+                                else
+                                {
+                                    <p class="muted-small" style="margin:6px 0 0;">Internet → Permit Access → DynDNS → <em>custom provider</em>. Domain / user / password can be anything; FRITZ!Box fills <span class="mono">&lt;ipaddr&gt;</span> / <span class="mono">&lt;ip6addr&gt;</span>.</p>
+                                }
                             </div>
                         </details>
 
@@ -190,12 +203,20 @@
                                 <table class="api-table">
                                     <tbody>
                                         <tr><td>Service</td><td class="mono">custom</td></tr>
-                                        <tr><td>Hostname</td><td>any FQDN, label only — e.g. <span class="mono">wan.example.com</span></td></tr>
+                                        <tr>
+                                            <td>Hostname</td>
+                                            @if (isDyn) { <td><span class="mono">&lt;name&gt;.@baseFqdn</span> — becomes the record</td> }
+                                            else { <td>any FQDN, label only — e.g. <span class="mono">wan.example.com</span></td> }
+                                        </tr>
                                         <tr><td>Username</td><td class="mono">matddns</td></tr>
                                         <tr><td>Password</td><td class="mono">@token</td></tr>
-                                        <tr><td>Server</td><td class="mono">@($"{host}/update?token=%p&ipv4=%i")</td></tr>
+                                        <tr><td>Server</td><td class="mono">@(isDyn ? $"{host}/update?token=%p&hostname=%h&ipv4=%i" : $"{host}/update?token=%p&ipv4=%i")</td></tr>
                                     </tbody>
                                 </table>
+                                @if (isDyn)
+                                {
+                                    <p class="muted-small" style="margin:8px 0 0;"><strong>Dynamic:</strong> set <strong>Hostname</strong> = <span class="mono">&lt;name&gt;.@baseFqdn</span>; <span class="mono">%h</span> sends it as the record to create/update.</p>
+                                }
                                 <p class="muted-small" style="margin:8px 0 0;"><strong>Server: no <span class="mono">http://</span> / <span class="mono">https://</span></strong> — bare host only, or UniFi's client tries to resolve the scheme as a hostname and never sends. Fill <strong>Password</strong> with the token; <span class="mono">%p</span> mirrors it into the URL and <span class="mono">%i</span> becomes the WAN IPv4 (both are placeholders — UniFi keeps those, drops plain text). Connects over HTTPS.</p>
                                 <p class="muted-small" style="margin:6px 0 0;"><strong>IPv4 only:</strong> UniFi has no IPv6 placeholder, so one entry tracks the WAN IPv4. For dual‑stack use the FRITZ!Box section (separate <span class="mono">&lt;ip6addr&gt;</span>).</p>
                                 <p class="muted-small" style="margin:6px 0 0;"><strong>Same‑network gotcha:</strong> if the UDM's DDNS host resolves to its own public IP, the request loops back to the UDM (NAT hairpin). Add a local DNS record so <span class="mono">@host</span> resolves to this server's internal IP.</p>
