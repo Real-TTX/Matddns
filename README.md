@@ -53,6 +53,13 @@ services:
     # lets the non-root user send ICMP for the "ping" failover check
     sysctls:
       - net.ipv4.ping_group_range=0 2147483647
+    # healthy while /healthz returns HTTP 200 (liveness; 8080 is the in-container port)
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 ```
 
 ```bash

@@ -17,9 +17,9 @@ ENV MATDDNS_VERSION=$VERSION
 ENV MATDDNS_BUILD=$BUILD
 ENV MATDDNS_BUILD_DATE=$BUILD_DATE
 EXPOSE 8080
-# tzdata so configurable time zones resolve (otherwise .NET only knows UTC)
+# tzdata so configurable time zones resolve (otherwise .NET only knows UTC); curl for the container healthcheck
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tzdata \
+    && apt-get install -y --no-install-recommends tzdata curl \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /data && useradd -u 10001 -m matddns && chown -R matddns:matddns /data /app
 COPY --from=build --chown=matddns:matddns /app ./
