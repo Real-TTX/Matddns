@@ -95,41 +95,47 @@ app.MapGet("/api/state", (StatusService status) =>
 
 // DynDNS receiver: external devices push their IP into a "Push" source (token-protected).
 // JSON API form: /api/update?token=<token>&ipv4=<v4>&ipv6=<v6>  (send either or both; legacy ?ip= auto-detects family).
-app.MapGet("/api/update", (HttpContext ctx, PushReceiver push) =>
+app.MapGet("/api/update", async (HttpContext ctx, PushReceiver push) =>
 {
     var q = ctx.Request.Query;
     var token = q["token"].FirstOrDefault();
+    var hostname = q["hostname"].FirstOrDefault();
     var ipv4 = q["ipv4"].FirstOrDefault();
     var ipv6 = q["ipv6"].FirstOrDefault();
     var ipAuto = q["ip"].FirstOrDefault();
     var caller = ctx.Connection.RemoteIpAddress?.ToString();
-    var r = push.Update(token, ipv4, ipv6, ipAuto, caller);
+    var r = await push.UpdateAsync(token, hostname, ipv4, ipv6, ipAuto, caller, ctx.RequestAborted);
     return r.Status switch
     {
         "ok" => Results.Json(new { status = "ok", changed = r.Changed, ipv4 = r.Ipv4, ipv6 = r.Ipv6, time = DateTime.UtcNow }, statusCode: 200),
         "no-ip" => Results.Json(new { status = "no-ip", message = "Supply ipv4 and/or ipv6 (or ip)." }, statusCode: 400),
+        "no-host" => Results.Json(new { status = "no-host", message = r.Message ?? "Hostname not allowed for this token." }, statusCode: 403),
+        "error" => Results.Json(new { status = "error", message = r.Message ?? "Update failed." }, statusCode: 502),
         _ => Results.Json(new { status = "unauthorized", message = "Invalid or missing token." }, statusCode: 401),
     };
 }).AllowAnonymous();
 
 // dyndns2-compatible (routers / FRITZ!Box / UniFi): /nic/update and the shorter /update alias.
 // Token via HTTP Basic auth password or ?token= (literal, or a client placeholder like %p); ipv4/ipv6 (or myip) set the address(es).
-// Keeps the dyndns2 plain-text protocol (good/nochg/badauth/nohost) these clients expect.
-IResult DynDns2Update(HttpContext ctx, PushReceiver push)
+// A dynamic receiver also reads ?hostname= and writes that record. Keeps the dyndns2 plain-text protocol these clients expect.
+async Task<IResult> DynDns2Update(HttpContext ctx, PushReceiver push)
 {
     var q = ctx.Request.Query;
     var token = PushReceiver.BasicAuthPassword(ctx.Request.Headers.Authorization.FirstOrDefault())
                 ?? q["token"].FirstOrDefault();
+    var hostname = q["hostname"].FirstOrDefault();
     // ipv4/ipv6 are canonical; myip/myipv6 accepted silently for stock dyndns2 clients.
     var ipv4 = q["ipv4"].FirstOrDefault() ?? q["myip"].FirstOrDefault();
     var ipv6 = q["ipv6"].FirstOrDefault() ?? q["myipv6"].FirstOrDefault() ?? q["myip6"].FirstOrDefault();
     var ipAuto = q["ip"].FirstOrDefault();
     var caller = ctx.Connection.RemoteIpAddress?.ToString();
-    var r = push.Update(token, ipv4, ipv6, ipAuto, caller);
+    var r = await push.UpdateAsync(token, hostname, ipv4, ipv6, ipAuto, caller, ctx.RequestAborted);
     var body = r.Status switch
     {
         "unauthorized" => "badauth",
         "no-ip" => "nohost",
+        "no-host" => "nohost",
+        "error" => "dnserr",
         _ => $"{(r.Changed ? "good" : "nochg")} {string.Join(" ", new[] { r.Ipv4, r.Ipv6 }.Where(x => x != null))}".Trim(),
     };
     return Results.Text(body, "text/plain", statusCode: 200); // dyndns2 carries status in the body
