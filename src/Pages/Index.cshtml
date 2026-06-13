@@ -90,6 +90,52 @@
     </table>
 </div>
 
+<div class="section-title"><h2>Domains</h2><a class="muted-small" href="/Domains">manage →</a></div>
+<div class="card">
+    <table class="dtable">
+        <thead><tr><th>Zone</th><th class="hide-sm">Provider</th><th>Record</th><th>Type</th></tr></thead>
+        @foreach (var g in Model.Domains)
+        {
+            var dkind = g.Kind == DomainKind.Netcup ? "Netcup API" : "DynDNS";
+            var dentries = g.Entries;
+            var dynForZone = Model.DynamicRules.Where(r => r.DomainGroupId == g.Id).ToList();
+            var dchild = dentries.Count + dynForZone.Count;
+            <tbody class="dt-group">
+                <tr class="dt-parent @(dchild > 0 ? "has-children" : "")">
+                    <td class="dt-name">@g.Name</td>
+                    <td class="hide-sm"><span class="badge @(g.Kind == DomainKind.Netcup ? "update" : "info")">@dkind</span> @if (dynForZone.Count > 0) { <span class="badge info">dynamic</span> }</td>
+                    <td class="cell-muted">@dentries.Count record@(dentries.Count == 1 ? "" : "s")</td>
+                    <td></td>
+                </tr>
+                @for (int i = 0; i < dentries.Count; i++)
+                {
+                    var e = dentries[i];
+                    <tr class="dt-child @(i == dchild - 1 ? "last" : "")">
+                        <td></td>
+                        <td class="hide-sm"></td>
+                        <td class="mono"><span class="dt-sub">@e.Hostname</span></td>
+                        <td><span class="badge muted">@e.Type</span></td>
+                    </tr>
+                }
+                @for (int j = 0; j < dynForZone.Count; j++)
+                {
+                    var dr = dynForZone[j];
+                    <tr class="dt-child @(dentries.Count + j == dchild - 1 ? "last" : "")">
+                        <td></td>
+                        <td class="hide-sm"></td>
+                        <td class="mono"><span class="dt-sub">*.@dr.DynamicBaseFqdn</span></td>
+                        <td><span class="badge info">dynamic</span></td>
+                    </tr>
+                }
+            </tbody>
+        }
+        @if (Model.Domains.Count == 0)
+        {
+            <tbody><tr><td colspan="4" class="muted">No domains configured. <a href="/Domains/Edit">Add one</a>.</td></tr></tbody>
+        }
+    </table>
+</div>
+
 <div class="section-title"><h2>Rules</h2><a class="muted-small" href="/Rules">manage →</a></div>
 <div class="card">
     <table>
