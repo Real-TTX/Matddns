@@ -37,30 +37,56 @@
 
 <div class="section-title"><h2>Sources</h2><a class="muted-small" href="/Sources">manage →</a></div>
 <div class="card">
-    <table>
-        <thead><tr><th class="hide-sm">Source</th><th>Entry</th><th>IPv4</th><th class="hide-sm">IPv6</th><th class="hide-sm">Last check</th><th>Status</th></tr></thead>
-        <tbody>
+    <table class="dtable">
+        <thead><tr><th>Source</th><th>IPv4</th><th class="hide-sm">IPv6</th><th class="hide-sm">Last check</th><th>Status</th></tr></thead>
         @foreach (var src in s.SourceList)
         {
-            @foreach (var e in src.Entries)
-            {
-                var noIp = string.IsNullOrEmpty(e.Ip) && string.IsNullOrEmpty(e.Ipv6);
-                var st = e.Error != null ? "err" : (noIp ? "warn" : "ok");
-                <tr>
-                    <td class="hide-sm">@src.Name <span class="muted-small">(@(src.Kind == "Push" ? "DynDNS Server" : src.Kind == "Dns" ? "DNS lookup" : src.Kind))</span></td>
-                    <td>@e.Label</td>
-                    <td class="mono">@(e.Ip ?? "—")</td>
-                    <td class="mono hide-sm">@(e.Ipv6 ?? "—")</td>
-                    <td class="hide-sm"><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
-                    <td><span class="status-pill" title="@(e.Error ?? "")"><span class="status-dot @st"></span><span class="hide-sm">@(e.Error != null ? "error" : (noIp ? "pending" : "ok"))</span></span></td>
+            var kindLabel = src.Kind == "Push" ? "DynDNS Server" : src.Kind == "Dns" ? "DNS lookup" : src.Kind;
+            var entries = src.Entries;
+            var multi = entries.Count > 1;
+            var first = entries.FirstOrDefault();
+            <tbody class="dt-group">
+                <tr class="dt-parent @(multi ? "has-children" : "")">
+                    <td class="dt-name">@src.Name <span class="muted-small">(@kindLabel)</span></td>
+                    @if (multi || first == null)
+                    {
+                        <td></td>
+                        <td class="hide-sm"></td>
+                        <td class="hide-sm"></td>
+                        <td></td>
+                    }
+                    else
+                    {
+                        var noIp = string.IsNullOrEmpty(first.Ip) && string.IsNullOrEmpty(first.Ipv6);
+                        var st = first.Error != null ? "err" : (noIp ? "warn" : "ok");
+                        <td class="mono">@(first.Ip ?? "—")</td>
+                        <td class="mono hide-sm">@(first.Ipv6 ?? "—")</td>
+                        <td class="hide-sm"><span class="muted-small">@Tz.Format(first.LastChecked)</span></td>
+                        <td><span class="status-pill" title="@(first.Error ?? "")"><span class="status-dot @st"></span><span class="hide-sm">@(first.Error != null ? "error" : (noIp ? "pending" : "ok"))</span></span></td>
+                    }
                 </tr>
-            }
+                @if (multi)
+                {
+                    for (int i = 0; i < entries.Count; i++)
+                    {
+                        var e = entries[i];
+                        var noIp = string.IsNullOrEmpty(e.Ip) && string.IsNullOrEmpty(e.Ipv6);
+                        var st = e.Error != null ? "err" : (noIp ? "warn" : "ok");
+                        <tr class="dt-child @(i == entries.Count - 1 ? "last" : "")">
+                            <td><span class="dt-sub">@e.Label</span></td>
+                            <td class="mono cell-muted">@(e.Ip ?? "—")</td>
+                            <td class="mono cell-muted hide-sm">@(e.Ipv6 ?? "—")</td>
+                            <td class="hide-sm"><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
+                            <td><span class="status-pill" title="@(e.Error ?? "")"><span class="status-dot @st"></span><span class="hide-sm">@(e.Error != null ? "error" : (noIp ? "pending" : "ok"))</span></span></td>
+                        </tr>
+                    }
+                }
+            </tbody>
         }
         @if (s.SourceList.Count == 0)
         {
-            <tr><td colspan="6" class="muted">No sources configured. <a href="/Sources/Edit">Add one</a>.</td></tr>
+            <tbody><tr><td colspan="5" class="muted">No sources configured. <a href="/Sources/Edit">Add one</a>.</td></tr></tbody>
         }
-        </tbody>
     </table>
 </div>
 
