@@ -257,7 +257,7 @@
                     <td class="mono">@(e.CurrentIp ?? "—")</td>
                     <td class="mono">@(e.CurrentIpv6 ?? "—")</td>
                     <td><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
-                    <td><span class="status-pill"><span class="status-dot @status"></span>@(e.LastError ?? (noIp ? "pending" : "ok"))</span></td>
+                    <td><span class="status-pill" title="@(e.LastError ?? "")"><span class="status-dot @status"></span>@(e.LastError != null ? "error" : (noIp ? "pending" : "ok"))</span></td>
                     @if (kind == SourceKind.Unifi)
                     {
                         <td style="text-align:right">
