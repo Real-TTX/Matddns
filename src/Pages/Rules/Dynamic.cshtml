@@ -42,7 +42,7 @@
             </div>
             <div class="field">
                 <label>Zone</label>
-                <input type="text" name="DynamicZone" value="@(r?.DynamicZone ?? "")" placeholder="h5x.de" />
+                <input type="text" name="DynamicZone" value="@(r?.DynamicZone ?? "")" placeholder="example.com" />
             </div>
             <div class="field">
                 <label>Namespace prefix</label>
@@ -71,7 +71,7 @@
 {
     <div class="section-title"><h2>Namespace</h2></div>
     <div class="card">
-        <p class="muted-small" style="margin-top:0;">Pushes to this receiver may set any record under <span class="mono">*.@r!.DynamicBaseFqdn</span> — others are rejected. The device sends <span class="mono">&amp;hostname=&lt;name&gt;.@r.DynamicBaseFqdn</span>.</p>
+        <p class="muted-small" style="margin-top:0;">Allowed: <span class="mono">*.@r!.DynamicBaseFqdn</span> (others rejected). Device sends <span class="mono">&amp;hostname=&lt;name&gt;.@r.DynamicBaseFqdn</span>.</p>
         @if (src != null)
         {
             <p class="muted-small" style="margin-bottom:0;">Token &amp; update URL on the receiver: <a href="/Sources/Edit?id=@src.Id">@src.Name</a></p>

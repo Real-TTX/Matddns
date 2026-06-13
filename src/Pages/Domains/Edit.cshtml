@@ -92,7 +92,7 @@
                 </div>
                 <div class="field full checkbox-field">
                     <input type="checkbox" name="NcAllowDynamic" value="true" id="ncDyn" @(g?.Netcup?.AllowDynamic == true ? "checked" : "") />
-                    <label for="ncDyn">Allow dynamic records — create records on demand (needed for dynamic hosts); off = update existing only</label>
+                    <label for="ncDyn">Allow dynamic records (create on demand)</label>
                 </div>
             </div>
         </div>
@@ -162,14 +162,14 @@
                 </div>
                 <div class="field">
                     <label>Domain / zone</label>
-                    <input type="text" name="DomainZone" required placeholder="h5x.de" />
+                    <input type="text" name="DomainZone" required placeholder="example.com" />
                 </div>
             }
             else
             {
                 <div class="field full">
                     <label>Hostname (FQDN)</label>
-                    <input type="text" name="Hostname" required placeholder="home1.h5x.de" />
+                    <input type="text" name="Hostname" required placeholder="home1.example.com" />
                 </div>
             }
             <div class="field">
