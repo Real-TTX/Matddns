@@ -8,6 +8,7 @@ public class UpdaterService : BackgroundService
     private readonly LogService _log;
     private readonly PublicIpClient _publicIp;
     private readonly DnsLookupClient _dns;
+    private readonly FritzboxClient _fritz;
     private readonly UnifiClient _unifi;
     private readonly DynDnsClient _dyndns;
     private readonly NetcupClient _netcup;
@@ -19,6 +20,7 @@ public class UpdaterService : BackgroundService
         LogService log,
         PublicIpClient publicIp,
         DnsLookupClient dns,
+        FritzboxClient fritz,
         UnifiClient unifi,
         DynDnsClient dyndns,
         NetcupClient netcup,
@@ -29,6 +31,7 @@ public class UpdaterService : BackgroundService
         _log = log;
         _publicIp = publicIp;
         _dns = dns;
+        _fritz = fritz;
         _unifi = unifi;
         _dyndns = dyndns;
         _netcup = netcup;
@@ -183,6 +186,25 @@ public class UpdaterService : BackgroundService
                     _log.Log(LogLevel.Debug, $"src:{group.Name}", $"DNS {host} v4={v4 ?? "-"} v6={v6 ?? "-"}");
                 else
                     _log.Log(LogLevel.Warn, $"src:{group.Name}", $"could not resolve {host}");
+            }
+            else if (group.Kind == SourceKind.Fritzbox && group.Fritzbox != null)
+            {
+                string? fv4 = null, fv6 = null, ferr = null;
+                try { var w = await _fritz.GetWanAsync(group.Fritzbox, ct); fv4 = w.Ipv4; fv6 = w.Ipv6; }
+                catch (Exception ex) { ferr = ex.Message; }
+                _config.Mutate(c =>
+                {
+                    var g = c.Sources.FirstOrDefault(x => x.Id == group.Id);
+                    if (g == null) return;
+                    if (g.Entries.Count == 0) g.Entries.Add(new SourceEntry { Label = "FRITZ!Box WAN" });
+                    var entry = g.Entries[0];
+                    entry.Label = "FRITZ!Box WAN";
+                    if (ferr == null) { entry.CurrentIp = fv4; entry.CurrentIpv6 = fv6; }
+                    entry.LastChecked = DateTime.UtcNow;
+                    entry.LastError = ferr ?? ((fv4 == null && fv6 == null) ? "no IP" : null);
+                });
+                if (ferr == null) _log.Log(LogLevel.Debug, $"src:{group.Name}", $"FRITZ!Box v4={fv4 ?? "-"} v6={fv6 ?? "-"}");
+                else _log.Log(LogLevel.Error, $"src:{group.Name}", $"FRITZ!Box: {ferr}");
             }
         }
     }

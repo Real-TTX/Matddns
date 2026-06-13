@@ -6,7 +6,8 @@ public enum SourceKind
     Unifi,
     Static,
     Push,
-    Dns
+    Dns,
+    Fritzbox
 }
 
 public class SourceGroup
@@ -19,7 +20,16 @@ public class SourceGroup
     public StaticSettings? Static { get; set; }
     public PushSettings? Push { get; set; }
     public DnsSettings? Dns { get; set; }
+    public FritzboxSettings? Fritzbox { get; set; }
     public List<SourceEntry> Entries { get; set; } = new();
+}
+
+public class FritzboxSettings
+{
+    public string BaseUrl { get; set; } = "";   // local: http://fritz.box:49000  ·  MyFRITZ: https://<id>.myfritz.net:<port>
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
+    public bool IgnoreCertificate { get; set; }
 }
 
 public class DnsSettings

@@ -11,13 +11,15 @@ public class EditModel : PageModel
     private readonly UnifiClient _unifi;
     private readonly PublicIpClient _publicIp;
     private readonly DnsLookupClient _dns;
+    private readonly FritzboxClient _fritz;
 
-    public EditModel(ConfigService config, UnifiClient unifi, PublicIpClient publicIp, DnsLookupClient dns)
+    public EditModel(ConfigService config, UnifiClient unifi, PublicIpClient publicIp, DnsLookupClient dns, FritzboxClient fritz)
     {
         _config = config;
         _unifi = unifi;
         _publicIp = publicIp;
         _dns = dns;
+        _fritz = fritz;
     }
 
     public SourceGroup? Group { get; private set; }
@@ -44,7 +46,8 @@ public class EditModel : PageModel
 
     public IActionResult OnPostCreate(string Name, SourceKind Kind, int IntervalSeconds,
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
-        string? StaticIp = null, string? StaticIpv6 = null, string? DnsHost = null)
+        string? StaticIp = null, string? StaticIpv6 = null, string? DnsHost = null,
+        string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false)
     {
         if (string.IsNullOrWhiteSpace(Name)) { Error = "Name missing"; return RedirectToPage("Edit"); }
 
@@ -91,6 +94,17 @@ public class EditModel : PageModel
             g.Dns = new DnsSettings { Hostname = host };
             g.Entries.Add(new SourceEntry { Label = string.IsNullOrEmpty(host) ? "DNS lookup" : host });
         }
+        else if (Kind == SourceKind.Fritzbox)
+        {
+            g.Fritzbox = new FritzboxSettings
+            {
+                BaseUrl = string.IsNullOrWhiteSpace(FbUrl) ? "http://fritz.box:49000" : FbUrl!.Trim(),
+                Username = FbUser ?? "",
+                Password = FbPass ?? "",
+                IgnoreCertificate = FbIgnoreCert
+            };
+            g.Entries.Add(new SourceEntry { Label = "FRITZ!Box WAN" });
+        }
         else
         {
             g.Entries.Add(new SourceEntry { Label = "Public IP" });
@@ -118,7 +132,8 @@ public class EditModel : PageModel
 
     public IActionResult OnPostSave(string Id, string Name, int IntervalSeconds,
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
-        string? StaticIp = null, string? StaticIpv6 = null, string? DnsHost = null)
+        string? StaticIp = null, string? StaticIpv6 = null, string? DnsHost = null,
+        string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false)
     {
         _config.Mutate(c =>
         {
@@ -156,6 +171,16 @@ public class EditModel : PageModel
                 if (e == null) { e = new SourceEntry(); g.Entries.Add(e); }
                 e.Label = string.IsNullOrEmpty(g.Dns.Hostname) ? "DNS lookup" : g.Dns.Hostname;
                 e.LastChecked = null; // force a re-resolve on the next poll
+            }
+            else if (g.Kind == SourceKind.Fritzbox)
+            {
+                g.Fritzbox ??= new FritzboxSettings();
+                g.Fritzbox.BaseUrl = string.IsNullOrWhiteSpace(FbUrl) ? "http://fritz.box:49000" : FbUrl!.Trim();
+                g.Fritzbox.Username = FbUser ?? "";
+                if (!string.IsNullOrEmpty(FbPass)) g.Fritzbox.Password = FbPass; // empty = unchanged
+                g.Fritzbox.IgnoreCertificate = FbIgnoreCert;
+                var e = g.Entries.FirstOrDefault();
+                if (e != null) e.LastChecked = null; // re-fetch on next poll
             }
         });
         Notice = "Saved";
@@ -220,7 +245,8 @@ public class EditModel : PageModel
 
     public async Task<IActionResult> OnPostTestAsync(string Id, CancellationToken ct,
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
-        string? DnsHost = null)
+        string? DnsHost = null,
+        string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false)
     {
         var g = _config.Read(c => c.Sources.FirstOrDefault(x => x.Id == Id));
         if (g == null) { Error = "Group not found"; return RedirectToPage("Index"); }
@@ -260,6 +286,19 @@ public class EditModel : PageModel
                 TestResult = TestOk
                     ? $"OK – {host} → {string.Join(" / ", new[] { v4, v6 }.Where(x => x != null))}"
                     : (string.IsNullOrWhiteSpace(host) ? "Enter a hostname first." : $"Could not resolve {host}.");
+            }
+            else if (g.Kind == SourceKind.Fritzbox)
+            {
+                var probe = new FritzboxSettings
+                {
+                    BaseUrl = string.IsNullOrWhiteSpace(FbUrl) ? (g.Fritzbox?.BaseUrl ?? "http://fritz.box:49000") : FbUrl.Trim(),
+                    Username = string.IsNullOrWhiteSpace(FbUser) ? (g.Fritzbox?.Username ?? "") : FbUser,
+                    Password = string.IsNullOrEmpty(FbPass) ? (g.Fritzbox?.Password ?? "") : FbPass,
+                    IgnoreCertificate = FbIgnoreCert
+                };
+                var w = await _fritz.GetWanAsync(probe, ct);
+                TestOk = w.Ipv4 != null || w.Ipv6 != null;
+                TestResult = TestOk ? $"OK – WAN {string.Join(" / ", new[] { w.Ipv4, w.Ipv6 }.Where(x => x != null))}" : "Connected, but no WAN IP returned.";
             }
             else
             {

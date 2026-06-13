@@ -22,6 +22,7 @@ builder.Services.AddSingleton<LogService>();
 builder.Services.AddSingleton<AuthService>();
 builder.Services.AddSingleton<PublicIpClient>();
 builder.Services.AddSingleton<DnsLookupClient>();
+builder.Services.AddSingleton<FritzboxClient>();
 builder.Services.AddSingleton<UnifiClient>();
 builder.Services.AddSingleton<NetcupClient>();
 builder.Services.AddSingleton<DynDnsClient>();

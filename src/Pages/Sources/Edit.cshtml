@@ -46,11 +46,12 @@
                         <option value="Static">Static IP</option>
                         <option value="Push">DynDNS Server</option>
                         <option value="Dns">DNS lookup</option>
+                        <option value="Fritzbox">FRITZ!Box</option>
                     </select>
                 }
                 else
                 {
-                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static IP", SourceKind.Push => "DynDNS Server", SourceKind.Dns => "DNS lookup", _ => "Public IP" };
+                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.Static => "Static IP", SourceKind.Push => "DynDNS Server", SourceKind.Dns => "DNS lookup", SourceKind.Fritzbox => "FRITZ!Box", _ => "Public IP" };
                     <input type="text" value="@typeLabel" disabled />
                 }
             </div>
@@ -115,6 +116,30 @@
                 <div class="field full">
                     <label>Hostname</label>
                     <input type="text" name="DnsHost" value="@(g?.Dns?.Hostname ?? "")" placeholder="xxxxxxxx.myfritz.net" />
+                </div>
+            </div>
+        </div>
+
+        <!-- FRITZ!Box fields -->
+        <div class="type-fields @(kind == SourceKind.Fritzbox ? "active" : "")" data-kind="Fritzbox">
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="field full">
+                    <label>Address (TR-064)</label>
+                    <input type="text" name="FbUrl" value="@(g?.Fritzbox?.BaseUrl ?? "")" placeholder="http://fritz.box:49000  ·  or https://xxxxxxxx.myfritz.net:port" />
+                </div>
+                <div class="field">
+                    <label>Username</label>
+                    <input type="text" name="FbUser" value="@(g?.Fritzbox?.Username ?? "")" autocomplete="off" />
+                </div>
+                <div class="field">
+                    <label>Password</label>
+                    <input type="password" name="FbPass" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
+                </div>
+                <div class="field full">
+                    <div class="checkbox-field">
+                        <input type="checkbox" id="FbIgnoreCert" name="FbIgnoreCert" value="true" @(g?.Fritzbox?.IgnoreCertificate == true ? "checked" : "") />
+                        <label for="FbIgnoreCert">Ignore self-signed certificate (MyFRITZ! TLS)</label>
+                    </div>
                 </div>
             </div>
         </div>
@@ -212,7 +237,7 @@
             <a class="button ghost" href="/Sources">Cancel</a>
             @if (!isNew)
             {
-                @if (kind == SourceKind.Unifi || kind == SourceKind.PublicIp || kind == SourceKind.Dns)
+                @if (kind == SourceKind.Unifi || kind == SourceKind.PublicIp || kind == SourceKind.Dns || kind == SourceKind.Fritzbox)
                 {
                     <button type="submit" class="ghost" asp-page-handler="Test" name="Id" value="@g!.Id">Test connection</button>
                 }
