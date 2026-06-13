@@ -39,6 +39,17 @@ public class Rule
     public string DomainEntryId { get; set; } = "";
     public List<string> SourceEntryIdsInOrder { get; set; } = new();
     public List<string> CnameTargets { get; set; } = new();
+
+    // Dynamic (pattern) rule: a DynDNS Server source pushes hostnames; matching records are created/updated
+    // on demand in the target Netcup zone (DomainGroupId). DomainEntryId / SourceEntryIdsInOrder are unused,
+    // and the updater skips it (it is push-driven, written by PushReceiver).
+    public bool Dynamic { get; set; }
+    public string DynamicSourceId { get; set; } = "";   // the DynDNS Server (push) source group id
+    public string DynamicZone { get; set; } = "";        // Netcup zone, e.g. h5x.de
+    public string DynamicPrefix { get; set; } = "";      // namespace prefix under the zone, e.g. "dynamic" (empty = whole zone)
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string DynamicBaseFqdn => string.IsNullOrWhiteSpace(DynamicPrefix) ? DynamicZone : $"{DynamicPrefix.Trim('.')}.{DynamicZone}";
     public DateTime? LastRun { get; set; }
     public string? LastResult { get; set; }
     public string? LastUsedSourceId { get; set; }

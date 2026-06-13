@@ -69,8 +69,10 @@ public class PushReceiver
 
         var joined = string.Join(" ", new[] { newV4, newV6 }.Where(x => x != null));
 
-        if (grp.Push!.Dynamic)
-            return await DynamicAsync(grp, hostname, newV4, newV6, joined, callerIp, ct);
+        // a dynamic rule pointing at this source turns it into a wildcard receiver
+        var dynRule = _config.Read(c => c.Rules.FirstOrDefault(r => r.Enabled && r.Dynamic && r.DynamicSourceId == grp.Id));
+        if (dynRule != null)
+            return await DynamicAsync(grp, dynRule, hostname, newV4, newV6, joined, callerIp, ct);
 
         // normal receiver: store into the single entry; the updater writes it via its rules
         var changed = false;
@@ -93,15 +95,14 @@ public class PushReceiver
     }
 
     /// <summary>Dynamic receiver: validate the hostname against the configured namespace, then write the record to Netcup.</summary>
-    private async Task<PushOutcome> DynamicAsync(SourceGroup grp, string? hostname, string? newV4, string? newV6, string joined, string? callerIp, CancellationToken ct)
+    private async Task<PushOutcome> DynamicAsync(SourceGroup grp, Rule rule, string? hostname, string? newV4, string? newV6, string joined, string? callerIp, CancellationToken ct)
     {
-        var push = grp.Push!;
         var host = (hostname ?? "").Trim().TrimEnd('.').ToLowerInvariant();
-        var baseFqdn = push.BaseFqdn.Trim('.').ToLowerInvariant();
-        var zone = push.Zone.Trim('.').ToLowerInvariant();
+        var baseFqdn = rule.DynamicBaseFqdn.Trim('.').ToLowerInvariant();
+        var zone = rule.DynamicZone.Trim('.').ToLowerInvariant();
 
-        if (string.IsNullOrEmpty(baseFqdn) || string.IsNullOrEmpty(zone) || string.IsNullOrWhiteSpace(push.TargetDomainGroupId))
-            return Reject(grp, "dynamic receiver is not fully configured (target zone / namespace)", callerIp);
+        if (string.IsNullOrEmpty(baseFqdn) || string.IsNullOrEmpty(zone) || string.IsNullOrWhiteSpace(rule.DomainGroupId))
+            return Reject(grp, "dynamic rule is not fully configured (target zone / namespace)", callerIp);
         if (string.IsNullOrEmpty(host))
             return Reject(grp, "no hostname supplied", callerIp);
         if (!(host == baseFqdn || host.EndsWith("." + baseFqdn, StringComparison.Ordinal)))
@@ -115,7 +116,7 @@ public class PushReceiver
             : host;
 
         var dgrp = _config.Read(c => c.Domains.FirstOrDefault(d =>
-            d.Id == push.TargetDomainGroupId && d.Kind == DomainKind.Netcup && d.Netcup != null));
+            d.Id == rule.DomainGroupId && d.Kind == DomainKind.Netcup && d.Netcup != null));
         if (dgrp == null)
             return Reject(grp, "target Netcup zone not found", callerIp);
 

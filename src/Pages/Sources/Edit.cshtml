@@ -126,8 +126,8 @@
                 var baseUrl = Model.BaseUrl;
                 var token = g!.Push?.Token ?? "";
                 var host = baseUrl.Replace("https://", "").Replace("http://", "");
-                var isDyn = g.Push?.Dynamic == true;
-                var baseFqdn = g.Push?.BaseFqdn ?? "";
+                var isDyn = Model.DynamicRule != null;
+                var baseFqdn = Model.DynamicRule?.DynamicBaseFqdn ?? "";
                 <div class="form-grid" style="margin-top:16px;">
                     <div class="field full">
                         <label>Update URL</label>
@@ -144,33 +144,10 @@
                     </div>
                 </div>
 
-                <div class="section-title" style="margin-top:18px;"><h2>Dynamic receiver</h2></div>
-                <div class="form-grid">
-                    <div class="field full checkbox-field">
-                        <input type="checkbox" name="PushDynamic" value="true" id="pushDyn" @(g.Push?.Dynamic == true ? "checked" : "") onchange="document.getElementById('pushDynFields').style.display=this.checked?'':'none'" />
-                        <label for="pushDyn">Push sets the record named in the request — one token for a whole namespace (friends / many devices)</label>
-                    </div>
-                </div>
-                <div class="form-grid" id="pushDynFields" style="@(g.Push?.Dynamic == true ? "" : "display:none")">
-                    <div class="field">
-                        <label>Target zone (Netcup)</label>
-                        <select name="PushTargetGroup">
-                            <option value="">—</option>
-                            @foreach (var d in Model.NetcupGroups)
-                            {
-                                <option value="@d.Id" selected="@(g.Push?.TargetDomainGroupId == d.Id)">@d.Name</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Zone</label>
-                        <input type="text" name="PushZone" value="@(g.Push?.Zone ?? "")" placeholder="h5x.de" />
-                    </div>
-                    <div class="field full">
-                        <label>Namespace prefix</label>
-                        <input type="text" name="PushPrefix" value="@(g.Push?.Prefix ?? "")" placeholder="dynamic  →  &lt;name&gt;.dynamic.h5x.de" />
-                    </div>
-                </div>
+                @if (isDyn)
+                {
+                    <p class="muted-small" style="margin-top:14px;">Dynamic receiver — a <a href="/Rules/Dynamic?id=@Model.DynamicRule!.Id">dynamic rule</a> writes pushes to <span class="mono">*.@baseFqdn</span>.</p>
+                }
 
                 <dialog id="pushDocs" class="modal">
                     <div class="modal-head">

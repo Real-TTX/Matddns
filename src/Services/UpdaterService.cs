@@ -194,6 +194,7 @@ public class UpdaterService : BackgroundService
         foreach (var rule in cfg.Rules)
         {
             if (!rule.Enabled) continue;
+            if (rule.Dynamic) continue; // push-driven; written by PushReceiver, not polled here
             var signature = SourceSignature(rule, cfg);
             if (!RuleDue(rule, now, signature)) continue;
 
