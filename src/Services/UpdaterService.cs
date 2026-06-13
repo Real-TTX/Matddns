@@ -349,7 +349,7 @@ public class UpdaterService : BackgroundService
                 (domain, host) = NetcupClient.SplitHostname(dentry.Hostname);
                 if (!string.IsNullOrWhiteSpace(dentry.RecordName)) host = dentry.RecordName!;
             }
-            (ok, msg) = await _netcup.UpdateRecordAsync(dgroup.Netcup, domain, host, recordType, chosenValue, ct);
+            (ok, msg) = await _netcup.UpdateRecordAsync(dgroup.Netcup, domain, host, recordType, chosenValue, dgroup.Netcup.AllowDynamic, ct);
         }
         else
         {

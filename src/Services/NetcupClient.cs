@@ -56,6 +56,7 @@ public class NetcupClient
         string hostname,
         string recordType,
         string destination,
+        bool allowCreate,
         CancellationToken ct)
     {
         var client = _http.CreateClient();
@@ -114,6 +115,8 @@ public class NetcupClient
 
             if (!foundExisting)
             {
+                if (!allowCreate)
+                    return (false, $"record {hostname}.{domain} {recordType} does not exist (enable dynamic records on this zone to auto-create)");
                 updated.Add(new
                 {
                     hostname,

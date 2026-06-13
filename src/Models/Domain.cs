@@ -35,6 +35,9 @@ public class NetcupSettings
     public string CustomerNumber { get; set; } = "";
     public string ApiKey { get; set; } = "";
     public string ApiPassword { get; set; } = "";
+
+    /// <summary>Opt-in: allow Matddns to create records that don't exist yet (needed for dynamic hosts). Off = update existing only.</summary>
+    public bool AllowDynamic { get; set; }
 }
 
 public class DomainEntry

@@ -30,7 +30,7 @@ public class EditModel : PageModel
 
     public IActionResult OnPostCreate(string Name, DomainKind Kind,
         string? DynUrl, string? DynUser, string? DynPass,
-        string? NcCustomer, string? NcKey, string? NcPass)
+        string? NcCustomer, string? NcKey, string? NcPass, bool NcAllowDynamic = false)
     {
         if (string.IsNullOrWhiteSpace(Name)) { Error = "Name missing"; return RedirectToPage("Edit"); }
 
@@ -38,7 +38,7 @@ public class EditModel : PageModel
         if (Kind == DomainKind.DynDns)
             g.DynDns = new DynDnsSettings { UpdateUrl = DynUrl ?? "", Username = DynUser ?? "", Password = DynPass ?? "" };
         else
-            g.Netcup = new NetcupSettings { CustomerNumber = NcCustomer ?? "", ApiKey = NcKey ?? "", ApiPassword = NcPass ?? "" };
+            g.Netcup = new NetcupSettings { CustomerNumber = NcCustomer ?? "", ApiKey = NcKey ?? "", ApiPassword = NcPass ?? "", AllowDynamic = NcAllowDynamic };
 
         _config.Mutate(c => c.Domains.Add(g));
         Notice = "Group created – now add records";
@@ -47,7 +47,7 @@ public class EditModel : PageModel
 
     public IActionResult OnPostSave(string Id, string Name,
         string? DynUrl, string? DynUser, string? DynPass,
-        string? NcCustomer, string? NcKey, string? NcPass)
+        string? NcCustomer, string? NcKey, string? NcPass, bool NcAllowDynamic = false)
     {
         _config.Mutate(c =>
         {
@@ -67,6 +67,7 @@ public class EditModel : PageModel
                 g.Netcup.CustomerNumber = NcCustomer ?? "";
                 g.Netcup.ApiKey = NcKey ?? "";
                 if (!string.IsNullOrEmpty(NcPass)) g.Netcup.ApiPassword = NcPass; // empty = unchanged
+                g.Netcup.AllowDynamic = NcAllowDynamic;
             }
         });
         Notice = "Saved";
