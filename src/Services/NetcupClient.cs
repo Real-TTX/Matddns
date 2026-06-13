@@ -116,7 +116,7 @@ public class NetcupClient
             if (!foundExisting)
             {
                 if (!allowCreate)
-                    return (false, $"record {hostname}.{domain} {recordType} does not exist (enable dynamic records on this zone to auto-create)");
+                    return (false, "record does not exist");
                 updated.Add(new
                 {
                     hostname,
