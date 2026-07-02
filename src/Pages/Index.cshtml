@@ -41,7 +41,7 @@
         <thead><tr><th>Source</th><th>IPv4</th><th class="hide-sm">IPv6</th><th class="hide-sm">Last check</th><th>Status</th></tr></thead>
         @foreach (var src in s.SourceList)
         {
-            var kindLabel = src.Kind == "Push" ? "DynDNS Server" : src.Kind == "Dns" ? "DNS lookup" : src.Kind == "Fritzbox" ? "FRITZ!Box" : src.Kind == "UnifiCloud" ? "UniFi Cloud" : src.Kind;
+            var kindLabel = src.Kind == "Push" ? "DynDNS Server" : src.Kind == "Dns" ? "DNS lookup" : src.Kind == "Fritzbox" ? "FRITZ!Box" : src.Kind == "UnifiCloud" ? "UniFi Cloud" : src.Kind == "Matddns" ? "Matddns peer" : src.Kind;
             var entries = src.Entries;
             var multi = entries.Count > 1;
             var first = entries.FirstOrDefault();
@@ -96,14 +96,14 @@
         <thead><tr><th>Zone</th><th class="hide-sm">Provider</th><th>Record</th><th>Type</th></tr></thead>
         @foreach (var g in Model.Domains)
         {
-            var dkind = g.Kind == DomainKind.Netcup ? "Netcup API" : "DynDNS";
+            var dkind = g.Kind switch { DomainKind.Netcup => "Netcup API", DomainKind.Cloudflare => "Cloudflare", DomainKind.Hetzner => "Hetzner DNS", DomainKind.GoDaddy => "GoDaddy", DomainKind.Matddns => "Matddns peer", _ => "DynDNS" };
             var dentries = g.Entries;
             var dynForZone = Model.DynamicRules.Where(r => r.DomainGroupId == g.Id).ToList();
             var dchild = dentries.Count + dynForZone.Count;
             <tbody class="dt-group">
                 <tr class="dt-parent @(dchild > 0 ? "has-children" : "")">
                     <td class="dt-name">@g.Name</td>
-                    <td class="hide-sm"><span class="badge @(g.Kind == DomainKind.Netcup ? "update" : "info")">@dkind</span> @if (dynForZone.Count > 0) { <span class="badge info">dynamic</span> }</td>
+                    <td class="hide-sm"><span class="badge @(g.Kind == DomainKind.DynDns ? "info" : "update")">@dkind</span> @if (dynForZone.Count > 0) { <span class="badge info">dynamic</span> }</td>
                     <td class="cell-muted">@dentries.Count record@(dentries.Count == 1 ? "" : "s")</td>
                     <td></td>
                 </tr>

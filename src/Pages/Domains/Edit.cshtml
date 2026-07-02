@@ -5,6 +5,7 @@
     var isNew = Model.IsNew;
     ViewData["Title"] = (isNew ? "New domain group" : g!.Name) + " – Matddns";
     var kind = g?.Kind ?? DomainKind.DynDns;
+    var zoneBased = kind is DomainKind.Netcup or DomainKind.Cloudflare or DomainKind.Hetzner or DomainKind.GoDaddy;   // record-name + zone, like Netcup
 }
 
 <a class="back-link" href="/Domains">‹ back to Domains</a>
@@ -35,11 +36,16 @@
                     <select name="Kind" id="kindSelect">
                         <option value="DynDns">DynDNS</option>
                         <option value="Netcup">Netcup</option>
+                        <option value="Cloudflare">Cloudflare</option>
+                        <option value="Hetzner">Hetzner DNS</option>
+                        <option value="GoDaddy">GoDaddy</option>
+                        <option value="Matddns">Matddns peer</option>
                     </select>
                 }
                 else
                 {
-                    <input type="text" value="@(kind == DomainKind.Netcup ? "Netcup" : "DynDNS")" disabled />
+                    var kindLabel = kind switch { DomainKind.Netcup => "Netcup", DomainKind.Cloudflare => "Cloudflare", DomainKind.Hetzner => "Hetzner DNS", DomainKind.GoDaddy => "GoDaddy", DomainKind.Matddns => "Matddns peer", _ => "DynDNS" };
+                    <input type="text" value="@kindLabel" disabled />
                 }
             </div>
         </div>
@@ -52,12 +58,28 @@
                     <select id="dynProvider">
                         <option value="">Custom / manual</option>
                         <option value="matddns">Matddns (another instance)</option>
-                        <option value="duckdns">DuckDNS</option>
-                        <option value="noip">No-IP</option>
-                        <option value="dynu">Dynu</option>
-                        <option value="dyndns">DynDNS.org</option>
-                        <option value="strato">Strato</option>
+                        <option value="changeip">ChangeIP</option>
+                        <option value="ddnss">DDNSS.de</option>
                         <option value="desec">deSEC</option>
+                        <option value="dd24">Domain Discount 24</option>
+                        <option value="duckdns">DuckDNS</option>
+                        <option value="dyndns">DynDNS.org</option>
+                        <option value="dnsomatic">DNS-O-Matic</option>
+                        <option value="dynu">Dynu</option>
+                        <option value="dynv6">DynV6</option>
+                        <option value="easydns">EasyDNS</option>
+                        <option value="freedns">FreeDNS (afraid.org)</option>
+                        <option value="goip">GoIP.de</option>
+                        <option value="henet">Hurricane Electric</option>
+                        <option value="ipv64">ipv64.net</option>
+                        <option value="noip">No-IP</option>
+                        <option value="nowdns">Now-DNS</option>
+                        <option value="opendns">OpenDNS</option>
+                        <option value="selfhost">Selfhost.de</option>
+                        <option value="spdyn">SPDYN</option>
+                        <option value="strato">Strato</option>
+                        <option value="variomedia">Variomedia</option>
+                        <option value="zoneedit">Zoneedit</option>
                     </select>
                 </div>
                 <div class="field full">
@@ -97,6 +119,66 @@
             </div>
         </div>
 
+        <!-- Cloudflare fields -->
+        <div class="type-fields @(kind == DomainKind.Cloudflare ? "active" : "")" data-kind="Cloudflare">
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="field full">
+                    <label>API token</label>
+                    <input type="password" name="CfToken" placeholder="@(isNew ? "Cloudflare API token (Zone.DNS edit)" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
+                </div>
+                <div class="field full checkbox-field">
+                    <input type="checkbox" name="CfAllowDynamic" value="true" id="cfDyn" @(g?.Cloudflare?.AllowDynamic == true ? "checked" : "") />
+                    <label for="cfDyn">Allow dynamic records (create on demand)</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hetzner DNS fields -->
+        <div class="type-fields @(kind == DomainKind.Hetzner ? "active" : "")" data-kind="Hetzner">
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="field full">
+                    <label>API token</label>
+                    <input type="password" name="HzToken" placeholder="@(isNew ? "Hetzner DNS API token" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
+                </div>
+                <div class="field full checkbox-field">
+                    <input type="checkbox" name="HzAllowDynamic" value="true" id="hzDyn" @(g?.Hetzner?.AllowDynamic == true ? "checked" : "") />
+                    <label for="hzDyn">Allow dynamic records (create on demand)</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Matddns peer fields -->
+        <div class="type-fields @(kind == DomainKind.Matddns ? "active" : "")" data-kind="Matddns">
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="field full">
+                    <label>Peer base URL</label>
+                    <input type="text" name="MdUrl" value="@(g?.Matddns?.BaseUrl ?? "")" placeholder="https://dyndns.example.com" />
+                </div>
+                <div class="field full">
+                    <label>Token</label>
+                    <input type="password" name="MdToken" placeholder="@(isNew ? "a DynDNS-Server token on the peer" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
+                </div>
+            </div>
+        </div>
+
+        <!-- GoDaddy fields -->
+        <div class="type-fields @(kind == DomainKind.GoDaddy ? "active" : "")" data-kind="GoDaddy">
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="field">
+                    <label>API key</label>
+                    <input type="text" name="GdKey" value="@(g?.GoDaddy?.ApiKey ?? "")" autocomplete="off" />
+                </div>
+                <div class="field">
+                    <label>API secret</label>
+                    <input type="password" name="GdSecret" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
+                </div>
+                <div class="field full checkbox-field">
+                    <input type="checkbox" name="GdAllowDynamic" value="true" id="gdDyn" @(g?.GoDaddy?.AllowDynamic == true ? "checked" : "") />
+                    <label for="gdDyn">Allow dynamic records (create on demand)</label>
+                </div>
+            </div>
+        </div>
+
         <div class="actions">
             <button type="submit">@(isNew ? "Create" : "Save")</button>
             <a class="button ghost" href="/Domains">Cancel</a>
@@ -115,7 +197,7 @@
         <table>
             <thead>
                 <tr>
-                    @if (kind == DomainKind.Netcup)
+                    @if (zoneBased)
                     {
                         <th>Record (host)</th>
                         <th>Zone</th>
@@ -129,7 +211,7 @@
             @foreach (var e in g!.Entries)
             {
                 <tr>
-                    @if (kind == DomainKind.Netcup)
+                    @if (zoneBased)
                     {
                         <td class="mono">@(string.IsNullOrEmpty(e.RecordName) ? "@" : e.RecordName)</td>
                         <td class="mono">@(e.Domain ?? "—")</td>
@@ -147,14 +229,14 @@
             }
             @if (g.Entries.Count == 0)
             {
-                <tr><td colspan="@(kind == DomainKind.Netcup ? 5 : 3)" class="muted">No records yet.</td></tr>
+                <tr><td colspan="@(zoneBased ? 5 : 3)" class="muted">No records yet.</td></tr>
             }
             </tbody>
         </table>
 
         <form method="post" asp-page-handler="AddEntry" class="form-grid" style="margin-top:16px;">
             <input type="hidden" name="Id" value="@g.Id" />
-            @if (kind == DomainKind.Netcup)
+            @if (zoneBased)
             {
                 <div class="field">
                     <label>Record / subdomain</label>
@@ -177,7 +259,7 @@
                 <select name="Type">
                     <option value="A">A</option>
                     <option value="AAAA">AAAA</option>
-                    @if (kind == DomainKind.Netcup) { <option value="CNAME">CNAME</option> }
+                    @if (zoneBased) { <option value="CNAME">CNAME</option> }
                 </select>
             </div>
             <div class="field full">
@@ -209,12 +291,28 @@
         if (!prov || !url) return;
         var presets = {
             matddns: '@Model.BaseUrl/api/update?token={password}&ipv4={ipv4}&ipv6={ipv6}',
+            changeip: 'https://nic.changeip.com/nic/update?hostname={hostname}&myip={ipv4}',
+            ddnss: 'https://www.ddnss.de/upd.php?key={password}&host={hostname}&ip={ipv4}&ip6={ipv6}',
+            desec: 'https://update.dedyn.io/?hostname={hostname}&myipv4={ipv4}&myipv6={ipv6}',
+            dd24: 'https://dynamicdns.key-systems.net/update.php?hostname={hostname}&password={password}&ip={ipv4}',
             duckdns: 'https://www.duckdns.org/update?domains={hostname}&token={password}&ip={ipv4}&ipv6={ipv6}',
-            noip: 'https://dynupdate.no-ip.com/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
-            dynu: 'https://api.dynu.com/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
             dyndns: 'https://members.dyndns.org/v3/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
+            dnsomatic: 'https://updates.dnsomatic.com/nic/update?hostname={hostname}&myip={ipv4}',
+            dynu: 'https://api.dynu.com/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
+            dynv6: 'https://dynv6.com/api/update?hostname={hostname}&ipv4={ipv4}&ipv6={ipv6}&token={password}',
+            easydns: 'https://api.cp.easydns.com/dyn/tomato.php?hostname={hostname}&myip={ipv4}',
+            freedns: 'https://freedns.afraid.org/dynamic/update.php?{password}',
+            goip: 'https://www.goip.de/setip?subdomain={hostname}&username={user}&password={password}&ip={ipv4}',
+            henet: 'https://dyn.dns.he.net/nic/update?hostname={hostname}&myip={ipv4}',
+            ipv64: 'https://ipv64.net/update.php?key={password}&domain={hostname}&ip={ipv4}&ip6={ipv6}',
+            noip: 'https://dynupdate.no-ip.com/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
+            nowdns: 'https://now-dns.com/update?hostname={hostname}&myip={ipv4}',
+            opendns: 'https://updates.opendns.com/nic/update?hostname={hostname}&myip={ipv4}',
+            selfhost: 'https://carol.selfhost.de/nic/update?hostname={hostname}&myip={ipv4}',
+            spdyn: 'https://update.spdyn.de/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
             strato: 'https://dyndns.strato.com/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
-            desec: 'https://update.dedyn.io/?hostname={hostname}&myipv4={ipv4}&myipv6={ipv6}'
+            variomedia: 'https://dyndns.variomedia.de/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
+            zoneedit: 'https://dynamic.zoneedit.com/auth/dynamic.html?host={hostname}&dnsto={ipv4}'
         };
         prov.addEventListener('change', function () {
             if (presets[prov.value]) url.value = presets[prov.value];

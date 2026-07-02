@@ -102,6 +102,7 @@
                 <tr><td class="mono">GET /healthz</td><td>Liveness — returns <span class="mono">ok</span> (200) while the app runs.</td></tr>
                 <tr><td class="mono">GET /api/health</td><td>Health summary. HTTP <span class="mono">200</span> when everything is OK, <span class="mono">503</span> when degraded — plus JSON with source/rule counts and IP‑change stats.</td></tr>
                 <tr><td class="mono">GET /api/state</td><td>Full state as JSON: per‑source IPs, per‑rule status and recent IP changes.</td></tr>
+                <tr><td class="mono">GET /api/source?token=</td><td>Peer pull — returns this instance's source entries (IPs only, no secrets) for a valid DynDNS‑Server token. Used by a <strong>Matddns peer</strong> source on another instance.</td></tr>
                 <tr><td class="mono">GET /api/update</td><td>DynDNS <strong>receiver</strong> (JSON) — a device or script pushes its IP into a “Push” source. The token‑protected URL is shown on that source's page.</td></tr>
                 <tr><td class="mono">GET /nic/update</td><td>The same receiver in the legacy <strong>dyndns2</strong> format (plain <span class="mono">good</span>/<span class="mono">nochg</span>) — only needed for routers / FRITZ!Box that speak that protocol. Same token.</td></tr>
             </tbody>

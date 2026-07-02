@@ -23,8 +23,8 @@ A universal DynDNS updater with a web UI. Pull an IP from one or more sources (t
 
 ## Features
 
-- Several source types: the container's own public IP; UniFi UDM/UGW WANs read locally from the controller (including LTE failover) or from the UniFi Site Manager cloud; a FRITZ!Box over TR-064; a DNS lookup of any hostname; a static value; or a value pushed in by a device.
-- Several targets: generic DynDNS update URLs (presets for Matddns, DuckDNS, No-IP, Dynu, DynDNS.org, Strato, deSEC) and the Netcup DNS API.
+- Several source types: the container's own public IP; UniFi UDM/UGW WANs read locally from the controller (including LTE failover) or from the UniFi Site Manager cloud; a FRITZ!Box over TR-064; a DNS lookup of any hostname; a static value; a value pushed in by a device; or another Matddns instance (peer pull over its JSON API).
+- Several targets: the Cloudflare, Netcup, Hetzner DNS and GoDaddy APIs; another Matddns instance (peer push over its JSON API); plus generic DynDNS update URLs with built-in presets for ~20 providers (DuckDNS, No-IP, Dynu, DynDNS.org, Strato, deSEC, DynV6, Zoneedit, EasyDNS, OpenDNS, DNS-O-Matic, He.net, SPDYN, Selfhost, Variomedia, DDNSS, GoIP, ipv64, FreeDNS, …).
 - Failover rules: a DNS record is bound to an ordered list of sources; the first reachable one wins.
 - Reachability validation: a source is only accepted if its IP answers a ping or a TCP-port check.
 - DynDNS server: Matddns can also receive updates, so a router or device can push its IP to a token-protected URL.
@@ -102,6 +102,7 @@ There are three building blocks.
 | DNS lookup | resolves any hostname to its A/AAAA (e.g. a MyFRITZ! address) |
 | Static IP | a fixed value you type in (a known server, a fallback) |
 | DynDNS server | an external device or router pushes its IP to a token URL; see [DynDNS server (incoming)](#dyndns-server-incoming) |
+| Matddns peer | pulls the source entries (IPv4/IPv6) of another Matddns instance over its JSON API, authenticated by a token (base URL + token) |
 
 ### Domains (where an IP is written)
 
@@ -109,6 +110,10 @@ There are three building blocks.
 |------|--------|
 | DynDNS | any provider via an update URL with `{ipv4}`, `{ipv6}`, `{hostname}`, `{user}`, `{password}` placeholders (empty ones are dropped, so one URL covers A and AAAA); HTTP Basic auth is added when user/password are set, and presets prefill the URL |
 | Netcup | the Netcup DNS API (record + zone) |
+| Cloudflare | the Cloudflare API (API token with Zone.DNS edit; record + zone, A/AAAA/CNAME, optional create-on-demand) |
+| Hetzner DNS | the Hetzner DNS API (Auth-API-Token; record + zone, A/AAAA/CNAME, optional create-on-demand) |
+| GoDaddy | the GoDaddy DNS API (API key + secret; record + zone, A/AAAA/CNAME, optional create-on-demand) |
+| Matddns peer | pushes the chosen IP to another Matddns instance over its JSON API (base URL + token); parses the JSON result |
 
 Each entry is a single record: a full FQDN plus type A, AAAA, or CNAME (for Netcup, record/subdomain + zone).
 
@@ -173,6 +178,7 @@ Unauthenticated JSON endpoints for monitoring software. They never expose passwo
 | `GET /healthz` | liveness; returns `ok` while the app runs |
 | `GET /api/health` | health summary: HTTP 200 when OK, 503 when degraded, plus source/rule counts and IP-change stats |
 | `GET /api/state` | full state: per-source IPs, per-rule status, recent IP changes |
+| `GET /api/source?token=` | peer pull: this instance's source entries (IPs only), for a valid DynDNS-Server token — used by a Matddns-peer source on another instance |
 
 ```bash
 curl http://localhost:4060/api/health   # point a monitor here and alert on a non-200 status

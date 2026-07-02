@@ -13,6 +13,10 @@ public class UpdaterService : BackgroundService
     private readonly UnifiCloudClient _unifiCloud;
     private readonly DynDnsClient _dyndns;
     private readonly NetcupClient _netcup;
+    private readonly CloudflareClient _cloudflare;
+    private readonly HetznerClient _hetzner;
+    private readonly GoDaddyClient _godaddy;
+    private readonly MatddnsClient _matddns;
     private readonly SourceResolver _resolver;
     private readonly ReachabilityChecker _reach;
 
@@ -26,6 +30,10 @@ public class UpdaterService : BackgroundService
         UnifiCloudClient unifiCloud,
         DynDnsClient dyndns,
         NetcupClient netcup,
+        CloudflareClient cloudflare,
+        HetznerClient hetzner,
+        GoDaddyClient godaddy,
+        MatddnsClient matddns,
         SourceResolver resolver,
         ReachabilityChecker reach)
     {
@@ -38,6 +46,10 @@ public class UpdaterService : BackgroundService
         _unifiCloud = unifiCloud;
         _dyndns = dyndns;
         _netcup = netcup;
+        _cloudflare = cloudflare;
+        _hetzner = hetzner;
+        _godaddy = godaddy;
+        _matddns = matddns;
         _resolver = resolver;
         _reach = reach;
     }
@@ -164,6 +176,45 @@ public class UpdaterService : BackgroundService
                 });
                 _log.Log(LogLevel.Debug, $"src:{group.Name}",
                     $"Unifi cloud: {string.Join(", ", group.Entries.Select(e => $"{e.Label}={(byId.TryGetValue(e.InterfaceName ?? "", out var h) ? (h.Ipv4 ?? h.Ipv6 ?? "no-ip") : "missing")}"))}");
+            }
+            else if (group.Kind == SourceKind.Matddns && group.Matddns != null)
+            {
+                List<MatddnsClient.RemoteEntry> remote;
+                try { remote = await _matddns.PullAsync(group.Matddns, ct); }
+                catch (Exception ex)
+                {
+                    _log.Log(LogLevel.Error, $"src:{group.Name}", $"Matddns peer: {ex.Message}");
+                    _config.Mutate(c =>
+                    {
+                        var g = c.Sources.FirstOrDefault(x => x.Id == group.Id);
+                        if (g == null) return;
+                        foreach (var e in g.Entries) { e.LastChecked = DateTime.UtcNow; e.LastError = ex.Message; }
+                    });
+                    continue;
+                }
+                _config.Mutate(c =>
+                {
+                    var g = c.Sources.FirstOrDefault(x => x.Id == group.Id);
+                    if (g == null) return;
+                    var keys = remote.Select(r => r.Key).ToHashSet();
+                    foreach (var re in remote)
+                    {
+                        var match = g.Entries.FirstOrDefault(e => e.InterfaceName == re.Key);
+                        if (match == null) { match = new SourceEntry { InterfaceName = re.Key }; g.Entries.Add(match); }
+                        match.Label = re.Label;
+                        match.CurrentIp = re.Ipv4;
+                        match.CurrentIpv6 = re.Ipv6;
+                        match.LastChecked = DateTime.UtcNow;
+                        match.LastError = re.Error ?? ((re.Ipv4 == null && re.Ipv6 == null) ? "no IP" : null);
+                    }
+                    // entries that vanished from the peer: keep them (rules may reference them) but flag
+                    foreach (var e in g.Entries.Where(e => e.InterfaceName != null && !keys.Contains(e.InterfaceName)))
+                    {
+                        e.LastChecked = DateTime.UtcNow;
+                        e.LastError = "not on remote";
+                    }
+                });
+                _log.Log(LogLevel.Debug, $"src:{group.Name}", $"Matddns peer: {remote.Count} entr{(remote.Count == 1 ? "y" : "ies")}");
             }
             else if (group.Kind == SourceKind.Static)
             {
@@ -423,6 +474,34 @@ public class UpdaterService : BackgroundService
             }
             (ok, msg) = await _netcup.UpdateRecordAsync(dgroup.Netcup, domain, host, recordType, chosenValue, dgroup.Netcup.AllowDynamic, ct);
         }
+        else if (dgroup.Kind == DomainKind.Cloudflare && dgroup.Cloudflare != null)
+        {
+            var zone = !string.IsNullOrWhiteSpace(dentry.Domain) ? dentry.Domain! : NetcupClient.SplitHostname(dentry.Hostname).Domain;
+            (ok, msg) = await _cloudflare.UpdateRecordAsync(dgroup.Cloudflare, zone, dentry.Hostname, recordType, chosenValue, dgroup.Cloudflare.AllowDynamic, ct);
+        }
+        else if (dgroup.Kind == DomainKind.Hetzner && dgroup.Hetzner != null)
+        {
+            var (zone, host) = ZoneAndHost(dentry);
+            (ok, msg) = await _hetzner.UpdateRecordAsync(dgroup.Hetzner, zone, host, recordType, chosenValue, dgroup.Hetzner.AllowDynamic, ct);
+        }
+        else if (dgroup.Kind == DomainKind.GoDaddy && dgroup.GoDaddy != null)
+        {
+            var (zone, host) = ZoneAndHost(dentry);
+            (ok, msg) = await _godaddy.UpdateRecordAsync(dgroup.GoDaddy, zone, host, recordType, chosenValue, dgroup.GoDaddy.AllowDynamic, ct);
+        }
+        else if (dgroup.Kind == DomainKind.Matddns && dgroup.Matddns != null)
+        {
+            if (dentry.Type == DnsRecordType.CNAME)
+            {
+                ok = false; msg = "CNAME not supported via Matddns push";
+            }
+            else
+            {
+                var v4 = dentry.Type == DnsRecordType.A ? chosenValue : null;
+                var v6 = dentry.Type == DnsRecordType.AAAA ? chosenValue : null;
+                (ok, msg) = await _matddns.PushAsync(dgroup.Matddns, dentry.Hostname, v4, v6, ct);
+            }
+        }
         else
         {
             ok = false; msg = "no credentials configured";
@@ -461,6 +540,16 @@ public class UpdaterService : BackgroundService
         if (rule.OnChange && signature != (rule.LastSourceSignature ?? "")) return true;
 
         return false;
+    }
+
+    // Zone + relative record name for zone-based APIs (Hetzner/GoDaddy). Prefers the explicit Domain/RecordName, else derives from the FQDN.
+    private static (string zone, string host) ZoneAndHost(DomainEntry de)
+    {
+        if (!string.IsNullOrWhiteSpace(de.Domain))
+            return (de.Domain!, string.IsNullOrWhiteSpace(de.RecordName) ? "@" : de.RecordName!);
+        var (domain, host) = NetcupClient.SplitHostname(de.Hostname);
+        if (!string.IsNullOrWhiteSpace(de.RecordName)) host = de.RecordName!;
+        return (domain, host);
     }
 
     private static string RuleDesc(Rule rule, AppConfig cfg)

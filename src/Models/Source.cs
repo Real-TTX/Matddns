@@ -8,7 +8,8 @@ public enum SourceKind
     Push,
     Dns,
     Fritzbox,
-    UnifiCloud
+    UnifiCloud,
+    Matddns
 }
 
 public class SourceGroup
@@ -23,7 +24,15 @@ public class SourceGroup
     public DnsSettings? Dns { get; set; }
     public FritzboxSettings? Fritzbox { get; set; }
     public UnifiCloudSettings? UnifiCloud { get; set; }
+    public MatddnsLinkSettings? Matddns { get; set; }
     public List<SourceEntry> Entries { get; set; } = new();
+}
+
+/// <summary>Link to another Matddns instance (its base URL + a DynDNS-Server token on that instance). Used by the Matddns source (pull) and the Matddns target (push).</summary>
+public class MatddnsLinkSettings
+{
+    public string BaseUrl { get; set; } = "";   // e.g. https://dyndns.example.com
+    public string Token { get; set; } = "";     // a DynDNS-Server source token on the remote instance
 }
 
 public class UnifiCloudSettings

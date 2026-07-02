@@ -13,8 +13,9 @@ public class EditModel : PageModel
     private readonly DnsLookupClient _dns;
     private readonly FritzboxClient _fritz;
     private readonly UnifiCloudClient _unifiCloud;
+    private readonly MatddnsClient _matddns;
 
-    public EditModel(ConfigService config, UnifiClient unifi, PublicIpClient publicIp, DnsLookupClient dns, FritzboxClient fritz, UnifiCloudClient unifiCloud)
+    public EditModel(ConfigService config, UnifiClient unifi, PublicIpClient publicIp, DnsLookupClient dns, FritzboxClient fritz, UnifiCloudClient unifiCloud, MatddnsClient matddns)
     {
         _config = config;
         _unifi = unifi;
@@ -22,6 +23,7 @@ public class EditModel : PageModel
         _dns = dns;
         _fritz = fritz;
         _unifiCloud = unifiCloud;
+        _matddns = matddns;
     }
 
     public SourceGroup? Group { get; private set; }
@@ -65,7 +67,7 @@ public class EditModel : PageModel
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
         string? StaticIp = null, string? StaticIpv6 = null, string? DnsHost = null,
         string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false,
-        string? UcKey = null)
+        string? UcKey = null, string? MdUrl = null, string? MdToken = null)
     {
         if (string.IsNullOrWhiteSpace(Name)) { Error = "Name missing"; return RedirectToPage("Edit"); }
 
@@ -128,6 +130,11 @@ public class EditModel : PageModel
             g.UnifiCloud = new UnifiCloudSettings { ApiKey = (UcKey ?? "").Trim() };
             // gateways are added on the edit page after the key is saved.
         }
+        else if (Kind == SourceKind.Matddns)
+        {
+            g.Matddns = new MatddnsLinkSettings { BaseUrl = (MdUrl ?? "").Trim(), Token = (MdToken ?? "").Trim() };
+            // entries are mirrored from the peer on the first successful pull.
+        }
         else
         {
             g.Entries.Add(new SourceEntry { Label = "Public IP" });
@@ -158,7 +165,7 @@ public class EditModel : PageModel
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
         string? StaticIp = null, string? StaticIpv6 = null, string? DnsHost = null,
         string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false,
-        string? UcKey = null)
+        string? UcKey = null, string? MdUrl = null, string? MdToken = null)
     {
         _config.Mutate(c =>
         {
@@ -212,6 +219,13 @@ public class EditModel : PageModel
                 g.UnifiCloud ??= new UnifiCloudSettings();
                 if (!string.IsNullOrEmpty(UcKey)) g.UnifiCloud.ApiKey = UcKey.Trim(); // empty = unchanged
                 foreach (var en in g.Entries) en.LastChecked = null; // re-fetch on next poll
+            }
+            else if (g.Kind == SourceKind.Matddns)
+            {
+                g.Matddns ??= new MatddnsLinkSettings();
+                g.Matddns.BaseUrl = (MdUrl ?? "").Trim();
+                if (!string.IsNullOrEmpty(MdToken)) g.Matddns.Token = MdToken.Trim(); // empty = unchanged
+                foreach (var en in g.Entries) en.LastChecked = null; // re-pull on next poll
             }
         });
         Notice = "Saved";
@@ -312,7 +326,8 @@ public class EditModel : PageModel
     public async Task<IActionResult> OnPostTestAsync(string Id, CancellationToken ct,
         string? UniUrl, string? UniSite, string? UniUser, string? UniPass, bool UniIgnoreCert = false,
         string? DnsHost = null,
-        string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false)
+        string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false,
+        string? MdUrl = null, string? MdToken = null)
     {
         var g = _config.Read(c => c.Sources.FirstOrDefault(x => x.Id == Id));
         if (g == null) { Error = "Group not found"; return RedirectToPage("Index"); }
@@ -365,6 +380,19 @@ public class EditModel : PageModel
                 var w = await _fritz.GetWanAsync(probe, ct);
                 TestOk = w.Ipv4 != null || w.Ipv6 != null;
                 TestResult = TestOk ? $"OK – WAN {string.Join(" / ", new[] { w.Ipv4, w.Ipv6 }.Where(x => x != null))}" : "Connected, but no WAN IP returned.";
+            }
+            else if (g.Kind == SourceKind.Matddns)
+            {
+                var probe = new MatddnsLinkSettings
+                {
+                    BaseUrl = string.IsNullOrWhiteSpace(MdUrl) ? (g.Matddns?.BaseUrl ?? "") : MdUrl.Trim(),
+                    Token = string.IsNullOrWhiteSpace(MdToken) ? (g.Matddns?.Token ?? "") : MdToken.Trim()
+                };
+                var remote = await _matddns.PullAsync(probe, ct);
+                TestOk = remote.Count > 0;
+                TestResult = remote.Count == 0
+                    ? "Connected, but the peer returned no source entries."
+                    : "OK – peer entries: " + string.Join(", ", remote.Select(r => $"{r.Label}={r.Ipv4 ?? r.Ipv6 ?? "—"}"));
             }
             else
             {

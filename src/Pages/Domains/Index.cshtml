@@ -31,6 +31,10 @@ else
                 <option value="">All providers</option>
                 <option value="dyndns">DynDNS</option>
                 <option value="netcup">Netcup</option>
+                <option value="cloudflare">Cloudflare</option>
+                <option value="hetzner">Hetzner DNS</option>
+                <option value="godaddy">GoDaddy</option>
+                <option value="matddns">Matddns peer</option>
             </select>
             <span class="dt-count" data-dt-count></span>
         </div>
@@ -41,8 +45,8 @@ else
                 </thead>
                 @foreach (var g in Model.Groups)
                 {
-                    var kindKey = g.Kind == DomainKind.Netcup ? "netcup" : "dyndns";
-                    var kindLabel = g.Kind == DomainKind.Netcup ? "Netcup API" : "DynDNS";
+                    var kindKey = g.Kind switch { DomainKind.Netcup => "netcup", DomainKind.Cloudflare => "cloudflare", DomainKind.Hetzner => "hetzner", DomainKind.GoDaddy => "godaddy", DomainKind.Matddns => "matddns", _ => "dyndns" };
+                    var kindLabel = g.Kind switch { DomainKind.Netcup => "Netcup API", DomainKind.Cloudflare => "Cloudflare", DomainKind.Hetzner => "Hetzner DNS", DomainKind.GoDaddy => "GoDaddy", DomainKind.Matddns => "Matddns peer", _ => "DynDNS" };
                     var entries = g.Entries.ToList();
                     var dynForZone = Model.DynamicRules.Where(r => r.DomainGroupId == g.Id).ToList();
                     var childCount = entries.Count + dynForZone.Count;
@@ -50,7 +54,7 @@ else
                     <tbody class="dt-group" data-search="@search" data-kind="@kindKey" data-href="/Domains/Edit?id=@g.Id">
                         <tr class="dt-parent @(childCount > 0 ? "has-children" : "")">
                             <td class="dt-name">@g.Name</td>
-                            <td class="hide-sm"><span class="badge @(g.Kind == DomainKind.Netcup ? "update" : "info")">@kindLabel</span> @if (dynForZone.Count > 0) { <span class="badge info">dynamic</span> }</td>
+                            <td class="hide-sm"><span class="badge @(g.Kind == DomainKind.DynDns ? "info" : "update")">@kindLabel</span> @if (dynForZone.Count > 0) { <span class="badge info">dynamic</span> }</td>
                             <td class="cell-muted">@entries.Count record@(entries.Count == 1 ? "" : "s")</td>
                             <td></td>
                             <td class="dt-go">›</td>

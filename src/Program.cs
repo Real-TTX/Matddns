@@ -26,6 +26,10 @@ builder.Services.AddSingleton<FritzboxClient>();
 builder.Services.AddSingleton<UnifiClient>();
 builder.Services.AddSingleton<UnifiCloudClient>();
 builder.Services.AddSingleton<NetcupClient>();
+builder.Services.AddSingleton<CloudflareClient>();
+builder.Services.AddSingleton<HetznerClient>();
+builder.Services.AddSingleton<GoDaddyClient>();
+builder.Services.AddSingleton<MatddnsClient>();
 builder.Services.AddSingleton<DynDnsClient>();
 builder.Services.AddSingleton<SourceResolver>();
 builder.Services.AddSingleton<ReachabilityChecker>();
@@ -93,6 +97,19 @@ app.MapGet("/api/state", (StatusService status) =>
         rules = s.RuleList,
         ipChanges = s.IpChanges
     });
+}).AllowAnonymous();
+
+// Peer pull: another Matddns instance reads this instance's source entries (IPs only, no secrets),
+// authenticated by any DynDNS-Server token on this instance.
+app.MapGet("/api/source", (HttpContext ctx, ConfigService config, StatusService status) =>
+{
+    var token = ctx.Request.Query["token"].FirstOrDefault();
+    var valid = !string.IsNullOrEmpty(token) &&
+                config.Read(c => c.Sources.Any(s => s.Kind == Matddns.Models.SourceKind.Push && s.Push != null && s.Push.Token == token));
+    if (!valid)
+        return Results.Json(new { status = "unauthorized", message = "Invalid or missing token." }, statusCode: 401);
+    var s = status.Build(0);
+    return Results.Json(new { time = s.Time, sources = s.SourceList });
 }).AllowAnonymous();
 
 // DynDNS receiver: external devices push their IP into a "Push" source (token-protected).

@@ -48,11 +48,12 @@
                         <option value="Push">DynDNS Server</option>
                         <option value="Dns">DNS lookup</option>
                         <option value="Fritzbox">FRITZ!Box</option>
+                        <option value="Matddns">Matddns peer</option>
                     </select>
                 }
                 else
                 {
-                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.UnifiCloud => "UniFi Cloud", SourceKind.Static => "Static IP", SourceKind.Push => "DynDNS Server", SourceKind.Dns => "DNS lookup", SourceKind.Fritzbox => "FRITZ!Box", _ => "Public IP" };
+                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.UnifiCloud => "UniFi Cloud", SourceKind.Static => "Static IP", SourceKind.Push => "DynDNS Server", SourceKind.Dns => "DNS lookup", SourceKind.Fritzbox => "FRITZ!Box", SourceKind.Matddns => "Matddns peer", _ => "Public IP" };
                     <input type="text" value="@typeLabel" disabled />
                 }
             </div>
@@ -141,6 +142,20 @@
                         <input type="checkbox" id="FbIgnoreCert" name="FbIgnoreCert" value="true" @(g?.Fritzbox?.IgnoreCertificate == true ? "checked" : "") />
                         <label for="FbIgnoreCert">Ignore self-signed certificate (MyFRITZ! TLS)</label>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Matddns peer fields -->
+        <div class="type-fields @(kind == SourceKind.Matddns ? "active" : "")" data-kind="Matddns">
+            <div class="form-grid" style="margin-top:16px;">
+                <div class="field full">
+                    <label>Peer base URL</label>
+                    <input type="text" name="MdUrl" value="@(g?.Matddns?.BaseUrl ?? "")" placeholder="https://dyndns.example.com" />
+                </div>
+                <div class="field full">
+                    <label>Token</label>
+                    <input type="password" name="MdToken" placeholder="@(isNew ? "a DynDNS-Server token on the peer" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
                 </div>
             </div>
         </div>
@@ -248,7 +263,7 @@
             <a class="button ghost" href="/Sources">Cancel</a>
             @if (!isNew)
             {
-                @if (kind == SourceKind.Unifi || kind == SourceKind.PublicIp || kind == SourceKind.Dns || kind == SourceKind.Fritzbox)
+                @if (kind == SourceKind.Unifi || kind == SourceKind.PublicIp || kind == SourceKind.Dns || kind == SourceKind.Fritzbox || kind == SourceKind.Matddns)
                 {
                     <button type="submit" class="ghost" asp-page-handler="Test" name="Id" value="@g!.Id">Test connection</button>
                 }

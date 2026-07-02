@@ -30,13 +30,22 @@ public class EditModel : PageModel
 
     public IActionResult OnPostCreate(string Name, DomainKind Kind,
         string? DynUrl, string? DynUser, string? DynPass,
-        string? NcCustomer, string? NcKey, string? NcPass, bool NcAllowDynamic = false)
+        string? NcCustomer, string? NcKey, string? NcPass, bool NcAllowDynamic = false,
+        string? CfToken = null, bool CfAllowDynamic = false,
+        string? HzToken = null, bool HzAllowDynamic = false,
+        string? GdKey = null, string? GdSecret = null, bool GdAllowDynamic = false)
     {
         if (string.IsNullOrWhiteSpace(Name)) { Error = "Name missing"; return RedirectToPage("Edit"); }
 
         var g = new DomainGroup { Name = Name.Trim(), Kind = Kind };
         if (Kind == DomainKind.DynDns)
             g.DynDns = new DynDnsSettings { UpdateUrl = DynUrl ?? "", Username = DynUser ?? "", Password = DynPass ?? "" };
+        else if (Kind == DomainKind.Cloudflare)
+            g.Cloudflare = new CloudflareSettings { ApiToken = (CfToken ?? "").Trim(), AllowDynamic = CfAllowDynamic };
+        else if (Kind == DomainKind.Hetzner)
+            g.Hetzner = new HetznerSettings { ApiToken = (HzToken ?? "").Trim(), AllowDynamic = HzAllowDynamic };
+        else if (Kind == DomainKind.GoDaddy)
+            g.GoDaddy = new GoDaddySettings { ApiKey = (GdKey ?? "").Trim(), ApiSecret = (GdSecret ?? "").Trim(), AllowDynamic = GdAllowDynamic };
         else
             g.Netcup = new NetcupSettings { CustomerNumber = NcCustomer ?? "", ApiKey = NcKey ?? "", ApiPassword = NcPass ?? "", AllowDynamic = NcAllowDynamic };
 
@@ -47,7 +56,10 @@ public class EditModel : PageModel
 
     public IActionResult OnPostSave(string Id, string Name,
         string? DynUrl, string? DynUser, string? DynPass,
-        string? NcCustomer, string? NcKey, string? NcPass, bool NcAllowDynamic = false)
+        string? NcCustomer, string? NcKey, string? NcPass, bool NcAllowDynamic = false,
+        string? CfToken = null, bool CfAllowDynamic = false,
+        string? HzToken = null, bool HzAllowDynamic = false,
+        string? GdKey = null, string? GdSecret = null, bool GdAllowDynamic = false)
     {
         _config.Mutate(c =>
         {
@@ -60,6 +72,25 @@ public class EditModel : PageModel
                 g.DynDns.UpdateUrl = DynUrl ?? "";
                 g.DynDns.Username = DynUser ?? "";
                 if (!string.IsNullOrEmpty(DynPass)) g.DynDns.Password = DynPass; // empty = unchanged
+            }
+            else if (g.Kind == DomainKind.Cloudflare)
+            {
+                g.Cloudflare ??= new CloudflareSettings();
+                if (!string.IsNullOrEmpty(CfToken)) g.Cloudflare.ApiToken = CfToken.Trim(); // empty = unchanged
+                g.Cloudflare.AllowDynamic = CfAllowDynamic;
+            }
+            else if (g.Kind == DomainKind.Hetzner)
+            {
+                g.Hetzner ??= new HetznerSettings();
+                if (!string.IsNullOrEmpty(HzToken)) g.Hetzner.ApiToken = HzToken.Trim(); // empty = unchanged
+                g.Hetzner.AllowDynamic = HzAllowDynamic;
+            }
+            else if (g.Kind == DomainKind.GoDaddy)
+            {
+                g.GoDaddy ??= new GoDaddySettings();
+                g.GoDaddy.ApiKey = (GdKey ?? "").Trim();
+                if (!string.IsNullOrEmpty(GdSecret)) g.GoDaddy.ApiSecret = GdSecret.Trim(); // empty = unchanged
+                g.GoDaddy.AllowDynamic = GdAllowDynamic;
             }
             else
             {
@@ -95,7 +126,7 @@ public class EditModel : PageModel
         string? rec = null;
         string? zone = null;
 
-        if (kind == DomainKind.Netcup)
+        if (kind is DomainKind.Netcup or DomainKind.Cloudflare)
         {
             zone = (DomainZone ?? "").Trim().TrimEnd('.');
             rec = string.IsNullOrWhiteSpace(RecordName) ? "@" : RecordName.Trim().TrimEnd('.');

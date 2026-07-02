@@ -3,7 +3,11 @@ namespace Matddns.Models;
 public enum DomainKind
 {
     DynDns,
-    Netcup
+    Netcup,
+    Cloudflare,
+    Hetzner,
+    GoDaddy,
+    Matddns
 }
 
 public enum DnsRecordType
@@ -20,7 +24,36 @@ public class DomainGroup
     public DomainKind Kind { get; set; } = DomainKind.DynDns;
     public DynDnsSettings? DynDns { get; set; }
     public NetcupSettings? Netcup { get; set; }
+    public CloudflareSettings? Cloudflare { get; set; }
+    public HetznerSettings? Hetzner { get; set; }
+    public GoDaddySettings? GoDaddy { get; set; }
+    public MatddnsLinkSettings? Matddns { get; set; }   // push to another Matddns instance (its JSON API)
     public List<DomainEntry> Entries { get; set; } = new();
+
+    /// <summary>Zone-based API providers use a record-name + zone (like Netcup); DynDNS just uses the full FQDN.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsZoneBased => Kind is DomainKind.Netcup or DomainKind.Cloudflare or DomainKind.Hetzner or DomainKind.GoDaddy;
+}
+
+public class CloudflareSettings
+{
+    public string ApiToken { get; set; } = "";   // Cloudflare API Token with Zone.DNS edit (Bearer)
+
+    /// <summary>Opt-in: create records that don't exist yet (needed for dynamic hosts). Off = update existing only.</summary>
+    public bool AllowDynamic { get; set; }
+}
+
+public class HetznerSettings
+{
+    public string ApiToken { get; set; } = "";   // Hetzner DNS API token (Auth-API-Token header)
+    public bool AllowDynamic { get; set; }
+}
+
+public class GoDaddySettings
+{
+    public string ApiKey { get; set; } = "";     // GoDaddy API key + secret ("Authorization: sso-key key:secret")
+    public string ApiSecret { get; set; } = "";
+    public bool AllowDynamic { get; set; }
 }
 
 public class DynDnsSettings
