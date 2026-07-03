@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Net.Sockets;
 using System.Text.Json;
 using Matddns.Models;
 
@@ -83,7 +82,9 @@ public class UnifiClient
                         var display = TryGetString(n, "name");
                         var cfgIp = TryGetString(n, "wan_ip");
                         liveByGroup.TryGetValue(group, out var live);
-                        var ip = !string.IsNullOrEmpty(live.Ip) ? live.Ip : (string.IsNullOrEmpty(cfgIp) ? null : cfgIp);
+                        // only publish a globally routable IPv4 — a WAN that's up but on CGNAT/private (double-NAT)
+                        // or reporting 0.0.0.0 must not push a bogus public A record.
+                        var ip = IpFilter.IsPublicV4(live.Ip) ? live.Ip : (IpFilter.IsPublicV4(cfgIp) ? cfgIp : null);
                         var up = live.Ip != null ? live.Up : !string.IsNullOrEmpty(cfgIp);
                         result.Add(new WanInfo(group, ip, up, gwMac, live.Ifname, display, live.Ipv6));
                     }
@@ -95,7 +96,7 @@ public class UnifiClient
         // 3) Fallback without networkconf: directly from the gateway's live groups.
         if (result.Count == 0)
             foreach (var kv in liveByGroup)
-                result.Add(new WanInfo(kv.Key, kv.Value.Ip, kv.Value.Up, gwMac, kv.Value.Ifname, null, kv.Value.Ipv6));
+                result.Add(new WanInfo(kv.Key, IpFilter.IsPublicV4(kv.Value.Ip) ? kv.Value.Ip : null, kv.Value.Up, gwMac, kv.Value.Ifname, null, kv.Value.Ipv6));
 
         // order: WAN, WAN2, … and LTE failover last.
         return result.OrderBy(GroupRank).ToList();
@@ -120,15 +121,7 @@ public class UnifiClient
             JsonValueKind.String => new[] { v6.GetString() },
             _ => Array.Empty<string?>()
         };
-        return candidates.FirstOrDefault(IsGlobalV6);
-    }
-
-    private static bool IsGlobalV6(string? s)
-    {
-        if (string.IsNullOrWhiteSpace(s)) return false;
-        if (!IPAddress.TryParse(s, out var a) || a.AddressFamily != AddressFamily.InterNetworkV6) return false;
-        if (a.IsIPv6LinkLocal || a.IsIPv6SiteLocal || a.IsIPv6Multicast || IPAddress.IsLoopback(a)) return false;
-        return (a.GetAddressBytes()[0] & 0xfe) != 0xfc; // exclude ULA fc00::/7
+        return candidates.FirstOrDefault(IpFilter.IsGlobalV6);
     }
 
     public static Uri NormalizeBaseUrl(string? raw)

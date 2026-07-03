@@ -23,16 +23,34 @@ public class NetcupClient
                 apipassword = cfg.ApiPassword
             }
         };
-        var resp = await client.PostAsJsonAsync(Endpoint, req, ct);
-        var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-        var status = doc.RootElement.GetProperty("status").GetString();
-        if (status != "success")
+        using var resp = await client.PostAsJsonAsync(Endpoint, req, ct);
+        var (rok, doc, rerr) = await ReadAsync(resp, ct);
+        if (!rok) return ("", rerr);
+        using (doc)
         {
-            var msg = doc.RootElement.TryGetProperty("longmessage", out var lm) ? lm.GetString() : "login failed";
-            return ("", msg);
+            var status = doc!.RootElement.TryGetProperty("status", out var st) ? st.GetString() : null;
+            if (status != "success")
+            {
+                var msg = doc.RootElement.TryGetProperty("longmessage", out var lm) ? lm.GetString() : null;
+                return ("", string.IsNullOrEmpty(msg) ? "login failed" : msg);
+            }
+            var sid = doc.RootElement.TryGetProperty("responsedata", out var rd) && rd.TryGetProperty("apisessionid", out var si)
+                ? si.GetString() : null;
+            return (sid ?? "", null);
         }
-        var sid = doc.RootElement.GetProperty("responsedata").GetProperty("apisessionid").GetString();
-        return (sid ?? "", null);
+    }
+
+    // Reads a Netcup JSON response defensively: a non-2xx status or a non-JSON/empty body fails cleanly
+    // instead of throwing an uncaught parser exception. Caller owns (and disposes) the returned document.
+    private static async Task<(bool ok, JsonDocument? doc, string error)> ReadAsync(HttpResponseMessage resp, CancellationToken ct)
+    {
+        if (!resp.IsSuccessStatusCode) return (false, null, $"HTTP {(int)resp.StatusCode}");
+        try
+        {
+            var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            return (true, doc, "");
+        }
+        catch { return (false, null, "invalid response from Netcup"); }
     }
 
     private async Task LogoutAsync(HttpClient client, NetcupSettings cfg, string sid, CancellationToken ct)
@@ -47,7 +65,7 @@ public class NetcupClient
                 apisessionid = sid
             }
         };
-        try { await client.PostAsJsonAsync(Endpoint, req, ct); } catch { /* ignore */ }
+        try { using var resp = await client.PostAsJsonAsync(Endpoint, req, ct); } catch { /* ignore */ }
     }
 
     public async Task<(bool ok, string message)> UpdateRecordAsync(
@@ -63,7 +81,8 @@ public class NetcupClient
         client.Timeout = TimeSpan.FromSeconds(30);
 
         var (sid, err) = await LoginAsync(client, cfg, ct);
-        if (!string.IsNullOrEmpty(err)) return (false, $"login: {err}");
+        if (!string.IsNullOrEmpty(err) || string.IsNullOrEmpty(sid))
+            return (false, $"login: {(string.IsNullOrEmpty(err) ? "no session id" : err)}");
 
         try
         {
@@ -78,15 +97,19 @@ public class NetcupClient
                     apisessionid = sid
                 }
             };
-            var infoResp = await client.PostAsJsonAsync(Endpoint, infoReq, ct);
-            var infoDoc = await JsonDocument.ParseAsync(await infoResp.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-            if (infoDoc.RootElement.GetProperty("status").GetString() != "success")
+            using var infoResp = await client.PostAsJsonAsync(Endpoint, infoReq, ct);
+            var (infoOk, infoDocN, infoErr) = await ReadAsync(infoResp, ct);
+            if (!infoOk) return (false, infoErr);
+            using var infoDoc = infoDocN!;
+            var infoStatus = infoDoc.RootElement.TryGetProperty("status", out var ist) ? ist.GetString() : null;
+            if (infoStatus != "success")
             {
-                var msg = infoDoc.RootElement.TryGetProperty("longmessage", out var lm) ? lm.GetString() : "infoDnsRecords failed";
-                return (false, msg ?? "infoDnsRecords failed");
+                var msg = infoDoc.RootElement.TryGetProperty("longmessage", out var lm) ? lm.GetString() : null;
+                return (false, string.IsNullOrEmpty(msg) ? "infoDnsRecords failed" : msg);
             }
 
-            var records = infoDoc.RootElement.GetProperty("responsedata").GetProperty("dnsrecords");
+            if (!infoDoc.RootElement.TryGetProperty("responsedata", out var rdata) || !rdata.TryGetProperty("dnsrecords", out var records))
+                return (false, "unexpected response (no dnsrecords)");
             var updated = new List<object>();
             var foundExisting = false;
             foreach (var rec in records.EnumerateArray())
@@ -140,13 +163,15 @@ public class NetcupClient
                     dnsrecordset = new { dnsrecords = updated }
                 }
             };
-            var updResp = await client.PostAsJsonAsync(Endpoint, updReq, ct);
-            var updDoc = await JsonDocument.ParseAsync(await updResp.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
-            var status = updDoc.RootElement.GetProperty("status").GetString();
-            var longMsg = updDoc.RootElement.TryGetProperty("longmessage", out var lm2) ? lm2.GetString() : "";
+            using var updResp = await client.PostAsJsonAsync(Endpoint, updReq, ct);
+            var (updOk, updDocN, updErr) = await ReadAsync(updResp, ct);
+            if (!updOk) return (false, updErr);
+            using var updDoc = updDocN!;
+            var status = updDoc.RootElement.TryGetProperty("status", out var ust) ? ust.GetString() : null;
             if (status == "success")
                 return (true, $"updated {hostname} {recordType} -> {destination}");
-            return (false, longMsg ?? "updateDnsRecords failed");
+            var longMsg = updDoc.RootElement.TryGetProperty("longmessage", out var lm2) ? lm2.GetString() : null;
+            return (false, string.IsNullOrEmpty(longMsg) ? "updateDnsRecords failed" : longMsg);
         }
         finally
         {

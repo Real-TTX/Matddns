@@ -14,9 +14,11 @@ public class TimeZoneService
         var id = _config.Read(c => c.Settings.TimeZone) ?? "";
         if (id != _cachedId)
         {
+            TimeZoneInfo zone;
+            try { zone = string.IsNullOrWhiteSpace(id) ? TimeZoneInfo.Utc : TimeZoneInfo.FindSystemTimeZoneById(id); }
+            catch { zone = TimeZoneInfo.Utc; }
+            _cachedZone = zone; // publish the value before the key, so a concurrent reader never pairs a new id with the old zone
             _cachedId = id;
-            try { _cachedZone = string.IsNullOrWhiteSpace(id) ? TimeZoneInfo.Utc : TimeZoneInfo.FindSystemTimeZoneById(id); }
-            catch { _cachedZone = TimeZoneInfo.Utc; }
         }
         return _cachedZone;
     }

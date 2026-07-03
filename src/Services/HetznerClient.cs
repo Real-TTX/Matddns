@@ -34,8 +34,9 @@ public class HetznerClient
         var (zOk, zRoot, zErr) = await ReadAsync(zResp, ct);
         if (!zOk) return (false, zErr);
         string? zoneId = null;
-        if (zRoot.TryGetProperty("zones", out var zones) && zones.ValueKind == JsonValueKind.Array && zones.GetArrayLength() > 0)
-            zoneId = zones[0].GetProperty("id").GetString();
+        if (zRoot.TryGetProperty("zones", out var zones) && zones.ValueKind == JsonValueKind.Array && zones.GetArrayLength() > 0
+            && zones[0].TryGetProperty("id", out var zid))
+            zoneId = zid.GetString();
         if (zoneId == null) return (false, $"zone '{zone}' not found for this token");
 
         // 2) find the existing record (Hetzner stores the relative name; apex = "@")
@@ -53,7 +54,7 @@ public class HetznerClient
                 if (string.Equals(name, recordName, StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(type, recordType, StringComparison.OrdinalIgnoreCase))
                 {
-                    recordId = rec.GetProperty("id").GetString();
+                    recordId = rec.TryGetProperty("id", out var rid) ? rid.GetString() : null;
                     currentValue = rec.TryGetProperty("value", out var v) ? v.GetString() : null;
                     break;
                 }

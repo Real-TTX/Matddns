@@ -5,6 +5,11 @@ namespace Matddns.Services;
 
 public class AuthService
 {
+    /// <summary>A syntactically valid hash to verify against when a username doesn't exist, so the login path
+    /// spends the same PBKDF2 work either way (defeats a username-enumeration timing oracle).</summary>
+    public static readonly string DummyHash =
+        "v1$" + Convert.ToBase64String(new byte[16]) + "$" + Convert.ToBase64String(new byte[32]);
+
     public string Hash(string password)
     {
         var salt = RandomNumberGenerator.GetBytes(16);

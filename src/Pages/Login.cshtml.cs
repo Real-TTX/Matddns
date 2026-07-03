@@ -40,7 +40,9 @@ public class LoginModel : PageModel
     {
         var user = _config.Read(c => c.Users.FirstOrDefault(u =>
             u.Username.Equals(Username, StringComparison.OrdinalIgnoreCase)));
-        if (user != null && _auth.Verify(Password, user.PasswordHash))
+        // verify unconditionally (dummy hash if the user doesn't exist) so the response time doesn't reveal valid usernames
+        var passwordOk = _auth.Verify(Password, user?.PasswordHash ?? AuthService.DummyHash);
+        if (user != null && passwordOk)
         {
             var claims = new[] { new Claim(ClaimTypes.Name, user.Username) };
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);

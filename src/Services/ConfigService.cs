@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Matddns.Models;
 
 namespace Matddns.Services;
@@ -9,11 +10,12 @@ public class ConfigService
     private readonly AuthService _auth;
     private readonly object _lock = new();
     private AppConfig _config = new();
+    private bool _saveBlocked; // config.json exists but is unreadable and couldn't be backed up — don't clobber it
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+        Converters = { new TolerantEnumConverterFactory() }
     };
 
     public ConfigService(PathOptions paths, AuthService auth)
@@ -43,7 +45,26 @@ public class ConfigService
                     var cfg = JsonSerializer.Deserialize<AppConfig>(json, JsonOpts);
                     if (cfg != null) { _config = cfg; loaded = true; }
                 }
-                catch { /* corrupt — keep defaults */ }
+                catch (Exception ex)
+                {
+                    // The file exists but couldn't be read/parsed. NEVER overwrite it blindly with defaults —
+                    // that would destroy the user's data. Preserve a copy first; only self-heal if that worked.
+                    _config = new AppConfig();
+                    if (TryPreserveCorruptConfig(out var backup))
+                    {
+                        Console.Error.WriteLine($"[Matddns] config.json is unreadable ({ex.Message}). " +
+                            $"Preserved the original as '{Path.GetFileName(backup)}'; starting with a fresh config.");
+                    }
+                    else
+                    {
+                        // couldn't even back it up (e.g. transient I/O) — refuse to overwrite; run until fixed
+                        _saveBlocked = true;
+                        _config.SchemaVersion = CurrentSchemaVersion;
+                        Console.Error.WriteLine($"[Matddns] config.json is unreadable ({ex.Message}) and could not be " +
+                            "backed up. Refusing to overwrite it - no changes are saved until the file is fixed or removed.");
+                        return;
+                    }
+                }
             }
 
             // A brand-new config is born at the current schema (nothing to migrate). An existing config
@@ -63,11 +84,20 @@ public class ConfigService
                 changed = true;
             }
 
-            // seed default admin/admin if there are no users at all
+            // seed the initial admin account if there are no users at all. The password comes from
+            // MATDDNS_ADMIN_PASSWORD, or is randomly generated and printed once so it isn't a guessable default.
             if (_config.Users.Count == 0)
             {
-                _config.Users.Add(new UserAccount { Username = "admin", PasswordHash = _auth.Hash("admin") });
+                var envPw = Environment.GetEnvironmentVariable("MATDDNS_ADMIN_PASSWORD");
+                var generated = string.IsNullOrEmpty(envPw);
+                var pw = generated ? GenerateInitialPassword() : envPw!;
+                _config.Users.Add(new UserAccount { Username = "admin", PasswordHash = _auth.Hash(pw) });
                 changed = true;
+                if (generated)
+                    Console.Error.WriteLine($"[Matddns] Created initial admin account - username 'admin', password '{pw}'. " +
+                        "Log in and change it. Set MATDDNS_ADMIN_PASSWORD to choose your own initial password instead.");
+                else
+                    Console.Error.WriteLine("[Matddns] Created initial admin account 'admin' from MATDDNS_ADMIN_PASSWORD.");
             }
 
             if (changed) SaveInternal();
@@ -150,15 +180,65 @@ public class ConfigService
 
     private void SaveInternal()
     {
+        if (_saveBlocked) return; // an unreadable config.json we couldn't back up — never clobber it
         var json = JsonSerializer.Serialize(_config, JsonOpts);
         var tmp = _paths.ConfigFile + ".tmp";
-        File.WriteAllText(tmp, json);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            fs.Write(bytes, 0, bytes.Length);
+            fs.Flush(flushToDisk: true); // fsync so a crash/power-loss can't leave a truncated file behind
+        }
         File.Move(tmp, _paths.ConfigFile, true);
+    }
+
+    private static string GenerateInitialPassword()
+        => Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(12)).ToLowerInvariant();
+
+    // Copy an unreadable config.json aside so its data can be recovered. Best effort — a failure here
+    // (e.g. transient I/O) tells the caller to refuse overwriting rather than risk data loss.
+    private bool TryPreserveCorruptConfig(out string backupPath)
+    {
+        backupPath = "";
+        try
+        {
+            var stamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ");
+            backupPath = _paths.ConfigFile + ".corrupt-" + stamp;
+            File.Copy(_paths.ConfigFile, backupPath, overwrite: true);
+            return true;
+        }
+        catch { return false; }
     }
 
     private static AppConfig CloneFrom(AppConfig src)
     {
         var json = JsonSerializer.Serialize(src, JsonOpts);
         return JsonSerializer.Deserialize<AppConfig>(json, JsonOpts)!;
+    }
+
+    // Deserialize enums leniently: an unknown member name (e.g. one added by a newer build, then downgraded)
+    // maps to the enum's default instead of throwing — which would otherwise take the entire config down.
+    // Serialization stays identical to JsonStringEnumConverter (writes the member name).
+    private sealed class TolerantEnumConverterFactory : JsonConverterFactory
+    {
+        public override bool CanConvert(Type t) => t.IsEnum;
+        public override JsonConverter CreateConverter(Type t, JsonSerializerOptions options)
+            => (JsonConverter)Activator.CreateInstance(typeof(TolerantEnumConverter<>).MakeGenericType(t))!;
+    }
+
+    private sealed class TolerantEnumConverter<T> : JsonConverter<T> where T : struct, Enum
+    {
+        public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.String)
+                return Enum.TryParse<T>(reader.GetString(), ignoreCase: true, out var v) ? v : default;
+            if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt32(out var n) && Enum.IsDefined(typeof(T), n))
+                return (T)Enum.ToObject(typeof(T), n);
+            reader.Skip();
+            return default;
+        }
+
+        public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
+            => writer.WriteStringValue(value.ToString());
     }
 }

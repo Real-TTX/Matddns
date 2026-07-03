@@ -44,17 +44,28 @@ public class DynDnsClient
         {
             using var resp = await client.GetAsync(url, ct);
             var body = await resp.Content.ReadAsStringAsync(ct);
-            var ok = resp.IsSuccessStatusCode &&
-                     !body.Contains("badauth", StringComparison.OrdinalIgnoreCase) &&
-                     !body.Contains("nohost", StringComparison.OrdinalIgnoreCase) &&
-                     !body.Contains("abuse", StringComparison.OrdinalIgnoreCase) &&
-                     !body.Contains("911", StringComparison.OrdinalIgnoreCase);
+            var ok = resp.IsSuccessStatusCode && !IsDynDnsFailure(body);
             return (ok, body.Trim());
         }
         catch (Exception ex)
         {
             return (false, ex.Message);
         }
+    }
+
+    // dyndns2 reports its status as the first whitespace-delimited token (e.g. "good 1.2.3.4", "badauth", "911").
+    // Match on that token only, so an echoed IP/hostname or a JSON body (Matddns peer: {"status":"ok",...})
+    // can't collide — e.g. an IPv6 hextet that happens to contain "911". Anything not a known failure code on
+    // an HTTP-2xx response counts as success.
+    private static readonly HashSet<string> DynDnsFailureCodes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "badauth", "!donator", "!yours", "notfqdn", "nohost", "numhost", "abuse", "dnserr", "911"
+    };
+
+    private static bool IsDynDnsFailure(string body)
+    {
+        var first = body.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        return first != null && DynDnsFailureCodes.Contains(first);
     }
 
     // Removes query params with an empty value, e.g. an A-record push leaves "&myipv6=" -> dropped,

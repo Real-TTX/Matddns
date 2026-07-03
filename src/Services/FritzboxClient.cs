@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text;
-using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Matddns.Models;
 
 namespace Matddns.Services;
@@ -44,8 +44,9 @@ public class FritzboxClient
                 using var resp = await http.SendAsync(req, ct);
                 var xml = await resp.Content.ReadAsStringAsync(ct);
                 if (!resp.IsSuccessStatusCode) continue;
-                var m = Regex.Match(xml, $"<{Regex.Escape(resultTag)}>(.*?)</{Regex.Escape(resultTag)}>", RegexOptions.Singleline);
-                if (m.Success) return m.Groups[1].Value.Trim();
+                // match by local name so a namespace prefix doesn't break it; XDocument also decodes entities
+                var value = XDocument.Parse(xml).Descendants().FirstOrDefault(e => e.Name.LocalName == resultTag)?.Value;
+                if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
             }
             catch { /* try the next service */ }
         }

@@ -106,7 +106,7 @@
                 </div>
                 <div class="field">
                     <label>API key</label>
-                    <input type="text" name="NcKey" value="@(g?.Netcup?.ApiKey ?? "")" autocomplete="off" />
+                    <input type="password" name="NcKey" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
                 </div>
                 <div class="field full">
                     <label>API password</label>
@@ -166,7 +166,7 @@
             <div class="form-grid" style="margin-top:16px;">
                 <div class="field">
                     <label>API key</label>
-                    <input type="text" name="GdKey" value="@(g?.GoDaddy?.ApiKey ?? "")" autocomplete="off" />
+                    <input type="password" name="GdKey" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
                 </div>
                 <div class="field">
                     <label>API secret</label>

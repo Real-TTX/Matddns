@@ -86,8 +86,9 @@ public class UpdaterService : BackgroundService
 
         foreach (var group in cfg.Sources)
         {
+            var interval = Math.Max(group.IntervalSeconds, 15); // never poll a network source more often than the 15s loop
             var due = group.Entries.All(e => e.LastChecked == null) ||
-                      group.Entries.Any(e => e.LastChecked == null || (now - e.LastChecked.Value).TotalSeconds >= group.IntervalSeconds);
+                      group.Entries.Any(e => e.LastChecked == null || (now - e.LastChecked.Value).TotalSeconds >= interval);
             if (!due) continue;
 
             if (group.Kind == SourceKind.PublicIp)
@@ -320,9 +321,10 @@ public class UpdaterService : BackgroundService
             var signature = SourceSignature(rule, cfg);
             if (!RuleDue(rule, now, signature)) continue;
 
-            try { await RunSingleRuleAsync(rule, cfg, ct); }
+            try { await RunSingleRuleAsync(rule, cfg, signature, ct); }
             catch (Exception ex)
             {
+                // leave LastSourceSignature untouched so the failed evaluation is retried next cycle
                 _log.Log(LogLevel.Error, $"rule:{RuleDesc(rule, cfg)}", ex.Message);
                 _config.Mutate(c =>
                 {
@@ -330,12 +332,6 @@ public class UpdaterService : BackgroundService
                     if (r != null) { r.LastRun = DateTime.UtcNow; r.LastResult = "error: " + ex.Message; }
                 });
             }
-            // remember the source-IP snapshot we just evaluated, so OnChange fires only on the next real change
-            _config.Mutate(c =>
-            {
-                var r = c.Rules.FirstOrDefault(x => x.Id == rule.Id);
-                if (r != null) r.LastSourceSignature = signature;
-            });
         }
     }
 
@@ -351,7 +347,7 @@ public class UpdaterService : BackgroundService
         return sb.ToString();
     }
 
-    private async Task RunSingleRuleAsync(Rule rule, AppConfig cfg, CancellationToken ct)
+    private async Task RunSingleRuleAsync(Rule rule, AppConfig cfg, string signature, CancellationToken ct)
     {
         var dgroup = cfg.Domains.FirstOrDefault(d => d.Id == rule.DomainGroupId);
         var dentry = dgroup?.Entries.FirstOrDefault(e => e.Id == rule.DomainEntryId);
@@ -363,7 +359,7 @@ public class UpdaterService : BackgroundService
                 _config.Mutate(c =>
                 {
                     var r = c.Rules.FirstOrDefault(x => x.Id == rule.Id);
-                    if (r != null) { r.LastRun = DateTime.UtcNow; r.LastResult = "target missing"; }
+                    if (r != null) { r.LastRun = DateTime.UtcNow; r.LastResult = "target missing"; r.LastSourceSignature = signature; }
                 });
             }
             return;
@@ -427,7 +423,7 @@ public class UpdaterService : BackgroundService
             _config.Mutate(c =>
             {
                 var r = c.Rules.FirstOrDefault(x => x.Id == rule.Id);
-                if (r != null) { r.LastRun = DateTime.UtcNow; r.LastResult = "no source"; }
+                if (r != null) { r.LastRun = DateTime.UtcNow; r.LastResult = "no source"; r.LastSourceSignature = signature; }
             });
             return;
         }
@@ -438,7 +434,7 @@ public class UpdaterService : BackgroundService
             _config.Mutate(c =>
             {
                 var r = c.Rules.FirstOrDefault(x => x.Id == rule.Id);
-                if (r != null) r.LastRun = DateTime.UtcNow;
+                if (r != null) { r.LastRun = DateTime.UtcNow; r.LastSourceSignature = signature; }
             });
             return;
         }
@@ -516,8 +512,12 @@ public class UpdaterService : BackgroundService
             if (r == null) return;
             r.LastRun = DateTime.UtcNow;
             r.LastResult = ok ? "ok: " + msg : "err: " + msg;
-            // a successful write = the moment it was set (happens only on change due to the skip logic)
-            if (ok) r.LastChange = DateTime.UtcNow;
+            // advance the signature only on success, so a failed write is retried next cycle instead of being masked
+            if (ok)
+            {
+                r.LastChange = DateTime.UtcNow; // a successful write = the moment it was set (happens only on change due to the skip logic)
+                r.LastSourceSignature = signature;
+            }
             r.LastValue = chosenValue;
             r.LastUsedSourceId = chosenSourceId;
         });

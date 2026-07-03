@@ -26,6 +26,15 @@ public class PushReceiver
     public static string NewToken() =>
         Convert.ToHexString(RandomNumberGenerator.GetBytes(20)).ToLowerInvariant();
 
+    /// <summary>Constant-time token comparison (avoids a character-timing side channel on the shared secret).</summary>
+    public static bool TokenEquals(string? stored, string? provided)
+    {
+        if (string.IsNullOrEmpty(stored) || string.IsNullOrEmpty(provided)) return false;
+        return CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.UTF8.GetBytes(stored),
+            System.Text.Encoding.UTF8.GetBytes(provided));
+    }
+
     /// <summary>
     /// Accepts explicit per-family values (ipv4/ipv6) and/or a legacy single value (ipAuto, family auto-detected);
     /// falls back to the caller IP. <paramref name="hostname"/> is only used by dynamic receivers.
@@ -39,7 +48,7 @@ public class PushReceiver
         }
 
         var grp = _config.Read(c => c.Sources.FirstOrDefault(s =>
-            s.Kind == SourceKind.Push && s.Push != null && s.Push.Token == token));
+            s.Kind == SourceKind.Push && s.Push != null && TokenEquals(s.Push.Token, token)));
         if (grp == null)
         {
             _log.Log(LogLevel.Warn, "push", $"rejected: token matches no DynDNS Server source (from {callerIp ?? "?"})");

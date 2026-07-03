@@ -33,7 +33,8 @@ public class EditModel : PageModel
         string? NcCustomer, string? NcKey, string? NcPass, bool NcAllowDynamic = false,
         string? CfToken = null, bool CfAllowDynamic = false,
         string? HzToken = null, bool HzAllowDynamic = false,
-        string? GdKey = null, string? GdSecret = null, bool GdAllowDynamic = false)
+        string? GdKey = null, string? GdSecret = null, bool GdAllowDynamic = false,
+        string? MdUrl = null, string? MdToken = null)
     {
         if (string.IsNullOrWhiteSpace(Name)) { Error = "Name missing"; return RedirectToPage("Edit"); }
 
@@ -46,6 +47,8 @@ public class EditModel : PageModel
             g.Hetzner = new HetznerSettings { ApiToken = (HzToken ?? "").Trim(), AllowDynamic = HzAllowDynamic };
         else if (Kind == DomainKind.GoDaddy)
             g.GoDaddy = new GoDaddySettings { ApiKey = (GdKey ?? "").Trim(), ApiSecret = (GdSecret ?? "").Trim(), AllowDynamic = GdAllowDynamic };
+        else if (Kind == DomainKind.Matddns)
+            g.Matddns = new MatddnsLinkSettings { BaseUrl = (MdUrl ?? "").Trim(), Token = (MdToken ?? "").Trim() };
         else
             g.Netcup = new NetcupSettings { CustomerNumber = NcCustomer ?? "", ApiKey = NcKey ?? "", ApiPassword = NcPass ?? "", AllowDynamic = NcAllowDynamic };
 
@@ -59,7 +62,8 @@ public class EditModel : PageModel
         string? NcCustomer, string? NcKey, string? NcPass, bool NcAllowDynamic = false,
         string? CfToken = null, bool CfAllowDynamic = false,
         string? HzToken = null, bool HzAllowDynamic = false,
-        string? GdKey = null, string? GdSecret = null, bool GdAllowDynamic = false)
+        string? GdKey = null, string? GdSecret = null, bool GdAllowDynamic = false,
+        string? MdUrl = null, string? MdToken = null)
     {
         _config.Mutate(c =>
         {
@@ -88,15 +92,21 @@ public class EditModel : PageModel
             else if (g.Kind == DomainKind.GoDaddy)
             {
                 g.GoDaddy ??= new GoDaddySettings();
-                g.GoDaddy.ApiKey = (GdKey ?? "").Trim();
+                if (!string.IsNullOrEmpty(GdKey)) g.GoDaddy.ApiKey = GdKey.Trim(); // empty = unchanged
                 if (!string.IsNullOrEmpty(GdSecret)) g.GoDaddy.ApiSecret = GdSecret.Trim(); // empty = unchanged
                 g.GoDaddy.AllowDynamic = GdAllowDynamic;
+            }
+            else if (g.Kind == DomainKind.Matddns)
+            {
+                g.Matddns ??= new MatddnsLinkSettings();
+                g.Matddns.BaseUrl = (MdUrl ?? "").Trim();
+                if (!string.IsNullOrEmpty(MdToken)) g.Matddns.Token = MdToken.Trim(); // empty = unchanged
             }
             else
             {
                 g.Netcup ??= new NetcupSettings();
                 g.Netcup.CustomerNumber = NcCustomer ?? "";
-                g.Netcup.ApiKey = NcKey ?? "";
+                if (!string.IsNullOrEmpty(NcKey)) g.Netcup.ApiKey = NcKey.Trim(); // empty = unchanged
                 if (!string.IsNullOrEmpty(NcPass)) g.Netcup.ApiPassword = NcPass; // empty = unchanged
                 g.Netcup.AllowDynamic = NcAllowDynamic;
             }
@@ -119,14 +129,14 @@ public class EditModel : PageModel
     public IActionResult OnPostAddEntry(string Id, DnsRecordType Type,
         string? Hostname, string? RecordName, string? DomainZone)
     {
-        var kind = _config.Read(c => c.Domains.FirstOrDefault(x => x.Id == Id)?.Kind);
-        if (kind == null) { Error = "Group not found"; return RedirectToPage("Index"); }
+        var group = _config.Read(c => c.Domains.FirstOrDefault(x => x.Id == Id));
+        if (group == null) { Error = "Group not found"; return RedirectToPage("Index"); }
 
         string fqdn;
         string? rec = null;
         string? zone = null;
 
-        if (kind is DomainKind.Netcup or DomainKind.Cloudflare)
+        if (group.IsZoneBased)
         {
             zone = (DomainZone ?? "").Trim().TrimEnd('.');
             rec = string.IsNullOrWhiteSpace(RecordName) ? "@" : RecordName.Trim().TrimEnd('.');

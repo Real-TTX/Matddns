@@ -23,8 +23,10 @@ public class DnsLookupClient
         try
         {
             var addrs = await Dns.GetHostAddressesAsync(host, family, ct);
-            return addrs.FirstOrDefault(a => a.AddressFamily == family
-                                             && !a.IsIPv6LinkLocal && !a.IsIPv6SiteLocal)?.ToString();
+            // only accept globally routable results — a split-horizon/misconfigured name can resolve to
+            // a private/loopback (v4) or ULA (v6) address that must not be pushed to public DNS.
+            return addrs.Select(a => a.ToString())
+                        .FirstOrDefault(s => family == AddressFamily.InterNetwork ? IpFilter.IsPublicV4(s) : IpFilter.IsGlobalV6(s));
         }
         catch { return null; }
     }

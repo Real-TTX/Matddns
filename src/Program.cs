@@ -1,6 +1,9 @@
+using System.Threading.RateLimiting;
 using Matddns.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,13 +63,43 @@ builder.Services.AddAuthorization(opt =>
 builder.Services.Configure<Microsoft.AspNetCore.Mvc.RazorPages.RazorPagesOptions>(opt =>
 {
     opt.Conventions.AllowAnonymousToPage("/Login");
+    // throttle the login page per client IP so credentials can't be brute-forced
+    opt.Conventions.AddPageApplicationModelConvention("/Login",
+        m => m.EndpointMetadata.Add(new EnableRateLimitingAttribute("login")));
+});
+
+// Rate limiting: protect the anonymous, credential/token-guarded surface from brute force / floods.
+// Partitioned per client IP. Behind a reverse proxy, configure ForwardedHeaders so this sees the real IP.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("login", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(5) }));
+    options.AddPolicy("dyndns", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
 });
 
 var app = builder.Build();
 
+// Behind a TLS-terminating reverse proxy, honor X-Forwarded-Proto/For so the request scheme becomes https
+// (making the auth cookie Secure via SameAsRequest) and the client IP is the real one (for rate limiting).
+// Opt-in only: without a trusted proxy a client could spoof these headers.
+if (Environment.GetEnvironmentVariable("MATDDNS_FORWARDED_HEADERS")?.Trim().ToLowerInvariant() is "1" or "true" or "yes")
+{
+    var fho = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto };
+    fho.KnownNetworks.Clear(); // trust the proxy in front of us (typical container/reverse-proxy setup)
+    fho.KnownProxies.Clear();
+    app.UseForwardedHeaders(fho);
+}
+
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapRazorPages();
 
 // Liveness + public monitoring endpoints (no authentication, for monitoring software).
@@ -105,12 +138,12 @@ app.MapGet("/api/source", (HttpContext ctx, ConfigService config, StatusService 
 {
     var token = ctx.Request.Query["token"].FirstOrDefault();
     var valid = !string.IsNullOrEmpty(token) &&
-                config.Read(c => c.Sources.Any(s => s.Kind == Matddns.Models.SourceKind.Push && s.Push != null && s.Push.Token == token));
+                config.Read(c => c.Sources.Any(s => s.Kind == Matddns.Models.SourceKind.Push && s.Push != null && PushReceiver.TokenEquals(s.Push.Token, token)));
     if (!valid)
         return Results.Json(new { status = "unauthorized", message = "Invalid or missing token." }, statusCode: 401);
     var s = status.Build(0);
     return Results.Json(new { time = s.Time, sources = s.SourceList });
-}).AllowAnonymous();
+}).AllowAnonymous().RequireRateLimiting("dyndns");
 
 // DynDNS receiver: external devices push their IP into a "Push" source (token-protected).
 // JSON API form: /api/update?token=<token>&ipv4=<v4>&ipv6=<v6>  (send either or both; legacy ?ip= auto-detects family).
@@ -132,7 +165,7 @@ app.MapGet("/api/update", async (HttpContext ctx, PushReceiver push) =>
         "error" => Results.Json(new { status = "error", message = r.Message ?? "Update failed." }, statusCode: 502),
         _ => Results.Json(new { status = "unauthorized", message = "Invalid or missing token." }, statusCode: 401),
     };
-}).AllowAnonymous();
+}).AllowAnonymous().RequireRateLimiting("dyndns");
 
 // dyndns2-compatible (routers / FRITZ!Box / UniFi): /nic/update and the shorter /update alias.
 // Token via HTTP Basic auth password or ?token= (literal, or a client placeholder like %p); ipv4/ipv6 (or myip) set the address(es).
@@ -159,8 +192,8 @@ async Task<IResult> DynDns2Update(HttpContext ctx, PushReceiver push)
     };
     return Results.Text(body, "text/plain", statusCode: 200); // dyndns2 carries status in the body
 }
-app.MapGet("/nic/update", DynDns2Update).AllowAnonymous();
-app.MapGet("/update", DynDns2Update).AllowAnonymous();
+app.MapGet("/nic/update", DynDns2Update).AllowAnonymous().RequireRateLimiting("dyndns");
+app.MapGet("/update", DynDns2Update).AllowAnonymous().RequireRateLimiting("dyndns");
 
 app.Services.GetRequiredService<ConfigService>().EnsureLoaded();
 

@@ -43,7 +43,7 @@ public class CloudflareClient
         if (listRoot.TryGetProperty("result", out var arr) && arr.ValueKind == JsonValueKind.Array && arr.GetArrayLength() > 0)
         {
             var rec = arr[0];
-            recordId = rec.GetProperty("id").GetString();
+            recordId = rec.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
             currentContent = rec.TryGetProperty("content", out var c) ? c.GetString() : null;
             currentProxied = rec.TryGetProperty("proxied", out var p) && p.ValueKind == JsonValueKind.True;
         }
@@ -68,11 +68,14 @@ public class CloudflareClient
 
     private async Task<(string? id, string? error)> GetZoneIdAsync(HttpClient client, string zone, CancellationToken ct)
     {
-        using var resp = await client.GetAsync($"{Api}/zones?name={Uri.EscapeDataString(zone)}&status=active", ct);
+        // no &status=active: Cloudflare already scopes /zones to token-visible zones, and a freshly added
+        // zone that is still 'pending' (delegation propagating) is editable but would be filtered out.
+        using var resp = await client.GetAsync($"{Api}/zones?name={Uri.EscapeDataString(zone)}", ct);
         var (ok, root, err) = await ReadAsync(resp, ct);
         if (!ok) return (null, err);
-        if (root.TryGetProperty("result", out var arr) && arr.ValueKind == JsonValueKind.Array && arr.GetArrayLength() > 0)
-            return (arr[0].GetProperty("id").GetString(), null);
+        if (root.TryGetProperty("result", out var arr) && arr.ValueKind == JsonValueKind.Array && arr.GetArrayLength() > 0
+            && arr[0].TryGetProperty("id", out var idEl))
+            return (idEl.GetString(), null);
         return (null, $"zone '{zone}' not found for this token");
     }
 
