@@ -84,20 +84,14 @@ public class ConfigService
                 changed = true;
             }
 
-            // seed the initial admin account if there are no users at all. The password comes from
-            // MATDDNS_ADMIN_PASSWORD, or is randomly generated and printed once so it isn't a guessable default.
+            // seed the initial admin account if there are no users at all: username "admin", password from
+            // MATDDNS_ADMIN_PASSWORD or "admin" by default. Change it after the first login (login is rate-limited).
             if (_config.Users.Count == 0)
             {
                 var envPw = Environment.GetEnvironmentVariable("MATDDNS_ADMIN_PASSWORD");
-                var generated = string.IsNullOrEmpty(envPw);
-                var pw = generated ? GenerateInitialPassword() : envPw!;
+                var pw = string.IsNullOrEmpty(envPw) ? "admin" : envPw;
                 _config.Users.Add(new UserAccount { Username = "admin", PasswordHash = _auth.Hash(pw) });
                 changed = true;
-                if (generated)
-                    Console.Error.WriteLine($"[Matddns] Created initial admin account - username 'admin', password '{pw}'. " +
-                        "Log in and change it. Set MATDDNS_ADMIN_PASSWORD to choose your own initial password instead.");
-                else
-                    Console.Error.WriteLine("[Matddns] Created initial admin account 'admin' from MATDDNS_ADMIN_PASSWORD.");
             }
 
             if (changed) SaveInternal();
@@ -191,9 +185,6 @@ public class ConfigService
         }
         File.Move(tmp, _paths.ConfigFile, true);
     }
-
-    private static string GenerateInitialPassword()
-        => Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(12)).ToLowerInvariant();
 
     // Copy an unreadable config.json aside so its data can be recovered. Best effort — a failure here
     // (e.g. transient I/O) tells the caller to refuse overwriting rather than risk data loss.
