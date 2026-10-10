@@ -1,6 +1,5 @@
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using Matddns.Models;
 
 namespace Matddns.Services;
 
@@ -8,17 +7,6 @@ namespace Matddns.Services;
 public class ReachabilityChecker
 {
     private const int TimeoutMs = 2500;
-
-    public async Task<bool> CheckAsync(RuleValidation mode, string ip, int port, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(ip)) return false;
-        return mode switch
-        {
-            RuleValidation.Ping => await PingAsync(ip),
-            RuleValidation.TcpPort => await TcpAsync(ip, port, ct),
-            _ => true
-        };
-    }
 
     public async Task<bool> PingAsync(string ip)
     {

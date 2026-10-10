@@ -19,6 +19,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Run tests
+        run: dotnet test tests/Matddns.Tests/Matddns.Tests.csproj --configuration Release
+
       - name: Compute version & build metadata
         id: ver
         run: |

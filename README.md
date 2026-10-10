@@ -169,6 +169,10 @@ dotnet run --project src
 
 The in-container port is `8080` (mapped to `4060` above). The UI is English throughout.
 
+**Lost the password?** There is no e-mail reset (no mail server involved). Stop the container, empty
+the `users` list in `data/config.json`, and start it again: `admin` is re-created with
+`MATDDNS_ADMIN_PASSWORD` (default `admin`). User names are free text, so an e-mail address works as one.
+
 ### The `/data` volume
 
 ```
@@ -296,7 +300,11 @@ exposes the same data as `/api/state`, nothing more.
 - **.NET 8 / ASP.NET Core Razor Pages**, cookie auth, a hosted background updater service
 - `System.Text.Json` config in `/data/config.json` (atomic + fsync'd, schema-migrated on load);
   DataProtection keys in `/data/keys`
-- Passwords hashed with **PBKDF2-SHA256**; per-IP **rate limiting** on the login and push endpoints
+- Passwords hashed with **PBKDF2-SHA256** (600,000 iterations; older hashes are upgraded on the next
+  login, minimum length 8). Changing a password or deleting a user ends that account's sessions.
+- Per-IP **rate limiting** on the login page, the push endpoints and the monitoring API; request URLs
+  (which carry tokens) are kept out of the application log
+- Tests: `dotnet test tests/Matddns.Tests` (unit tests plus integration tests against the real app)
 - Docker (`mcr.microsoft.com/dotnet/aspnet:8.0`, non-root, `tzdata` for time zones)
 - GitHub Actions publishing to GHCR on every push to `main`
 

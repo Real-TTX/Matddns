@@ -13,5 +13,5 @@ public class IndexModel : PageModel
     [Microsoft.AspNetCore.Mvc.TempData] public string? Notice { get; set; }
     [Microsoft.AspNetCore.Mvc.TempData] public string? Error { get; set; }
 
-    public void OnGet() => Groups = _config.Read(c => c.Sources.ToList());
+    public void OnGet() => Groups = _config.Current.Sources;
 }

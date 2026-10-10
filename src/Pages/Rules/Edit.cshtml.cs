@@ -53,7 +53,7 @@ public class EditModel : PageModel
         LoadLookups();
         if (!string.IsNullOrEmpty(id))
         {
-            RuleItem = _config.Read(c => c.Rules.FirstOrDefault(r => r.Id == id));
+            RuleItem = _config.Current.Rules.FirstOrDefault(r => r.Id == id);
             if (RuleItem == null) { Error = "Rule not found"; return RedirectToPage("Index"); }
         }
         return Page();

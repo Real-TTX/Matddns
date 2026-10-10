@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Matddns.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -38,17 +37,26 @@ public class LoginModel : PageModel
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {
-        var user = _config.Read(c => c.Users.FirstOrDefault(u =>
-            u.Username.Equals(Username, StringComparison.OrdinalIgnoreCase)));
+        var user = _config.Current.Users.FirstOrDefault(u =>
+            u.Username.Equals(Username, StringComparison.OrdinalIgnoreCase));
         // verify unconditionally (dummy hash if the user doesn't exist) so the response time doesn't reveal valid usernames
         var passwordOk = _auth.Verify(Password, user?.PasswordHash ?? AuthService.DummyHash);
         if (user != null && passwordOk)
         {
-            var claims = new[] { new Claim(ClaimTypes.Name, user.Username) };
-            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            if (_auth.NeedsRehash(user.PasswordHash))
+            {
+                var upgradedHash = _auth.Hash(Password);
+                _config.Mutate(c =>
+                {
+                    var stored = c.Users.FirstOrDefault(u => u.Username == user.Username);
+                    if (stored != null) stored.PasswordHash = upgradedHash;
+                });
+                user.PasswordHash = upgradedHash;
+            }
+
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(identity),
+                AuthService.CreatePrincipal(user),
                 new AuthenticationProperties { IsPersistent = true });
             _log.Log(Services.LogLevel.Info, "auth", $"login ok: {Username}");
             return SafeRedirect(returnUrl);

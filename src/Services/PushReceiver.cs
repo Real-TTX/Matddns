@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using Matddns.Models;
 
 namespace Matddns.Services;
@@ -114,6 +115,8 @@ public class PushReceiver
             return Reject(grp, "dynamic rule is not fully configured (target zone / namespace)", callerIp);
         if (string.IsNullOrEmpty(host))
             return Reject(grp, "no hostname supplied", callerIp);
+        if (!IsValidHostname(host))
+            return Reject(grp, "not a valid hostname", callerIp);
         if (!(host == baseFqdn || host.EndsWith("." + baseFqdn, StringComparison.Ordinal)))
         {
             _log.Log(LogLevel.Warn, $"src:{grp.Name}", $"dynamic push rejected: '{host}' is not under {baseFqdn} (from {callerIp ?? "?"})");
@@ -169,6 +172,14 @@ public class PushReceiver
         _log.Log(LogLevel.Warn, $"src:{grp.Name}", $"dynamic push rejected: {reason} (from {callerIp ?? "?"})");
         return new PushOutcome(400, "no-host", false, null, null, reason);
     }
+
+    // Dot-separated DNS labels (letters, digits, '-', '_'; 1-63 chars, not starting/ending with '-'), at most 253 characters in total.
+    private static readonly Regex HostnamePattern = new(
+        @"^(?=.{1,253}$)[a-z0-9_]([a-z0-9_-]{0,61}[a-z0-9_])?(\.[a-z0-9_]([a-z0-9_-]{0,61}[a-z0-9_])?)*$",
+        RegexOptions.Compiled);
+
+    /// <summary>Expects an already lower-cased hostname without a trailing dot.</summary>
+    public static bool IsValidHostname(string host) => HostnamePattern.IsMatch(host);
 
     /// <summary>Reads the password from an HTTP Basic auth header value, or null.</summary>
     public static string? BasicAuthPassword(string? authHeader)
