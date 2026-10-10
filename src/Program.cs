@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Matddns.Api;
 using Matddns.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
@@ -39,7 +40,8 @@ builder.Services.AddSingleton<ReachabilityChecker>();
 builder.Services.AddSingleton<StatusService>();
 builder.Services.AddSingleton<TimeZoneService>();
 builder.Services.AddSingleton<PushReceiver>();
-builder.Services.AddHostedService<UpdaterService>();
+builder.Services.AddSingleton<UpdaterService>(); // also injected by the management API (POST /api/v1/run)
+builder.Services.AddHostedService(sp => sp.GetRequiredService<UpdaterService>());
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opt =>
@@ -194,6 +196,9 @@ async Task<IResult> DynDns2Update(HttpContext ctx, PushReceiver push)
 }
 app.MapGet("/nic/update", DynDns2Update).AllowAnonymous().RequireRateLimiting("dyndns");
 app.MapGet("/update", DynDns2Update).AllowAnonymous().RequireRateLimiting("dyndns");
+
+// Management API for Mattiverse (/api/v1): guarded by the X-Api-Key header (MATDDNS_API_KEY), not by the cookie login.
+app.MapManagementApi();
 
 app.Services.GetRequiredService<ConfigService>().EnsureLoaded();
 

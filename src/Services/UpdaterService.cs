@@ -20,6 +20,9 @@ public class UpdaterService : BackgroundService
     private readonly SourceResolver _resolver;
     private readonly ReachabilityChecker _reach;
 
+    // one evaluation pass at a time: the periodic loop and an on-demand run (management API) never overlap
+    private readonly SemaphoreSlim _pass = new(1, 1);
+
     public UpdaterService(
         ConfigService config,
         LogService log,
@@ -63,8 +66,13 @@ public class UpdaterService : BackgroundService
         {
             try
             {
-                await RefreshSourcesAsync(stoppingToken);
-                await RunRulesAsync(stoppingToken);
+                await _pass.WaitAsync(stoppingToken);
+                try
+                {
+                    await RefreshSourcesAsync(stoppingToken);
+                    await RunRulesAsync(stoppingToken);
+                }
+                finally { _pass.Release(); }
                 if ((DateTime.UtcNow - lastRetention).TotalHours >= 1)
                 {
                     _log.ApplyRetention();
@@ -77,6 +85,22 @@ public class UpdaterService : BackgroundService
             }
             try { await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken); } catch { }
         }
+    }
+
+    /// <summary>
+    /// Runs one evaluation pass now instead of waiting for the next 15-second cycle (management API <c>POST /api/v1/run</c>):
+    /// refreshes the sources that are due and evaluates every enabled rule, ignoring the error back-off. A rule whose
+    /// chosen value did not change is not written again, so this never causes needless DNS updates.
+    /// </summary>
+    public async Task RunNowAsync(CancellationToken ct)
+    {
+        await _pass.WaitAsync(ct);
+        try
+        {
+            await RefreshSourcesAsync(ct);
+            await RunRulesAsync(ct, force: true);
+        }
+        finally { _pass.Release(); }
     }
 
     private async Task RefreshSourcesAsync(CancellationToken ct)
@@ -310,7 +334,7 @@ public class UpdaterService : BackgroundService
         });
     }
 
-    private async Task RunRulesAsync(CancellationToken ct)
+    private async Task RunRulesAsync(CancellationToken ct, bool force = false)
     {
         var cfg = _config.Current;
         var now = DateTime.UtcNow;
@@ -319,7 +343,7 @@ public class UpdaterService : BackgroundService
             if (!rule.Enabled) continue;
             if (rule.Dynamic) continue; // push-driven; written by PushReceiver, not polled here
             var signature = SourceSignature(rule, cfg);
-            if (!RuleDue(rule, now, signature)) continue;
+            if (!force && !RuleDue(rule, now, signature)) continue;
 
             try { await RunSingleRuleAsync(rule, cfg, signature, ct); }
             catch (Exception ex)

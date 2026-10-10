@@ -167,6 +167,30 @@ public class ConfigService
         }
     }
 
+    /// <summary>
+    /// Like <see cref="Mutate"/>, but all-or-nothing and with a result: if the function throws (e.g. a validation
+    /// error found after part of the change was applied) the in-memory config is restored and nothing is saved.
+    /// Used by the management API, where one request can touch several objects.
+    /// </summary>
+    public T Transact<T>(Func<AppConfig, T> change)
+    {
+        lock (_lock)
+        {
+            var snapshot = CloneFrom(_config);
+            try
+            {
+                var result = change(_config);
+                SaveInternal();
+                return result;
+            }
+            catch
+            {
+                _config = snapshot;
+                throw;
+            }
+        }
+    }
+
     public T Read<T>(Func<AppConfig, T> reader)
     {
         lock (_lock) return reader(_config);
