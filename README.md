@@ -53,8 +53,9 @@ its IP into Matddns just like it would to any DynDNS provider.
 - **Dual-stack**: every source carries an optional IPv4 and IPv6 (IPv6-only works too)
 - **Multi-user login** with **rate-limited sign-in**, a per-install **time zone**, an adjustable
   **log level** with retention, and an optional **read-only public dashboard**
-- **Monitoring API** (`/api/health`, `/api/state`) and one **.NET 8 container** with a single
-  `/data` volume; CI publishes the image to GHCR on every push
+- **Monitoring API** (`/api/health`, `/api/state`), an optional key-protected
+  [management API](#management-api-for-mattiverse) to provision sources, domains and rules,
+  and one **.NET 8 container** with a single `/data` volume; CI publishes the image to GHCR on every push
 
 ## Screenshots
 
@@ -163,6 +164,7 @@ dotnet run --project src
 | Variable | Default | Meaning |
 |---|---|---|
 | `MATDDNS_ADMIN_PASSWORD` | `admin` | Initial password for `admin` on first start |
+| `MATDDNS_API_KEY` | – | Key for the [management API](#management-api-for-mattiverse) (`X-Api-Key` header; config key `Matddns:ApiKey`). Unset = the API is disabled (`503`) |
 | `MATDDNS_DATA` | `/data` | Data directory (config, log, keys) |
 | `MATDDNS_FORWARDED_HEADERS` | – | Set to `true` behind a TLS reverse proxy to honor `X-Forwarded-Proto`/`-For` (secure cookie + real client IP) |
 | `TZ` | – | Time zone for UI timestamps (the log and `/api/*` stay UTC) |
@@ -291,9 +293,143 @@ curl http://localhost:4060/api/health   # point a monitor here and alert on a no
 Keep Matddns on a trusted network or behind a reverse proxy; the optional public dashboard
 exposes the same data as `/api/state`, nothing more.
 
+## Management API (for Mattiverse)
+
+Mattiverse installs Docker apps and gives each one a DNS record. For that it provisions Matddns through a small REST API
+under **`/api/v1`**, which manages exactly what the UI manages: **sources**, **domains** (a provider account with its
+records) and **rules**. Whatever the API writes is visible and editable in the UI.
+
+**Enable it** by setting a key; without one the API answers `503` and cannot be reached at all:
+
+```yaml
+    environment:
+      - MATDDNS_API_KEY=<a long random string>      # or the config key Matddns:ApiKey
+```
+
+Every request carries the key in the **`X-Api-Key`** header (compared in constant time). A missing or wrong key is `401`.
+The login cookie is ignored, and the API paths are never redirected to the login page. Bodies and answers are JSON in the same
+camelCase as `config.json`; errors are `{"error": "..."}` with `400` (invalid input), `404`, `409` (conflict) or `500`.
+
+| Method and path | What it does |
+|---|---|
+| `GET /api/v1/status` | `{"ok":true,"app":"matddns","version":"<footer version>","apiVersion":1,"counts":{"sources":n,"domains":n,"rules":n}}` |
+| `GET /api/v1/sources` · `POST /api/v1/sources` · `DELETE /api/v1/sources/{id}` | list · upsert · delete a source |
+| `GET /api/v1/domains` · `POST /api/v1/domains` · `DELETE /api/v1/domains/{id}` | list · upsert · delete a domain group |
+| `GET /api/v1/rules` · `POST /api/v1/rules` · `DELETE /api/v1/rules/{id}` | list · upsert · delete a rule |
+| `POST /api/v1/run` | evaluate all rules now, like the periodic check; answers `{"ok":true}` |
+
+`DELETE` answers `204` (`404` if the id does not exist). Ids are the 32-character hex ids of `config.json`; every answer carries them.
+
+**Upserts are idempotent.** Repeating a `POST` with the same body changes nothing: no duplicate objects, ids stay stable.
+The object is found by `id` (an unknown id is `404`), else by `name` (case-insensitive; `409` if several objects share the name) for
+sources and domain groups, and by (`domainGroupId`, `domainEntryId`) for rules. A property that is left out of the body keeps its
+stored value; send it to change it. Unknown properties are ignored, so an object read with `GET` can be sent back after editing.
+`kind` is required when creating and cannot be changed afterwards.
+
+**Sources** (`name`, `kind`, `intervalSeconds`, the kind's settings object, `managedBy`):
+
+- `kind` is `PublicIp`, `Unifi`, `Static`, `Push`, `Dns`, `Fritzbox`, `UnifiCloud` or `Matddns`; the settings object is named after the kind
+  (`unifi`, `static`, `push`, `dns`, `fritzbox`, `unifiCloud`, `matddns`), with the fields of the UI form
+  (e.g. `{"static": {"ip": "203.0.113.7", "ipv6": ""}}`, `{"dns": {"hostname": "x.myfritz.net"}}`).
+- A new `PublicIp`, `Static`, `Push`, `Dns` or `Fritzbox` source gets its single entry exactly like the UI creates it. For `Unifi`,
+  `UnifiCloud` and `Matddns` the body may carry `entries: [{id?, label, interfaceName}]` (the complete list, matched by `id`, else by
+  `interfaceName`); for the other kinds the engine owns the entry and the list is ignored.
+- `intervalSeconds` is at least 15 (default 60; `Push` sources are never polled).
+- Deleting a source (or an entry) drops it from the failover lists of the rules, as the UI does.
+- Secrets (UniFi/FRITZ!Box password, UniFi Cloud key, push and peer tokens) are accepted but never returned; the answer says
+  `"credentialsSet": true|false` instead.
+
+**Domain groups** (`name`, `kind`, the kind's settings object, `entries`, `managedBy`):
+
+- `kind` is `DynDns`, `Netcup`, `Cloudflare`, `Hetzner`, `GoDaddy` or `Matddns` (peer); the settings object is `dynDns`, `netcup`,
+  `cloudflare`, `hetzner`, `goDaddy` or `matddns`, e.g. `{"cloudflare": {"apiToken": "...", "allowDynamic": true}}`.
+- **Credentials are never returned** (Cloudflare/Hetzner token, Netcup customer number/key/password, GoDaddy key/secret, DynDNS
+  URL/user/password, peer token); the answer has `"credentialsSet": true|false`. When a later upsert leaves the credentials out
+  (or empty), the stored ones are kept.
+- **`entries` is the complete list of the group's records:** `[{id?, hostname, type: "A"|"AAAA"|"CNAME", recordName?, domain?}]`.
+  A record is matched by `id`, else by (`hostname`, `type`) and keeps its id; a record that is not in the list is removed; a new one
+  is created. Leave `entries` out to leave the records alone (`[]` removes all of them).
+- **Removing a record that a rule still uses is refused with `409`** (the message names the rule), and nothing is changed. The API
+  never deletes a rule as a side effect: delete the rule first, then send the shorter list. (The UI, in contrast, deletes the rules
+  together with the record.) Likewise `DELETE /domains/{id}` is `409` while rules use the group.
+- Records follow the UI: `hostname` is a valid FQDN; Netcup, Cloudflare, Hetzner and GoDaddy are zone-based and also store the zone
+  (`domain`) and record name (`recordName`), derived from the hostname unless you send them (send `domain` for zones such as
+  `example.co.uk`); DynDNS and Matddns-peer groups store just the FQDN and cannot have `CNAME` records.
+
+**Rules** (`enabled`, `onChange`, `intervalSeconds`, `validatePing`, `validateTcp`, `validationPort`, `domainGroupId`,
+`domainEntryId`, `sourceEntryIdsInOrder`, `cnameTargets`, `managedBy`):
+
+- The group and the record must exist, and every id in `sourceEntryIdsInOrder` must be a source entry (the failover order).
+  `cnameTargets` has one target per source (needed for `CNAME` records); a source that stays in the list keeps its target.
+- `intervalSeconds` is `0` (off) or at least 15, `validationPort` 1-65535. As in the UI, ping/TCP validation forces a re-check
+  interval (60 s if none is set) and at least one trigger always stays on.
+- The dynamic (pattern) rules of the UI are not part of the API.
+
+**Effect.** Every write is validated completely first (an invalid request changes nothing), then saved atomically like a UI change.
+The background updater reads the configuration every 15 seconds, so a change takes effect without a restart within that time;
+`POST /api/v1/run` does it right now (it refreshes the sources and evaluates every enabled rule, ignoring the error back-off; a
+record whose value did not change is not written again).
+
+**`managedBy`.** Sources, domain groups and rules take an optional string `managedBy` (Mattiverse sends `"mattiverse"`). It is stored
+in `config.json`, returned by the API (`null` when unset; `""` clears it) and shown in the lists and on the edit pages as a
+**Managed by Mattiverse** badge ("Created by Mattiverse. Manual changes may be overwritten."). Editing such an object in the UI keeps
+the field. It is optional, so older `config.json` files load unchanged and need no schema migration.
+
+### Example: one app, from nothing to a DNS record
+
+Create the source of the IP, a Cloudflare group with two records and a rule per record (`jq` only picks the ids out of the answers):
+
+```bash
+API=http://localhost:4060/api/v1
+KEY=<the value of MATDDNS_API_KEY>
+api() { curl -fsS -H "X-Api-Key: $KEY" -H 'Content-Type: application/json' "$@"; }
+
+# 1. where the IP comes from: the container's own public IP
+SRC=$(api -X POST $API/sources -d '{"name":"Public IP","kind":"PublicIp","managedBy":"mattiverse"}')
+SRC_ENTRY=$(echo "$SRC" | jq -r '.entries[0].id')
+
+# 2. a Cloudflare account with two records
+DOM=$(api -X POST $API/domains -d '{
+  "name": "Cloudflare", "kind": "Cloudflare", "managedBy": "mattiverse",
+  "cloudflare": { "apiToken": "<Cloudflare token with Zone.DNS edit>", "allowDynamic": true },
+  "entries": [
+    { "hostname": "nextcloud.example.com", "type": "A" },
+    { "hostname": "paperless.example.com", "type": "A" }
+  ]
+}')
+DOM_ID=$(echo "$DOM" | jq -r '.id')
+
+# 3. a rule per record: follow the public IP
+for ENTRY in $(echo "$DOM" | jq -r '.entries[].id'); do
+  api -X POST $API/rules -d "{
+    \"domainGroupId\": \"$DOM_ID\", \"domainEntryId\": \"$ENTRY\",
+    \"sourceEntryIdsInOrder\": [\"$SRC_ENTRY\"], \"managedBy\": \"mattiverse\"
+  }"
+done
+
+# 4. write the records now instead of within 15 seconds
+api -X POST $API/run
+```
+
+Running the same calls again changes nothing. To remove one host, delete its rule, then send the group with the shorter list
+(the other record keeps its id and its rule):
+
+```bash
+api -X DELETE $API/rules/<id of the paperless rule>
+api -X POST $API/domains -d '{"name":"Cloudflare","entries":[{"hostname":"nextcloud.example.com","type":"A"}]}'
+```
+
+`scripts/api-test.sh <base-url> <api-key>` runs this whole flow plus the validation and conflict cases with plain `curl`, against
+a throw-away instance, and removes what it created (without a key it just checks that the API answers `503`):
+
+```bash
+docker run -d --name matddns-test -p 18702:8080 -e MATDDNS_API_KEY=testkey matddns:local
+scripts/api-test.sh http://localhost:18702 testkey
+```
+
 ## How it is built
 
-- **.NET 8 / ASP.NET Core Razor Pages**, cookie auth, a hosted background updater service
+- **.NET 8 / ASP.NET Core Razor Pages**, cookie auth (the management API uses a key instead), a hosted background updater service
 - `System.Text.Json` config in `/data/config.json` (atomic + fsync'd, schema-migrated on load);
   DataProtection keys in `/data/keys`
 - Passwords hashed with **PBKDF2-SHA256**; per-IP **rate limiting** on the login and push endpoints
@@ -309,7 +445,9 @@ shows version, build and date. Local builds show `local · build local`.
 between the stored version and `CurrentSchemaVersion`, then stamps the new version and saves. A
 fresh install starts at the current version; an older config is upgraded in place. To change the
 data shape: raise `CurrentSchemaVersion`, append a `MigrateVXToVY` step (append-only), and raise
-the release minor (`MAJOR_MINOR` in the CI workflow).
+the release minor (`MAJOR_MINOR` in the CI workflow). A new *optional* property (such as `managedBy`)
+needs no migration: a missing property loads as its default, an unknown one is ignored, and the
+property is only written when it has a value.
 
 ## License
 
