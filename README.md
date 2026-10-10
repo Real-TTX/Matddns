@@ -53,6 +53,9 @@ its IP into Matddns just like it would to any DynDNS provider.
 - **Dual-stack**: every source carries an optional IPv4 and IPv6 (IPv6-only works too)
 - **Multi-user login** with **rate-limited sign-in**, a per-install **time zone**, an adjustable
   **log level** with retention, and an optional **read-only public dashboard**
+- **Installable web app (PWA)** for phone and desktop: light/dark/system theme, safe-area aware on
+  iOS and Android, and an offline mode that shows the last known dashboard (see
+  [Install as an app](#install-as-an-app-pwa))
 - **Monitoring API** (`/api/health`, `/api/state`) and one **.NET 8 container** with a single
   `/data` volume; CI publishes the image to GHCR on every push
 
@@ -80,6 +83,13 @@ ping/TCP validation and the check interval are set per rule.
 
 Domains group your records per provider zone; System holds general settings, users and the
 API docs.
+
+### On the phone
+
+![The dashboard on a phone in light and dark, and the menu](docs/images/mobile.png)
+
+The same pages work at phone width: the menu becomes a drawer, wide tables keep their key
+columns, and the theme follows the system unless you pick one in the menu.
 
 ## Quick start
 
@@ -295,9 +305,39 @@ curl http://localhost:4060/api/health   # point a monitor here and alert on a no
 Keep Matddns on a trusted network or behind a reverse proxy; the optional public dashboard
 exposes the same data as `/api/state`, nothing more.
 
+## Install as an app (PWA)
+
+Matddns is an installable web app. Installing needs **HTTPS** (or `localhost`) – put it behind a
+TLS reverse proxy and set `MATDDNS_FORWARDED_HEADERS=true`.
+
+| Platform | How |
+|---|---|
+| Android / Chrome, desktop Chrome / Edge | the **Install app** button in the menu (or the browser's install icon) |
+| iOS / Safari | **Share → Add to Home Screen** (iOS has no install button for web apps) |
+
+**Offline and reconnecting**
+
+- Offline, the **dashboard** shows the last copy that was loaded, marked as "last known state".
+  Every other page shows an offline screen that retries by itself and opens the page you wanted as
+  soon as the server answers.
+- Forms are **not** sent while offline (nothing is queued or replayed): the page stays as it is so
+  nothing you typed is lost, and a banner says so.
+- When the connection returns, read-only pages reload so no stale data stays on screen. The dashboard
+  also refreshes itself every 30 s while it is visible, and when the app comes back to the foreground.
+- Only the dashboard copy and the app files (styles, scripts, icons) are kept on the device. **Signing
+  out deletes the dashboard copy.** Pages with tokens or credentials are never stored.
+- A short "loading" bar and a busy button show that a request is running, so a slow DynDNS call can't be
+  sent twice by a second tap.
+
+**On phones:** pinch zoom stays available, form fields are 16 px so iOS doesn't zoom when one gets
+focus, and the layout respects the notch and the home indicator. The status bar follows the chosen
+theme (`theme-color`); on iOS the installed app uses a translucent status bar.
+
 ## How it is built
 
 - **.NET 8 / ASP.NET Core Razor Pages**, cookie auth, a hosted background updater service
+- UI in the design system of the sibling project Mattiverse (plain CSS and JavaScript, no build
+  step, inline SVG icons); the service worker (`sw.js`) is versioned with the build
 - `System.Text.Json` config in `/data/config.json` (atomic + fsync'd, schema-migrated on load);
   DataProtection keys in `/data/keys`
 - Passwords hashed with **PBKDF2-SHA256** (600,000 iterations; older hashes are upgraded on the next

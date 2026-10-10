@@ -126,7 +126,19 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        // The service worker, manifest and offline page must never be served from a stale HTTP cache; assets that carry
+        // their build tag (?v=) can be cached for good.
+        var file = ctx.File.Name;
+        ctx.Context.Response.Headers.CacheControl =
+            file is "sw.js" or "manifest.webmanifest" or "offline.html" ? "no-cache"
+            : ctx.Context.Request.Query.ContainsKey("v") ? "public, max-age=31536000, immutable"
+            : "public, max-age=3600";
+    }
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();

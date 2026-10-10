@@ -1,92 +1,101 @@
 @page
 @model Matddns.Pages.Sources.IndexModel
 @{
-    ViewData["Title"] = "Sources – Matddns";
+    ViewData["Title"] = "Sources";
+    ViewData["Reconnect"] = "reload";
 }
 
-<div class="page-header">
-    <div><h1>Sources</h1></div>
-    <a class="button" href="/Sources/Edit">+ New source</a>
+<div class="page-head">
+    <div class="page-head__title"><h1>Sources</h1></div>
 </div>
 
-@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
-@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert err">@Model.Error</div> }
+@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert alert--success"><icon name="check-circle" /><span>@Model.Notice</span></div> }
+@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert alert--error"><icon name="x-circle" /><span>@Model.Error</span></div> }
 
 @if (Model.Groups.Count == 0)
 {
-    <div class="empty-state">
-        No sources yet.<br />
-        <a class="button" style="margin-top:12px;" href="/Sources/Edit">Create the first source</a>
+    <div class="card">
+        <div class="empty-state">
+            <div><icon name="network" /></div>
+            <p>No sources yet.</p>
+            <a class="mat-btn mat-btn--primary" href="/Sources/Edit"><icon name="plus" /><span>Create the first source</span></a>
+        </div>
     </div>
 }
 else
 {
-    <div data-dt>
-        <div class="table-toolbar">
-            <div class="dt-search">
-                <span class="ico">⌕</span>
-                <input type="text" data-dt-search placeholder="Search sources, IPs…" autocomplete="off" />
+    <div class="mat-table" data-dt>
+        <div class="mat-table__toolbar">
+            <div class="search">
+                <icon name="search" />
+                <input type="search" data-dt-search class="mat-input" placeholder="Search sources, IPs…" autocomplete="off" enterkeyhint="search" />
             </div>
-            <select data-dt-filter="kind" aria-label="Filter by type">
-                <option value="">All types</option>
-                <option value="publicip">Public IP</option>
-                <option value="unifi">Unifi</option>
-                <option value="unificloud">UniFi Cloud</option>
-                <option value="static">Static</option>
-                <option value="push">DynDNS Server</option>
-                <option value="dns">DNS lookup</option>
-                <option value="fritzbox">FRITZ!Box</option>
-                <option value="matddns">Matddns peer</option>
-            </select>
-            <span class="dt-count" data-dt-count></span>
+            <div class="toolbar-field">
+                <label for="filter-kind">Type</label>
+                <select id="filter-kind" data-dt-filter="kind" class="mat-select">
+                    <option value="">All types</option>
+                    <option value="publicip">Public IP</option>
+                    <option value="unifi">Unifi</option>
+                    <option value="unificloud">UniFi Cloud</option>
+                    <option value="static">Static</option>
+                    <option value="push">DynDNS Server</option>
+                    <option value="dns">DNS lookup</option>
+                    <option value="fritzbox">FRITZ!Box</option>
+                    <option value="matddns">Matddns peer</option>
+                </select>
+            </div>
+            <span class="mat-table__count" data-dt-count></span>
         </div>
-        <div class="dtable-wrap">
-            <table class="dtable">
-                <thead>
-                    <tr><th>Name</th><th class="hide-sm">Type</th><th>IPv4</th><th class="hide-sm">IPv6</th><th>Status</th><th></th></tr>
-                </thead>
-                @foreach (var g in Model.Groups)
-                {
-                    var hasErr = g.Entries.Any(e => e.LastError != null);
-                    var hasIp = g.Entries.Any(e => !string.IsNullOrEmpty(e.CurrentIp) || !string.IsNullOrEmpty(e.CurrentIpv6));
-                    var dot = hasErr ? "err" : (hasIp ? "ok" : "warn");
-                    var statusText = hasErr ? "error" : (hasIp ? "ok" : "pending");
-                    var kindLabel = g.Kind switch { SourceKind.Unifi => "Unifi", SourceKind.UnifiCloud => "UniFi Cloud", SourceKind.Static => "Static", SourceKind.Push => "DynDNS Server", SourceKind.Dns => "DNS lookup", SourceKind.Fritzbox => "FRITZ!Box", SourceKind.Matddns => "Matddns peer", _ => "Public IP" };
-                    var kindKey = g.Kind.ToString().ToLowerInvariant();
-                    var schedule = g.Kind == SourceKind.Push ? "push-driven" : (g.IntervalSeconds > 0 ? $"every {g.IntervalSeconds}s" : "no polling");
-                    var entries = g.Entries.ToList();
-                    var multi = entries.Count > 1;
-                    var first = entries.FirstOrDefault();
-                    var search = $"{g.Name} {kindLabel} {string.Join(' ', entries.Select(e => $"{e.Label} {e.CurrentIp} {e.CurrentIpv6}"))}";
-                    <tbody class="dt-group" data-search="@search" data-kind="@kindKey" data-href="/Sources/Edit?id=@g.Id">
-                        <tr class="dt-parent @(multi ? "has-children" : "")">
-                            <td class="dt-name">@g.Name</td>
-                            <td class="hide-sm"><span class="badge info">@kindLabel</span> <span class="muted-small">@schedule</span></td>
-                            <td class="mono">@(multi ? "" : (first?.CurrentIp ?? "—"))</td>
-                            <td class="mono hide-sm">@(multi ? "" : (first?.CurrentIpv6 ?? "—"))</td>
-                            <td><span class="status-pill"><span class="status-dot @dot"></span>@statusText</span></td>
-                            <td class="dt-go">›</td>
-                        </tr>
-                        @if (multi)
+        <div class="mat-table__scroll">
+        <table class="data dtable">
+            <thead>
+                <tr><th>Name</th><th class="hide-sm">Type</th><th>IPv4</th><th class="hide-sm">IPv6</th><th>Status</th><th></th></tr>
+            </thead>
+            @foreach (var g in Model.Groups)
+            {
+                var hasErr = g.Entries.Any(e => e.LastError != null);
+                var hasIp = g.Entries.Any(e => !string.IsNullOrEmpty(e.CurrentIp) || !string.IsNullOrEmpty(e.CurrentIpv6));
+                var dot = hasErr ? "err" : (hasIp ? "ok" : "warn");
+                var statusText = hasErr ? "error" : (hasIp ? "ok" : "pending");
+                var kindLabel = g.Kind switch { SourceKind.Unifi => "Unifi", SourceKind.UnifiCloud => "UniFi Cloud", SourceKind.Static => "Static", SourceKind.Push => "DynDNS Server", SourceKind.Dns => "DNS lookup", SourceKind.Fritzbox => "FRITZ!Box", SourceKind.Matddns => "Matddns peer", _ => "Public IP" };
+                var kindKey = g.Kind.ToString().ToLowerInvariant();
+                var schedule = g.Kind == SourceKind.Push ? "push-driven" : (g.IntervalSeconds > 0 ? $"every {g.IntervalSeconds}s" : "no polling");
+                var entries = g.Entries.ToList();
+                var multi = entries.Count > 1;
+                var first = entries.FirstOrDefault();
+                var search = $"{g.Name} {kindLabel} {string.Join(' ', entries.Select(e => $"{e.Label} {e.CurrentIp} {e.CurrentIpv6}"))}";
+                <tbody class="dt-group" data-search="@search" data-kind="@kindKey" data-href="/Sources/Edit?id=@g.Id">
+                    <tr class="dt-parent @(multi ? "has-children" : "")">
+                        <td class="dt-name">@g.Name</td>
+                        <td class="hide-sm"><span class="mat-badge">@kindLabel</span> <span class="text-muted small">@schedule</span></td>
+                        <td class="mono">@(multi ? "" : (first?.CurrentIp ?? "—"))</td>
+                        <td class="mono hide-sm">@(multi ? "" : (first?.CurrentIpv6 ?? "—"))</td>
+                        <td><span class="pill @Ui.Pill(dot)">@statusText</span></td>
+                        <td class="dt-go"><icon name="chevron-right" /></td>
+                    </tr>
+                    @if (multi)
+                    {
+                        for (int i = 0; i < entries.Count; i++)
                         {
-                            for (int i = 0; i < entries.Count; i++)
-                            {
-                                var e = entries[i];
-                                var est = e.LastError != null ? "err" : ((!string.IsNullOrEmpty(e.CurrentIp) || !string.IsNullOrEmpty(e.CurrentIpv6)) ? "ok" : "warn");
-                                <tr class="dt-child @(i == entries.Count - 1 ? "last" : "")">
-                                    <td><span class="dt-sub">@e.Label</span></td>
-                                    <td class="hide-sm"></td>
-                                    <td class="mono cell-muted">@(e.CurrentIp ?? "—")</td>
-                                    <td class="mono cell-muted hide-sm">@(e.CurrentIpv6 ?? "—")</td>
-                                    <td><span class="status-pill" title="@(e.LastError ?? "")"><span class="status-dot @est"></span>@(e.LastError != null ? "error" : "ok")</span></td>
-                                    <td></td>
-                                </tr>
-                            }
+                            var e = entries[i];
+                            var est = e.LastError != null ? "err" : ((!string.IsNullOrEmpty(e.CurrentIp) || !string.IsNullOrEmpty(e.CurrentIpv6)) ? "ok" : "warn");
+                            <tr class="dt-child @(i == entries.Count - 1 ? "last" : "")">
+                                <td><span class="dt-sub">@e.Label</span></td>
+                                <td class="hide-sm"></td>
+                                <td class="mono cell-muted">@(e.CurrentIp ?? "—")</td>
+                                <td class="mono cell-muted hide-sm">@(e.CurrentIpv6 ?? "—")</td>
+                                <td><span class="pill @Ui.Pill(est)" title="@(e.LastError ?? "")">@(e.LastError != null ? "error" : "ok")</span></td>
+                                <td></td>
+                            </tr>
                         }
-                    </tbody>
-                }
-                <tbody class="dt-empty" hidden><tr><td colspan="6">No sources match your search.</td></tr></tbody>
-            </table>
+                    }
+                </tbody>
+            }
+            <tbody class="dt-empty" hidden><tr><td colspan="6">No sources match your search.</td></tr></tbody>
+        </table>
+        </div>
+        <div class="mat-table__actions">
+            <a class="mat-btn mat-btn--primary" href="/Sources/Edit"><icon name="plus" /><span>New source</span></a>
         </div>
     </div>
 }

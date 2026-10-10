@@ -1,67 +1,127 @@
 @{
     var path = Context.Request.Path.Value ?? "/";
-    bool Starts(string p) => path.StartsWith(p, StringComparison.OrdinalIgnoreCase);
-    bool DomainsActive() => Starts("/Domains");
-    var isLogin = Starts("/Login");
+    bool IsActive(string prefix) => prefix == "/"
+        ? path == "/"
+        : path.Equals(prefix, StringComparison.OrdinalIgnoreCase) || path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase);
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var isLogin = IsActive("/Login");
+    var title = ViewData["Title"] as string;
+    var assetTag = Matddns.Services.BuildInfo.CacheTag;
 }
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@(ViewData["Title"] ?? "Matddns")</title>
+    @* No maximum-scale / user-scalable: pinch zoom has to stay available. iOS focus-zoom is avoided with 16px fields instead. *@
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>@(string.IsNullOrEmpty(title) ? "Matddns" : $"{title} · Matddns")</title>
     <link rel="icon" href="~/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="~/css/site.css?v=@Matddns.Services.BuildInfo.CacheTag" />
+    <link rel="apple-touch-icon" href="~/img/apple-touch-icon.png" />
+    <link rel="manifest" href="~/manifest.webmanifest" />
+    <meta name="theme-color" id="meta-theme-color" content="#121830" />
+    <meta name="application-name" content="Matddns" />
+    <meta name="apple-mobile-web-app-title" content="Matddns" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="stylesheet" href="~/css/site.css?v=@assetTag" />
+    <script>
+        // Apply the theme before the first paint (no flash). The status-bar colour follows it.
+        (function () {
+            try {
+                var t = localStorage.getItem('matddns-theme') || 'system';
+                var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-theme-pref', t);
+                var m = document.getElementById('meta-theme-color');
+                if (m) { m.setAttribute('content', dark ? '#121830' : '#ffffff'); }
+            } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+        })();
+    </script>
 </head>
-<body class="@(isLogin ? "login" : "app")">
+<body class="@(isLogin ? "is-plain" : "is-app")">
     @if (!isLogin)
     {
-        <header class="topbar">
-            <a class="brand" href="/" title="Dashboard">
-                <span class="logo">◈</span>
-                <span class="title">Matddns</span>
-            </a>
-            <button type="button" class="navtoggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">
-                <span></span><span></span><span></span>
-            </button>
-            <div class="topbar-menu" id="topbarMenu">
-                <nav>
-                    @if (User.Identity?.IsAuthenticated == true)
+        <div class="app">
+            <input type="checkbox" id="nav-toggle" class="nav-toggle" hidden />
+            <aside class="sidebar" id="sidebar">
+                <a class="brand" href="/" aria-label="Dashboard">
+                    <img class="brand__logo" src="~/favicon.svg" alt="" width="36" height="36" />
+                    <span class="brand__text">
+                        <span class="brand__name">Matddns</span>
+                        <span class="brand__version" title="@Matddns.Services.BuildInfo.Display">@(Matddns.Services.BuildInfo.IsRelease ? "v" + Matddns.Services.BuildInfo.Version : "local build")</span>
+                    </span>
+                </a>
+
+                <nav class="sidebar__nav" aria-label="Main navigation">
+                    @if (isAuthenticated)
                     {
-                        <a class="@(Starts("/Sources") ? "active" : "")" href="/Sources">Sources</a>
-                        <a class="@(DomainsActive() ? "active" : "")" href="/Domains">Domains</a>
-                        <a class="@(Starts("/Rules") ? "active" : "")" href="/Rules">Rules</a>
-                        <a class="@(Starts("/System") ? "active" : "")" href="/System">System</a>
-                        <a class="@(Starts("/Log") ? "active" : "")" href="/Log">Log</a>
+                        <a class="nav-link @(IsActive("/") ? "is-active" : "")" href="/"><icon name="dashboard" /><span>Dashboard</span></a>
+                        <a class="nav-link @(IsActive("/Sources") ? "is-active" : "")" href="/Sources"><icon name="network" /><span>Sources</span></a>
+                        <a class="nav-link @(IsActive("/Domains") ? "is-active" : "")" href="/Domains"><icon name="globe" /><span>Domains</span></a>
+                        <a class="nav-link @(IsActive("/Rules") ? "is-active" : "")" href="/Rules"><icon name="route" /><span>Rules</span></a>
+                        <a class="nav-link @(IsActive("/System") || IsActive("/Users") ? "is-active" : "")" href="/System"><icon name="settings" /><span>System</span></a>
+                        <a class="nav-link @(IsActive("/Log") ? "is-active" : "")" href="/Log"><icon name="file" /><span>Log</span></a>
                     }
                 </nav>
-                @if (User.Identity?.IsAuthenticated == true)
-                {
-                    <form method="post" asp-page="/Logout" class="logout">
-                        <button type="submit" class="ghost">Logout</button>
-                    </form>
-                }
-                else
-                {
-                    <div class="logout"><a class="button ghost" href="/Login">Login</a></div>
-                }
+
+                <div class="sidebar__footer">
+                    <div data-install hidden>
+                        <button type="button" class="nav-link" data-install-btn><icon name="download" /><span>Install app</span></button>
+                    </div>
+
+                    @if (isAuthenticated)
+                    {
+                        <div class="account">
+                            <span class="account__avatar"><icon name="user" /></span>
+                            <span class="account__meta">
+                                <span class="account__name">@User.Identity!.Name</span>
+                            </span>
+                        </div>
+                    }
+
+                    <div class="theme-switch" role="group" aria-label="Theme">
+                        <button type="button" class="theme-switch__btn" data-theme-set="system" title="System" aria-label="System theme"><icon name="monitor" /></button>
+                        <button type="button" class="theme-switch__btn" data-theme-set="light" title="Light" aria-label="Light theme"><icon name="sun" /></button>
+                        <button type="button" class="theme-switch__btn" data-theme-set="dark" title="Dark" aria-label="Dark theme"><icon name="moon" /></button>
+                    </div>
+
+                    @if (isAuthenticated)
+                    {
+                        <form method="post" asp-page="/Logout" class="logout-form">
+                            <button type="submit" class="nav-link nav-link--logout"><icon name="logout" /><span>Sign out</span></button>
+                        </form>
+                    }
+                    else
+                    {
+                        <a class="nav-link" href="/Login"><icon name="login" /><span>Sign in</span></a>
+                    }
+                </div>
+            </aside>
+
+            <div class="content">
+                <header class="topbar">
+                    <label for="nav-toggle" class="topbar__menu" role="button" tabindex="0" aria-label="Menu" aria-controls="sidebar"><icon name="menu" /></label>
+                    <span class="topbar__title">@title</span>
+                </header>
+                @* data-autorefresh only exists on pages that asked for it: a page with a form must never reload by itself. *@
+                <main class="main" data-reconnect="@(ViewData["Reconnect"] ?? "keep")" @(ViewData["AutoRefresh"] is int refreshMs ? Html.Raw($"data-autorefresh=\"{refreshMs}\"") : null)>
+                    @RenderBody()
+                </main>
             </div>
-        </header>
-        <main class="container">
-            @RenderBody()
-        </main>
-        <footer class="appfooter">
-            <span class="build-chip">
-                <span class="logo">◈</span>
-                <span>Matddns</span>
-                <span class="mono">@Matddns.Services.BuildInfo.Display</span>
-            </span>
-        </footer>
-        <script src="~/js/tables.js?v=@Matddns.Services.BuildInfo.CacheTag"></script>
+            <label for="nav-toggle" class="nav-backdrop" aria-hidden="true"></label>
+        </div>
     }
     else
     {
-        @RenderBody()
+        <main class="plain-main">
+            @RenderBody()
+        </main>
     }
+
+    <script src="~/js/site.js?v=@assetTag" data-sw="/sw.js?v=@assetTag"></script>
+    <script src="~/js/tables.js?v=@assetTag"></script>
+    @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

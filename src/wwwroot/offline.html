@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" id="meta-theme-color" content="#121830" />
+<title>Offline · Matddns</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<style>
+  /* Self-contained on purpose: this page is served by the service worker when nothing else can be loaded. */
+  :root { --bg: #0a0e1d; --surface: #121830; --text: #eaeefc; --muted: #9aa3c7; --border: rgba(255,255,255,.12); --accent: #6366f1; --warn: #fbbf24; color-scheme: dark; }
+  [data-theme="light"] { --bg: #f1f2f9; --surface: #ffffff; --text: #151a33; --muted: #5d6385; --border: rgba(24,32,78,.14); --warn: #c77700; color-scheme: light; }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center;
+    padding: calc(24px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) calc(24px + env(safe-area-inset-left, 0px));
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text); background: radial-gradient(900px 520px at 6% -10%, rgba(99,102,241,.28), transparent 60%), var(--bg);
+  }
+  .card { width: min(420px, 100%); text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 32px 24px; box-shadow: 0 14px 50px rgba(0,0,0,.25); }
+  .icon { width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 50%; display: grid; place-items: center; color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+  .icon svg { width: 30px; height: 30px; }
+  h1 { margin: 0 0 8px; font-size: 1.4rem; letter-spacing: -.01em; }
+  p { margin: 0 0 8px; color: var(--muted); }
+  .status { min-height: 1.5em; font-size: .88rem; }
+  .buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+  button {
+    min-height: 40px; padding: 9px 20px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text);
+    font: inherit; font-weight: 600; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  button.primary { border-color: transparent; color: #fff; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 55%, #06b6d4 100%); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button[disabled] { opacity: .6; }
+  @media (pointer: coarse) { button { min-height: 44px; } }
+</style>
+<script>
+  (function () {
+    var t; try { t = localStorage.getItem('matddns-theme'); } catch (e) { }
+    var dark = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    var m = document.getElementById('meta-theme-color'); if (m) { m.setAttribute('content', dark ? '#121830' : '#ffffff'); }
+  })();
+</script>
+</head>
+<body>
+<main class="card" role="alert">
+  <div class="icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="2" x2="22" y2="22"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M2 8.82a15 15 0 0 1 4.17-2.65"/><path d="M10.66 5c4.01-.36 8.14.9 11.34 3.76"/><path d="M16.85 11.25a10 10 0 0 1 2.22 1.68"/><path d="M5 13a10 10 0 0 1 5.24-2.76"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+  </div>
+  <h1 id="title">You&rsquo;re offline</h1>
+  <p id="text">Matddns can&rsquo;t be reached right now. This page reconnects by itself as soon as the server is back.</p>
+  <p class="status" id="status" aria-live="polite"></p>
+  <div class="buttons">
+    <button type="button" class="primary" id="retry">Try again</button>
+    <button type="button" id="back" hidden>Go back</button>
+  </div>
+</main>
+<script>
+  (function () {
+    var retry = document.getElementById('retry');
+    var statusEl = document.getElementById('status');
+    var sending = !!document.querySelector('meta[name="offline-post"]'); // a form was being sent: reloading would send it again
+
+    if (sending) {
+      document.getElementById('title').textContent = 'Not saved';
+      document.getElementById('text').textContent = 'The connection was lost while sending. Go back to your form, check your entries and send it again once you’re online.';
+      retry.hidden = true;
+      var back = document.getElementById('back');
+      back.hidden = false;
+      back.className = 'primary';
+      back.addEventListener('click', function () { history.back(); });
+      return;
+    }
+
+    var checking = false;
+    function check() {
+      if (checking) { return; }
+      checking = true;
+      retry.disabled = true;
+      statusEl.textContent = 'Checking the connection…';
+      var controller = window.AbortController ? new AbortController() : null;
+      var timeout = setTimeout(function () { if (controller) { controller.abort(); } }, 5000);
+      fetch('/healthz', { cache: 'no-store', signal: controller ? controller.signal : undefined })
+        .then(function (r) { if (!r.ok) { throw new Error('down'); } statusEl.textContent = 'Connected – loading…'; location.reload(); })
+        .catch(function () { statusEl.textContent = 'Still not reachable. Trying again…'; })
+        .then(function () { clearTimeout(timeout); checking = false; retry.disabled = false; });
+    }
+    retry.addEventListener('click', check);
+    window.addEventListener('online', check);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) { check(); } });
+    setInterval(function () { if (!document.hidden) { check(); } }, 5000);
+  })();
+</script>
+</body>
+</html>

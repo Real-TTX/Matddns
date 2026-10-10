@@ -82,7 +82,12 @@ public sealed class CapturingLoggerProvider : ILoggerProvider, ILogger
         Messages.Enqueue(formatter(state, exception));
 }
 
-public class AppTests : IClassFixture<AppFactory>
+/// <summary>All integration tests share one running app (one data directory, one rate-limit state).</summary>
+[CollectionDefinition("app")]
+public sealed class AppCollection : ICollectionFixture<AppFactory> { }
+
+[Collection("app")]
+public class AppTests
 {
     private readonly AppFactory _app;
 

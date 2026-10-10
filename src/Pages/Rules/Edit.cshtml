@@ -14,116 +14,119 @@
     var isNew = Model.IsNew;
     var de = Model.TargetEntry;
     var isCname = de?.Type == DnsRecordType.CNAME;
-    ViewData["Title"] = (isNew ? "New rule" : $"{de?.Type} {de?.Hostname}") + " – Matddns";
+    ViewData["Title"] = isNew ? "New rule" : $"{de?.Type} {de?.Hostname}";
 }
 
-<a class="back-link" href="/Rules">‹ back to Rules</a>
-
-<div class="page-header">
-    <div>
-        <h1>
-            @if (isNew) { <text>New rule</text> }
-            else
-            {
-                <span class="badge info">@(de?.Type.ToString() ?? "?")</span>
-                <span class="mono">@(de?.Hostname ?? "(target missing)")</span>
-            }
-        </h1>
+<div class="page-head">
+    <div class="page-head__title">
+        @if (isNew) { <h1>New rule</h1> }
+        else
+        {
+            <span class="mat-badge">@(de?.Type.ToString() ?? "?")</span>
+            <h1 class="mono">@(de?.Hostname ?? "(target missing)")</h1>
+        }
     </div>
 </div>
 
-@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
-@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert err">@Model.Error</div> }
+@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert alert--success"><icon name="check-circle" /><span>@Model.Notice</span></div> }
+@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert alert--error"><icon name="x-circle" /><span>@Model.Error</span></div> }
 
 @if (isNew && !Model.HasAnyRecord)
 {
-    <div class="alert err">No record yet – first create a record under <a href="/Domains">Domains</a> (e.g. <span class="mono">home1.example.com (A)</span>).</div>
+    <div class="alert alert--error"><icon name="x-circle" /><span>No record yet – first create a record under <a href="/Domains">Domains</a> (e.g. <span class="mono">home1.example.com (A)</span>).</span></div>
 }
 else
 {
     @if (!isNew && !string.IsNullOrEmpty(r!.LastResult))
     {
-        var cls = r.LastResult.StartsWith("ok", StringComparison.OrdinalIgnoreCase) ? "ok"
+        var state = r.LastResult.StartsWith("ok", StringComparison.OrdinalIgnoreCase) ? "ok"
             : r.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase) ? "err" : "warn";
-        <div class="muted-small" style="margin-bottom:12px;">Last run @Tz.Format(r.LastRun) (@Tz.Label()) · <span class="badge @cls">@r.LastResult</span></div>
+        <div class="text-muted small" style="margin-bottom:14px;">Last run @Tz.Format(r.LastRun) (@Tz.Label()) · <span class="pill @Ui.Pill(state)">@r.LastResult</span></div>
     }
 
     <form method="post" asp-page-handler="@(isNew ? "Create" : "Save")">
         @if (!isNew) { <input type="hidden" name="Id" value="@r!.Id" /> }
 
         <div class="card">
-            <div class="form-grid">
-                <div class="field full">
-                    <label>Domain</label>
-                    <select name="DomainEntryRef" required>
-                        @if (isNew) { <option value="">— select —</option> }
-                        @foreach (var d in Model.AllDomains)
-                        {
-                            foreach (var entry in d.Entries)
+            <div class="card__body">
+                <div class="form-grid">
+                    <div class="mat-field span-2">
+                        <label class="mat-label" for="DomainEntryRef">Domain</label>
+                        <select id="DomainEntryRef" name="DomainEntryRef" class="mat-select" required>
+                            @if (isNew) { <option value="">— select —</option> }
+                            @foreach (var d in Model.AllDomains)
                             {
-                                var sel = r != null && d.Id == r.DomainGroupId && entry.Id == r.DomainEntryId;
-                                <option value="@(d.Id):@(entry.Id)" selected="@sel">@entry.Display · @d.Name</option>
+                                foreach (var entry in d.Entries)
+                                {
+                                    var sel = r != null && d.Id == r.DomainGroupId && entry.Id == r.DomainEntryId;
+                                    <option value="@(d.Id):@(entry.Id)" selected="@sel">@entry.Display · @d.Name</option>
+                                }
                             }
-                        }
-                    </select>
-                </div>
-
-                @if (!isNew)
-                {
-                    <div class="field">
-                        <label>Status</label>
-                        <select name="Enabled">
-                            <option value="true" selected="@r!.Enabled">enabled</option>
-                            <option value="false" selected="@(!r.Enabled)">disabled</option>
                         </select>
                     </div>
-                }
+
+                    @if (!isNew)
+                    {
+                        <div class="mat-field">
+                            <label class="mat-label" for="Enabled">Status</label>
+                            <select id="Enabled" name="Enabled" class="mat-select">
+                                <option value="true" selected="@r!.Enabled">enabled</option>
+                                <option value="false" selected="@(!r.Enabled)">disabled</option>
+                            </select>
+                        </div>
+                    }
+                </div>
             </div>
         </div>
 
-        <div class="section-title"><h2>Checks &amp; failover</h2></div>
+        <div class="section-head"><h2 class="section-title">Checks &amp; failover</h2></div>
         <div class="card">
-            <div class="form-grid">
-                <div class="field full checkbox-field">
-                    <input type="checkbox" name="OnChange" value="true" id="onChange" checked="@(r == null || r.OnChange)" />
-                    <label for="onChange">React immediately when a source IP changes</label>
-                </div>
+            <div class="card__body">
+                <div class="form-grid">
+                    <div class="mat-field span-2">
+                        <label class="mat-switch">
+                            <input type="checkbox" name="OnChange" value="true" checked="@(r == null || r.OnChange)" />
+                            <span>React immediately when a source IP changes</span>
+                        </label>
+                    </div>
 
-                <div class="field">
-                    <label>Re-check every (sec.)</label>
-                    <input type="number" name="IntervalSeconds" value="@(r?.IntervalSeconds ?? 300)" min="0" max="86400" />
-                </div>
+                    <div class="mat-field">
+                        <label class="mat-label" for="IntervalSeconds">Re-check every (sec.)</label>
+                        <input type="number" id="IntervalSeconds" name="IntervalSeconds" value="@(r?.IntervalSeconds ?? 300)" min="0" max="86400" class="mat-input" inputmode="numeric" />
+                    </div>
 
-                <div class="field full">
-                    <label>Failover validation</label>
-                    <label class="checkbox-row">
-                        <input type="checkbox" name="ValidatePing" value="true" checked="@(r != null && r.ValidatePing)" />
-                        <span>Ping (ICMP)</span>
-                    </label>
-                    <label class="checkbox-row">
-                        <input type="checkbox" name="ValidateTcp" value="true" data-validation checked="@(r != null && r.ValidateTcp)" />
-                        <span>TCP port open</span>
-                    </label>
-                </div>
+                    <div class="mat-field span-2">
+                        <span class="mat-label">Failover validation</span>
+                        <label class="mat-switch">
+                            <input type="checkbox" name="ValidatePing" value="true" checked="@(r != null && r.ValidatePing)" />
+                            <span>Ping (ICMP)</span>
+                        </label>
+                        <label class="mat-switch">
+                            <input type="checkbox" name="ValidateTcp" id="validateTcp" value="true" checked="@(r != null && r.ValidateTcp)" />
+                            <span>TCP port open</span>
+                        </label>
+                    </div>
 
-                <div class="field validation-port-field">
-                    <label>Port</label>
-                    <input type="number" name="ValidationPort" value="@(r?.ValidationPort ?? 443)" min="1" max="65535" />
+                    <div class="mat-field" data-show-if="#validateTcp" data-show-value="true" hidden="@(r == null || !r.ValidateTcp)">
+                        <label class="mat-label" for="ValidationPort">Port</label>
+                        <input type="number" id="ValidationPort" name="ValidationPort" value="@(r?.ValidationPort ?? 443)" min="1" max="65535" class="mat-input" inputmode="numeric" />
+                    </div>
                 </div>
-
             </div>
         </div>
 
         @if (isNew)
         {
-            <div class="section-title"><h2>Failover sources</h2></div>
+            <div class="section-head"><h2 class="section-title">Failover sources</h2></div>
             <div class="card">
+                <div class="card__body">
                 @if (Model.AllSources.SelectMany(s => s.Entries).Any())
                 {
                     <div id="newSrcList" class="failover-list"></div>
-                    <div class="inline-form" style="margin-top:10px;">
-                        <div class="col">
-                            <select id="newSrcSelect">
+                    <div class="form-grid">
+                        <div class="mat-field span-2">
+                            <label class="mat-label" for="newSrcSelect">Add source</label>
+                            <select id="newSrcSelect" class="mat-select">
                                 <option value="">— select source —</option>
                                 @foreach (var sg in Model.AllSources)
                                 {
@@ -135,109 +138,110 @@ else
                                 }
                             </select>
                         </div>
-                        <div><button type="button" id="newSrcAdd">+ Add</button></div>
+                    </div>
+                    <div class="mat-buttons" style="margin-top:12px;">
+                        <button type="button" id="newSrcAdd" class="mat-btn mat-btn--ghost"><icon name="plus" /><span>Add</span></button>
                     </div>
                 }
                 else
                 {
-                    <p class="muted-small" style="margin-top:0;">No sources yet — <a href="/Sources/Edit">add a source</a> first.</p>
+                    <p class="text-muted" style="margin:0;">No sources yet — <a href="/Sources/Edit">add a source</a> first.</p>
                 }
+                </div>
             </div>
         }
 
-        <div class="actions">
-            <button type="submit">@(isNew ? "Create" : "Save")</button>
-            <a class="button ghost" href="/Rules">Cancel</a>
+        <div class="mat-buttons">
+            <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>@(isNew ? "Create" : "Save")</span></button>
             @if (!isNew)
             {
-                <button type="submit" class="ghost" asp-page-handler="RunNow" asp-route-Id="@r!.Id">Run now</button>
-                <button type="submit" class="danger" asp-page-handler="Delete" asp-route-Id="@r.Id" onclick="return confirm('Delete rule?');">Delete rule</button>
+                <button type="submit" class="mat-btn mat-btn--ghost" asp-page-handler="RunNow" asp-route-Id="@r!.Id"><icon name="play" /><span>Run now</span></button>
+            }
+            <a class="mat-btn mat-btn--ghost" href="/Rules"><icon name="back" /><span>Back</span></a>
+            @if (!isNew)
+            {
+                <span class="mat-buttons__spacer"></span>
+                <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Delete" asp-route-Id="@r!.Id" data-confirm="Delete this rule?" data-confirm-ok="Delete rule"><icon name="trash" /><span>Delete rule</span></button>
             }
         </div>
     </form>
 
     @if (!isNew)
     {
-        <div class="section-title"><h2>Failover order</h2></div>
+        <div class="section-head"><h2 class="section-title">Failover order</h2></div>
         <div class="card">
-            <form method="post" asp-page-handler="SaveSources">
-                <input type="hidden" name="Id" value="@r!.Id" />
+            <div class="card__body">
+                <form method="post" asp-page-handler="SaveSources">
+                    <input type="hidden" name="Id" value="@r!.Id" />
 
-                <div class="failover-list">
-                @for (int i = 0; i < r.SourceEntryIdsInOrder.Count; i++)
-                {
-                    var sid = r.SourceEntryIdsInOrder[i];
-                    var info = Model.SourceLookup.TryGetValue(sid, out var v) ? v : null;
-                    var ip = info?.Entry.CurrentIp;
-                    var status = info == null ? "muted" : (string.IsNullOrEmpty(ip) ? "warn" : "ok");
-                    var cname = i < r.CnameTargets.Count ? r.CnameTargets[i] : "";
-                    <div class="failover-row">
-                        <span class="idx">#@(i + 1)</span>
-                        <div>
-                            <div>@(info != null ? $"{info.Group.Name} · {info.Entry.Label}" : "(unknown source)")</div>
-                            <div class="status-pill"><span class="status-dot @status"></span><span class="mono">@(ip ?? "–")</span></div>
-                        </div>
-                        <div>
+                    <div class="failover-list">
+                    @for (int i = 0; i < r.SourceEntryIdsInOrder.Count; i++)
+                    {
+                        var sid = r.SourceEntryIdsInOrder[i];
+                        var info = Model.SourceLookup.TryGetValue(sid, out var v) ? v : null;
+                        var ip = info?.Entry.CurrentIp;
+                        var status = info == null ? "muted" : (string.IsNullOrEmpty(ip) ? "warn" : "ok");
+                        var cname = i < r.CnameTargets.Count ? r.CnameTargets[i] : "";
+                        <div class="failover-row @(isCname ? "failover-row--cname" : "")">
+                            <span class="idx">#@(i + 1)</span>
+                            <div class="failover-row__name">
+                                <div>@(info != null ? $"{info.Group.Name} · {info.Entry.Label}" : "(unknown source)")</div>
+                                <span class="pill @Ui.Pill(status) mono">@(ip ?? "–")</span>
+                            </div>
                             @if (isCname)
                             {
-                                <input name="CnameTargets" value="@cname" placeholder="target.example.com" />
+                                <div><input name="CnameTargets" value="@cname" class="mat-input" placeholder="target.example.com" autocapitalize="none" spellcheck="false" /></div>
                             }
                             else
                             {
                                 <input type="hidden" name="CnameTargets" value="@cname" />
                             }
+                            <div class="row-actions">
+                                <button type="submit" class="mat-btn mat-btn--sm mat-btn--icon mat-btn--ghost" asp-page-handler="MoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid" asp-route-Dir="-1" title="Move up" aria-label="Move up" disabled="@(i == 0)"><icon name="arrow-up" /></button>
+                                <button type="submit" class="mat-btn mat-btn--sm mat-btn--icon mat-btn--ghost" asp-page-handler="MoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid" asp-route-Dir="1" title="Move down" aria-label="Move down" disabled="@(i == r.SourceEntryIdsInOrder.Count - 1)"><icon name="arrow-down" /></button>
+                                <button type="submit" class="mat-btn mat-btn--sm mat-btn--icon mat-btn--danger" asp-page-handler="RemoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid" title="Remove" aria-label="Remove source"><icon name="x" /></button>
+                            </div>
+                            <input type="hidden" name="SourceEntryIdsInOrder" value="@sid" />
                         </div>
-                        <div class="move-btns">
-                            <button type="submit" class="ghost" asp-page-handler="MoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid" asp-route-Dir="-1" title="up" disabled="@(i == 0)">↑</button>
-                            <button type="submit" class="ghost" asp-page-handler="MoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid" asp-route-Dir="1" title="down" disabled="@(i == r.SourceEntryIdsInOrder.Count - 1)">↓</button>
-                        </div>
-                        <button type="submit" class="danger" asp-page-handler="RemoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid">Remove</button>
-                        <input type="hidden" name="SourceEntryIdsInOrder" value="@sid" />
+                    }
                     </div>
-                }
-                </div>
-                @if (r.SourceEntryIdsInOrder.Count == 0)
-                {
-                    <div class="muted">No sources yet – add below.</div>
-                }
-                else
-                {
-                    <div class="actions"><button type="submit">@(isCname ? "Save order & CNAME targets" : "Save order")</button></div>
-                }
-            </form>
+                    @if (r.SourceEntryIdsInOrder.Count == 0)
+                    {
+                        <div class="text-muted">No sources yet – add below.</div>
+                    }
+                    else
+                    {
+                        <div class="mat-buttons"><button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>@(isCname ? "Save order & CNAME targets" : "Save order")</span></button></div>
+                    }
+                </form>
 
-            <form method="post" asp-page-handler="AddSource" class="inline-form" style="margin-top:16px;">
-                <input type="hidden" name="Id" value="@r!.Id" />
-                <div class="col">
-                    <label>Add source</label>
-                    <select name="SourceEntryId" required>
-                        <option value="">— select —</option>
-                        @foreach (var sg in Model.AllSources)
-                        {
-                            foreach (var se in sg.Entries)
+                <form method="post" asp-page-handler="AddSource" class="mat-form" style="margin-top:20px; padding-top:18px; border-top:1px solid var(--border);">
+                    <input type="hidden" name="Id" value="@r!.Id" />
+                    <div class="mat-field">
+                        <label class="mat-label" for="SourceEntryId">Add source</label>
+                        <select id="SourceEntryId" name="SourceEntryId" class="mat-select" required>
+                            <option value="">— select —</option>
+                            @foreach (var sg in Model.AllSources)
                             {
-                                if (r.SourceEntryIdsInOrder.Contains(se.Id)) continue;
-                                <option value="@se.Id">@SrcOption(sg, se)</option>
+                                foreach (var se in sg.Entries)
+                                {
+                                    if (r.SourceEntryIdsInOrder.Contains(se.Id)) continue;
+                                    <option value="@se.Id">@SrcOption(sg, se)</option>
+                                }
                             }
-                        }
-                    </select>
-                </div>
-                <div><button type="submit">+ Add</button></div>
-            </form>
+                        </select>
+                    </div>
+                    <div class="mat-buttons" style="margin-top:0;">
+                        <button type="submit" class="mat-btn mat-btn--ghost"><icon name="plus" /><span>Add</span></button>
+                    </div>
+                </form>
+            </div>
         </div>
     }
 }
 
+@section Scripts {
 <script>
-    (function () {
-        var tcp = document.querySelector('input[data-validation]');
-        var portField = document.querySelector('.validation-port-field');
-        if (!tcp || !portField) return;
-        function sync() { portField.style.display = tcp.checked ? '' : 'none'; }
-        tcp.addEventListener('change', sync);
-        sync();
-    })();
-
     // ordered failover-source picker on the new-rule form
     (function () {
         var sel = document.getElementById('newSrcSelect');
@@ -245,6 +249,15 @@ else
         var list = document.getElementById('newSrcList');
         if (!sel || !add || !list) return;
         var items = [];
+        function button(text, label, extra) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'mat-btn mat-btn--sm mat-btn--icon ' + extra;
+            b.textContent = text;
+            b.title = label;
+            b.setAttribute('aria-label', label);
+            return b;
+        }
         function swap(i, j) { var t = items[i]; items[i] = items[j]; items[j] = t; render(); }
         function render() {
             list.innerHTML = '';
@@ -252,18 +265,17 @@ else
                 var row = document.createElement('div');
                 row.className = 'failover-row';
                 var idx = document.createElement('span'); idx.className = 'idx'; idx.textContent = '#' + (i + 1);
-                var name = document.createElement('div'); name.textContent = it.label;
-                var spacer = document.createElement('div');
-                var moves = document.createElement('div'); moves.className = 'move-btns';
-                var up = document.createElement('button'); up.type = 'button'; up.textContent = '↑'; up.disabled = i === 0;
+                var name = document.createElement('div'); name.className = 'failover-row__name'; name.textContent = it.label;
+                var actions = document.createElement('div'); actions.className = 'row-actions';
+                var up = button('↑', 'Move up', 'mat-btn--ghost'); up.disabled = i === 0;
                 up.addEventListener('click', function () { swap(i, i - 1); });
-                var down = document.createElement('button'); down.type = 'button'; down.textContent = '↓'; down.disabled = i === items.length - 1;
+                var down = button('↓', 'Move down', 'mat-btn--ghost'); down.disabled = i === items.length - 1;
                 down.addEventListener('click', function () { swap(i, i + 1); });
-                moves.appendChild(up); moves.appendChild(down);
-                var rm = document.createElement('button'); rm.type = 'button'; rm.className = 'danger'; rm.textContent = '✕';
+                var rm = button('✕', 'Remove source', 'mat-btn--danger');
                 rm.addEventListener('click', function () { items.splice(i, 1); render(); });
                 var hid = document.createElement('input'); hid.type = 'hidden'; hid.name = 'SourceEntryIdsInOrder'; hid.value = it.id;
-                [idx, name, spacer, moves, rm, hid].forEach(function (el) { row.appendChild(el); });
+                [up, down, rm].forEach(function (el) { actions.appendChild(el); });
+                [idx, name, actions, hid].forEach(function (el) { row.appendChild(el); });
                 list.appendChild(row);
             });
         }
@@ -277,3 +289,4 @@ else
         });
     })();
 </script>
+}

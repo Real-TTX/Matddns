@@ -1,7 +1,7 @@
 // Shared data-table behaviour: live search, dropdown filters, clickable row groups.
 // Markup contract:
-//   <div data-dt> … toolbar with [data-dt-search] and/or <select data-dt-filter="kind"> …
-//     <table class="dtable">
+//   <div class="mat-table" data-dt> … toolbar with [data-dt-search] and/or <select data-dt-filter="kind"> …
+//     <table class="data dtable">
 //       <tbody class="dt-group" data-search="…" data-kind="unifi" data-href="/Sources/Edit?id=…">
 //         <tr class="dt-parent">…</tr> <tr class="dt-child">…</tr>
 //       </tbody>
@@ -47,6 +47,7 @@
             g.classList.add('clickable');
             g.addEventListener('click', function (e) {
                 if (e.target.closest('a, button, input, select, label')) return;
+                document.dispatchEvent(new Event('mat:navigate')); // shows the loading bar
                 window.location.href = href;
             });
         });
@@ -54,20 +55,8 @@
         apply();
     }
 
-    function initNav() {
-        var toggle = document.getElementById('navToggle');
-        var menu = document.getElementById('topbarMenu');
-        if (!toggle || !menu) return;
-        toggle.addEventListener('click', function () {
-            var open = menu.classList.toggle('open');
-            toggle.classList.toggle('open', open);
-            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        });
-    }
-
     function initAll() {
         Array.prototype.slice.call(document.querySelectorAll('[data-dt]')).forEach(initTable);
-        initNav();
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initAll);
