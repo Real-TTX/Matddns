@@ -380,6 +380,8 @@ td.mono, .mono {
 .badge.update { background: rgba(163, 113, 247, 0.15); color: var(--update); }
 .badge.info { background: rgba(79, 140, 255, 0.12); color: var(--accent); }
 .badge.muted { background: var(--panel-2); color: var(--muted); }
+/* "Managed by Mattiverse": the object is written by another system (managedBy), manual edits may be overwritten */
+.badge.managed { background: rgba(163, 113, 247, 0.15); color: var(--update); text-transform: none; letter-spacing: 0; margin-left: 6px; cursor: help; }
 
 .muted { color: var(--muted); }
 .muted-small { color: var(--muted); font-size: 12px; }

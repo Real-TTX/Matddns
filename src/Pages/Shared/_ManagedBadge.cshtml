@@ -1,0 +1,7 @@
+@* Small badge for objects that another system owns (the "managedBy" field, set by Mattiverse through the management API). Model: the managedBy value. *@
+@model string?
+@if (!string.IsNullOrWhiteSpace(Model))
+{
+    var who = Model.Equals("mattiverse", StringComparison.OrdinalIgnoreCase) ? "Mattiverse" : Model;
+    <span class="badge managed" title="Created by @who. Manual changes may be overwritten.">Managed by @who</span>
+}

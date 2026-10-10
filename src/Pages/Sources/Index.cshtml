@@ -60,7 +60,7 @@ else
                     var search = $"{g.Name} {kindLabel} {string.Join(' ', entries.Select(e => $"{e.Label} {e.CurrentIp} {e.CurrentIpv6}"))}";
                     <tbody class="dt-group" data-search="@search" data-kind="@kindKey" data-href="/Sources/Edit?id=@g.Id">
                         <tr class="dt-parent @(multi ? "has-children" : "")">
-                            <td class="dt-name">@g.Name</td>
+                            <td class="dt-name">@g.Name<partial name="_ManagedBadge" model="g.ManagedBy" /></td>
                             <td class="hide-sm"><span class="badge info">@kindLabel</span> <span class="muted-small">@schedule</span></td>
                             <td class="mono">@(multi ? "" : (first?.CurrentIp ?? "—"))</td>
                             <td class="mono hide-sm">@(multi ? "" : (first?.CurrentIpv6 ?? "—"))</td>

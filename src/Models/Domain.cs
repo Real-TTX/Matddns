@@ -30,6 +30,10 @@ public class DomainGroup
     public MatddnsLinkSettings? Matddns { get; set; }   // push to another Matddns instance (its JSON API)
     public List<DomainEntry> Entries { get; set; } = new();
 
+    /// <summary>Who owns this object (e.g. "mattiverse", set through the management API); null = created by hand. Shown as a badge in the UI.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? ManagedBy { get; set; }
+
     /// <summary>Zone-based API providers use a record-name + zone (like Netcup); DynDNS just uses the full FQDN.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsZoneBased => Kind is DomainKind.Netcup or DomainKind.Cloudflare or DomainKind.Hetzner or DomainKind.GoDaddy;

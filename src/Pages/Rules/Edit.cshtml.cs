@@ -82,8 +82,7 @@ public class EditModel : PageModel
         };
         // ping/TCP failover needs a periodic re-check: a source coming back up keeps its IP, so an
         // OnChange-only rule would never re-evaluate. Force a minimum interval when validation is on.
-        if ((rule.ValidatePing || rule.ValidateTcp) && rule.IntervalSeconds <= 0) rule.IntervalSeconds = 60;
-        if (!rule.OnChange && rule.IntervalSeconds <= 0) rule.OnChange = true; // keep at least one trigger active
+        rule.NormalizeTriggers();
         _config.Mutate(c => c.Rules.Add(rule));
         Notice = ordered.Count > 0 ? "Rule created" : "Rule created – add failover sources below";
         return RedirectToPage("Edit", new { id = rule.Id });
@@ -102,8 +101,7 @@ public class EditModel : PageModel
             r.ValidatePing = ValidatePing;
             r.ValidateTcp = ValidateTcp;
             // ping/TCP failover needs a periodic re-check (a recovered source keeps its IP), so force a minimum interval
-            if ((r.ValidatePing || r.ValidateTcp) && r.IntervalSeconds <= 0) r.IntervalSeconds = 60;
-            if (!r.OnChange && r.IntervalSeconds <= 0) r.OnChange = true; // keep at least one trigger active
+            r.NormalizeTriggers();
             r.Enabled = Enabled;
             if (ValidationPort is >= 1 and <= 65535) r.ValidationPort = ValidationPort;
             if (parts.Length == 2) { r.DomainGroupId = parts[0]; r.DomainEntryId = parts[1]; }

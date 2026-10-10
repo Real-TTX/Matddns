@@ -27,6 +27,7 @@
             {
                 <span class="badge info">@(de?.Type.ToString() ?? "?")</span>
                 <span class="mono">@(de?.Hostname ?? "(target missing)")</span>
+                <partial name="_ManagedBadge" model="r!.ManagedBy" />
             }
         </h1>
     </div>

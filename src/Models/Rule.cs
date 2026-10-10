@@ -40,6 +40,21 @@ public class Rule
     public List<string> SourceEntryIdsInOrder { get; set; } = new();
     public List<string> CnameTargets { get; set; } = new();
 
+    /// <summary>Who owns this object (e.g. "mattiverse", set through the management API); null = created by hand. Shown as a badge in the UI.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? ManagedBy { get; set; }
+
+    /// <summary>
+    /// Keeps the trigger settings consistent (shared by the UI and the management API): ping/TCP failover needs a
+    /// periodic re-check (a recovered source keeps its IP), so validation forces a minimum interval, and at least
+    /// one trigger always stays active.
+    /// </summary>
+    public void NormalizeTriggers()
+    {
+        if ((ValidatePing || ValidateTcp) && IntervalSeconds <= 0) IntervalSeconds = 60;
+        if (!OnChange && IntervalSeconds <= 0) OnChange = true;
+    }
+
     // Dynamic (pattern) rule: a DynDNS Server source pushes hostnames; matching records are created/updated
     // on demand in the target Netcup zone (DomainGroupId). DomainEntryId / SourceEntryIdsInOrder are unused,
     // and the updater skips it (it is push-driven, written by PushReceiver).

@@ -12,7 +12,7 @@
 
 <div class="page-header">
     <div>
-        <h1>@(isNew ? "New domain group" : g!.Name)</h1>
+        <h1>@(isNew ? "New domain group" : g!.Name)<partial name="_ManagedBadge" model="g?.ManagedBy" /></h1>
     </div>
 </div>
 

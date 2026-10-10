@@ -26,6 +26,10 @@ public class SourceGroup
     public UnifiCloudSettings? UnifiCloud { get; set; }
     public MatddnsLinkSettings? Matddns { get; set; }
     public List<SourceEntry> Entries { get; set; } = new();
+
+    /// <summary>Who owns this object (e.g. "mattiverse", set through the management API); null = created by hand. Shown as a badge in the UI.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? ManagedBy { get; set; }
 }
 
 /// <summary>Link to another Matddns instance (its base URL + a DynDNS-Server token on that instance). Used by the Matddns source (pull) and the Matddns target (push).</summary>
