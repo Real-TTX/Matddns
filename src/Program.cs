@@ -44,6 +44,7 @@ builder.Services.AddSingleton<SourceResolver>();
 builder.Services.AddSingleton<ReachabilityChecker>();
 builder.Services.AddSingleton<StatusService>();
 builder.Services.AddSingleton<TimeZoneService>();
+builder.Services.AddSingleton<Matddns.Support.Toolkit>();
 builder.Services.AddSingleton<PushReceiver>();
 builder.Services.AddHostedService<UpdaterService>();
 

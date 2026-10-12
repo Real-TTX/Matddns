@@ -29,7 +29,7 @@ public class EditModel : PageModel
         if (!string.IsNullOrEmpty(name))
         {
             var u = _config.Read(c => c.Users.FirstOrDefault(x => x.Username.Equals(name, StringComparison.OrdinalIgnoreCase)));
-            if (u == null) { Error = "User not found"; return RedirectToPage("/System"); }
+            if (u == null) { Error = "User not found"; return RedirectToPage("Index"); }
             Username = u.Username;
         }
         return Page();
@@ -53,7 +53,7 @@ public class EditModel : PageModel
 
         _config.Mutate(c => c.Users.Add(new UserAccount { Username = nm, PasswordHash = _auth.Hash(NewPassword) }));
         Notice = $"User '{nm}' created";
-        return RedirectToPage("/System");
+        return RedirectToPage("Index");
     }
 
     public async Task<IActionResult> OnPostSaveAsync(string Name, string? NewPassword)
@@ -101,6 +101,6 @@ public class EditModel : PageModel
                 c.Users.RemoveAll(u => u.Username.Equals(Name, StringComparison.OrdinalIgnoreCase));
         });
         Notice = $"User '{Name}' deleted";
-        return RedirectToPage("/System");
+        return RedirectToPage("Index");
     }
 }

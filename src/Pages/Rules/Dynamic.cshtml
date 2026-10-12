@@ -3,86 +3,86 @@
 @{
     var r = Model.RuleItem;
     var isNew = Model.IsNew;
-    ViewData["Title"] = isNew ? "New dynamic rule" : "Dynamic rule";
+    var title = isNew ? "New dynamic rule" : "Dynamic rule";
+    ViewData["Title"] = title;
+    ViewData["Crumbs"] = Crumbs.Of(("Rules", "/Rules"), (title, null));
+    ViewData["ActiveHref"] = "/Rules";
     var src = isNew ? null : Model.PushSources.FirstOrDefault(s => s.Id == r!.DynamicSourceId);
 }
 
-<div class="page-head">
-    <div class="page-head__title"><h1>@(isNew ? "New dynamic rule" : "Dynamic rule")</h1></div>
-</div>
-
-@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert alert--success"><icon name="check-circle" /><span>@Model.Notice</span></div> }
-@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert alert--error"><icon name="x-circle" /><span>@Model.Error</span></div> }
-
 @if (isNew && (Model.PushSources.Count == 0 || Model.NetcupGroups.Count == 0))
 {
-    <div class="alert alert--error"><icon name="x-circle" /><span>Needs at least one DynDNS Server source and one Netcup domain group.</span></div>
+    <div class="mat-alert mat-alert--danger" role="alert">
+        <icon name="x-circle" />
+        <div class="mat-alert__body">A dynamic rule needs at least one DynDNS Server source and one Netcup domain group.</div>
+    </div>
 }
 
-<div class="card">
-    <div class="card__body">
-        <form method="post" asp-page-handler="@(isNew ? "Create" : "Save")" class="mat-form">
-            @if (!isNew) { <input type="hidden" name="Id" value="@r!.Id" /> }
-            <div class="form-grid">
-                <div class="mat-field">
-                    <label class="mat-label" for="DynamicSourceId">Receiver (DynDNS Server)</label>
+<form method="post" asp-page-handler="@(isNew ? "Create" : "Save")" class="mat-form" novalidate>
+    @if (!isNew) { <input type="hidden" name="Id" value="@r!.Id" /> }
+    <partial name="_ValidationSummary" />
+
+    <div class="mat-card">
+        <div class="mat-card__body mat-stack">
+            <div class="mat-form__grid">
+                <mat-field label="Receiver (DynDNS Server)" for-id="DynamicSourceId">
                     <select id="DynamicSourceId" name="DynamicSourceId" class="mat-select">
                         @foreach (var s in Model.PushSources)
                         {
                             <option value="@s.Id" selected="@(r?.DynamicSourceId == s.Id)">@s.Name</option>
                         }
                     </select>
-                </div>
-                <div class="mat-field">
-                    <label class="mat-label" for="DomainGroupId">Target zone (Netcup)</label>
+                </mat-field>
+                <mat-field label="Target zone (Netcup)" for-id="DomainGroupId">
                     <select id="DomainGroupId" name="DomainGroupId" class="mat-select">
                         @foreach (var d in Model.NetcupGroups)
                         {
                             <option value="@d.Id" selected="@(r?.DomainGroupId == d.Id)">@d.Name</option>
                         }
                     </select>
-                </div>
-                <div class="mat-field">
-                    <label class="mat-label" for="DynamicZone">Zone</label>
-                    <input type="text" id="DynamicZone" name="DynamicZone" value="@(r?.DynamicZone ?? "")" class="mat-input" placeholder="example.com" autocapitalize="none" spellcheck="false" />
-                </div>
-                <div class="mat-field">
-                    <label class="mat-label" for="DynamicPrefix">Namespace prefix</label>
-                    <input type="text" id="DynamicPrefix" name="DynamicPrefix" value="@(r?.DynamicPrefix ?? "")" class="mat-input" placeholder="dynamic" autocapitalize="none" spellcheck="false" />
-                </div>
+                </mat-field>
+                <mat-field label="Zone" for-id="DynamicZone" required="true">
+                    <input type="text" id="DynamicZone" name="DynamicZone" value="@(r?.DynamicZone ?? "")" class="mat-input mat-mono" required placeholder="example.com" autocapitalize="none" spellcheck="false" data-msg-required="Please enter the zone, for example example.com." />
+                </mat-field>
+                <mat-field label="Namespace prefix" for-id="DynamicPrefix">
+                    <input type="text" id="DynamicPrefix" name="DynamicPrefix" value="@(r?.DynamicPrefix ?? "")" class="mat-input mat-mono" placeholder="dynamic" autocapitalize="none" spellcheck="false" />
+                </mat-field>
                 @if (!isNew)
                 {
-                    <div class="mat-field span-2">
-                        <label class="mat-switch">
-                            <input type="checkbox" name="Enabled" value="true" @(r!.Enabled ? "checked" : "") />
-                            <span>Enabled</span>
-                        </label>
+                    <div class="mat-field mat-field--full">
+                        <label class="mat-check"><input type="checkbox" id="Enabled" name="Enabled" value="true" checked="@r!.Enabled" /><span class="mat-check__text">Enabled</span></label>
                     </div>
                 }
             </div>
-            <div class="mat-buttons">
-                <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>@(isNew ? "Create" : "Save")</span></button>
-                <a class="mat-btn mat-btn--ghost" href="/Rules"><icon name="back" /><span>Back</span></a>
-                @if (!isNew)
-                {
-                    <span class="mat-buttons__spacer"></span>
-                    <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Delete" name="Id" value="@r!.Id" data-confirm="Delete this dynamic rule?" data-confirm-ok="Delete"><icon name="trash" /><span>Delete</span></button>
-                }
-            </div>
-        </form>
+        </div>
     </div>
-</div>
+
+    <div class="mat-btn-row">
+        <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>@(isNew ? "Create" : "Save")</span></button>
+        <a class="mat-btn mat-btn--secondary" href="/Rules"><icon name="back" /><span>Back</span></a>
+        @if (!isNew)
+        {
+            <span class="mat-btn-row__spacer"></span>
+            <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Delete" name="Id" value="@r!.Id" data-confirm="Delete this dynamic rule?" data-confirm-ok="Delete"><icon name="trash" /><span>Delete</span></button>
+        }
+    </div>
+</form>
 
 @if (!isNew)
 {
-    <div class="section-head"><h2 class="section-title">Namespace</h2></div>
-    <div class="card">
-        <div class="card__body">
-            <p class="text-muted small" style="margin-top:0;">Allowed: <span class="mono">*.@r!.DynamicBaseFqdn</span> (others rejected). Device sends <span class="mono">&amp;hostname=&lt;name&gt;.@r.DynamicBaseFqdn</span>.</p>
-            @if (src != null)
-            {
-                <p class="text-muted small" style="margin-bottom:0;">Token &amp; update URL on the receiver: <a href="/Sources/Edit?id=@src.Id">@src.Name</a></p>
-            }
+    <section class="mat-section">
+        <div class="mat-section__head"><h2>Namespace</h2></div>
+        <div class="mat-card">
+            <div class="mat-card__body">
+                <dl class="mat-kv">
+                    <dt>Allowed</dt><dd class="mat-mono">*.@r!.DynamicBaseFqdn</dd>
+                    <dt>The device sends</dt><dd class="mat-mono">&amp;hostname=&lt;name&gt;.@r.DynamicBaseFqdn</dd>
+                    @if (src != null)
+                    {
+                        <dt>Token and update URL</dt><dd><a href="/Sources/Edit?id=@src.Id">@src.Name</a></dd>
+                    }
+                </dl>
+            </div>
         </div>
-    </div>
+    </section>
 }

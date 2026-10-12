@@ -1,0 +1,50 @@
+/* Matddns: the few styles only this app has (prefix md-). Everything else is MatUi (wwwroot/matui/matui.css); colours, sizes and spacing come from its tokens. */
+
+.md-install { margin-top: var(--mat-space-2); }
+
+/* iOS zooms into a field whose text is smaller than 16 px as soon as it gets focus, and stays zoomed. The toolkit's body text is 15 px, so on a touch screen the fields use 1 rem. */
+@media (pointer: coarse) {
+  .mat-input, .mat-select, .mat-textarea { font-size: 1rem; }
+}
+
+/* A quick second tap on a control is a second tap, not a zoom (pinching still zooms). */
+a, button, input, select, textarea, label, summary, [role="button"] { touch-action: manipulation; }
+
+/* A select next to a button (the source picker of a rule) takes the room that is left; the toolkit sizes it to its longest option, which can be wider than a phone. */
+.mat-input-group > .mat-select { flex: 1 1 auto; min-width: 0; }
+
+/* Sources, Domains, Rules: a row and what belongs to it (records, the sources in failover order) in the same table. */
+.mat-table tr.md-parent.has-children td { padding-bottom: var(--mat-space-1); }
+.mat-table tr.md-child td { border-top: 0; padding-top: var(--mat-space-1); padding-bottom: var(--mat-space-1); color: var(--mat-text-muted); }
+.mat-table tr.md-child.is-last td { padding-bottom: var(--mat-space-3); }
+.md-child__name { padding-left: var(--mat-space-5); }
+
+/* On a phone a row is a card: what belongs to it continues the card instead of starting a new one. */
+@media (max-width: 720px) {
+  .mat-table tr.md-child { padding-top: 0; padding-bottom: 0; border-top: 0; }
+  .mat-table tr.md-child.is-last { padding-bottom: var(--mat-space-3); }
+  .mat-table tr.md-child td { padding: var(--mat-space-1) 0; }
+  .md-child__name { padding-left: 0; }
+}
+
+/* The order of the sources of a rule: index, name, the target of a CNAME, and the buttons that move or remove it. */
+.md-failover__row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--mat-space-3);
+  padding: var(--mat-space-3) 0;
+  border-top: 1px solid var(--mat-border);
+}
+.md-failover__row:first-child { border-top: 0; }
+.md-failover__row--cname { grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1fr) auto; }
+.md-failover__index { text-align: center; color: var(--mat-text-muted); }
+.md-failover__name { min-width: 0; overflow-wrap: anywhere; }
+.md-failover__actions { display: flex; align-items: center; gap: var(--mat-space-1); }
+
+@media (max-width: 720px) {
+  /* the CNAME target moves under the name */
+  .md-failover__row--cname { grid-template-columns: 2rem minmax(0, 1fr) auto; }
+  .md-failover__row--cname > :nth-child(3) { grid-column: 2 / -1; grid-row: 2; }
+  .md-failover__row--cname > :nth-child(4) { grid-column: 3; grid-row: 1; }
+}

@@ -81,8 +81,8 @@ ping/TCP validation and the check interval are set per rule.
 |---|---|
 | ![The domains list grouped by zone](docs/images/domains.png) | ![The system settings tabs](docs/images/system.png) |
 
-Domains group your records per provider zone; System holds general settings, users and the
-API docs.
+Domains group your records per provider zone; System holds the general settings and the API
+docs, Users and Log sit next to it under Administration.
 
 ### On the phone
 
@@ -132,7 +132,7 @@ docker compose up -d
 ```
 
 Open **http://localhost:4060** and sign in with **`admin` / `admin`**. Change the password
-under *System → Users* before exposing Matddns beyond localhost. An update is just
+under *Users* (or the user menu, *Change password*) before exposing Matddns beyond localhost. An update is just
 `docker compose pull && docker compose up -d`; the `./data` folder keeps the config, log and
 session keys.
 
@@ -331,13 +331,17 @@ TLS reverse proxy and set `MATDDNS_FORWARDED_HEADERS=true`.
 
 **On phones:** pinch zoom stays available, form fields are 16 px so iOS doesn't zoom when one gets
 focus, and the layout respects the notch and the home indicator. The status bar follows the chosen
-theme (`theme-color`); on iOS the installed app uses a translucent status bar.
+accent (`theme-color`); on iOS the installed app keeps the standard status bar, so it stays readable in light and dark.
 
 ## How it is built
 
 - **.NET 8 / ASP.NET Core Razor Pages**, cookie auth, a hosted background updater service
-- UI in the design system of the sibling project Mattiverse (plain CSS and JavaScript, no build
-  step, inline SVG icons); the service worker (`sw.js`) is versioned with the build
+- UI on **MatUi**, the toolkit of the Mat design system (MatDesign): plain CSS and JavaScript, no
+  build step, one inline SVG icon sprite, light/dark/system theme. The toolkit files in
+  `src/wwwroot/matui` are a copy, not a link, so the app also works offline and as an installed app;
+  `scripts/update-matui.ps1` fetches a newer release from a running MatDesign. The few styles only
+  Matddns needs are in `src/wwwroot/css/matddns.css` (prefix `md-`); the service worker (`sw.js`) is
+  versioned with the build
 - `System.Text.Json` config in `/data/config.json` (atomic + fsync'd, schema-migrated on load);
   DataProtection keys in `/data/keys`
 - Passwords hashed with **PBKDF2-SHA256** (600,000 iterations; older hashes are upgraded on the next

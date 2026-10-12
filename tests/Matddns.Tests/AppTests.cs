@@ -174,8 +174,8 @@ public class AppTests
 
         await AppFactory.PostForm(admin, "/Users/Edit?handler=Create", "/Users/Edit", ("NewUsername", "weakling"), ("NewPassword", "short"));
 
-        var system = await (await admin.GetAsync("/System")).Content.ReadAsStringAsync();
-        Assert.DoesNotContain("weakling", system);
+        var users = await (await admin.GetAsync("/Users")).Content.ReadAsStringAsync();
+        Assert.DoesNotContain("weakling", users);
     }
 
     [Fact]

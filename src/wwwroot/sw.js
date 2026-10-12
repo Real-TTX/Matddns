@@ -12,13 +12,17 @@ const DASHBOARD_KEY = '/__last-dashboard';
 const OFFLINE_URL = '/offline.html';
 
 // The asset URLs carry the same build tag (?v=), so they can be cached by their exact address.
+// The offline page asks for the same files without the tag; handleStatic finds them anyway.
 const PRECACHE = [
   OFFLINE_URL,
   '/favicon.svg',
   '/img/icon-192.png',
-  '/css/site.css?v=' + VERSION,
-  '/js/site.js?v=' + VERSION,
-  '/js/tables.js?v=' + VERSION,
+  '/matui/matui.css?v=' + VERSION,
+  '/matui/matui.js?v=' + VERSION,
+  '/matui/matui.boot.js?v=' + VERSION,
+  '/css/matddns.css?v=' + VERSION,
+  '/js/matddns.js?v=' + VERSION,
+  '/js/offline.js?v=' + VERSION,
 ];
 
 self.addEventListener('install', function (event) {
@@ -34,7 +38,7 @@ self.addEventListener('activate', function (event) {
 });
 
 function isStaticAsset(url) {
-  return url.pathname.startsWith('/css/') || url.pathname.startsWith('/js/') || url.pathname.startsWith('/img/') || url.pathname === '/favicon.svg';
+  return url.pathname.startsWith('/matui/') || url.pathname.startsWith('/css/') || url.pathname.startsWith('/js/') || url.pathname.startsWith('/img/') || url.pathname === '/favicon.svg';
 }
 
 self.addEventListener('fetch', function (event) {
@@ -63,7 +67,11 @@ function handleStatic(event, request, url) {
         event.waitUntil(fetched.catch(function () { /* offline: the cached copy is enough */ }));
         return cached;
       }
-      return fetched;
+      // Not cached under this exact address and no network: any copy of the same file will do. The offline page asks without the tag,
+      // and the saved dashboard of an older build asks for the tag of that build.
+      return fetched.catch(function () {
+        return cache.match(request, { ignoreSearch: true }).then(function (any) { return any || Response.error(); });
+      });
     });
   });
 }

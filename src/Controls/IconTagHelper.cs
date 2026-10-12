@@ -1,37 +1,34 @@
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 
 namespace Matddns.Controls;
 
-/// <summary>Renders an inline SVG icon: <c>&lt;icon name="save" /&gt;</c>. Size and colour follow the surrounding text.</summary>
+/// <summary>
+/// Renders an icon of the page's inline sprite: <c>&lt;icon name="save" /&gt;</c> becomes <c>&lt;svg class="mat-icon"&gt;&lt;use href="#mat-i-save"&gt;</c>
+/// (rules ICON-01, ICON-02). The name must exist in <c>matui-icons.svg</c>; a unit test checks every name the pages use.
+/// </summary>
 [HtmlTargetElement("icon", TagStructure = TagStructure.WithoutEndTag)]
-public sealed class IconTagHelper : TagHelper
+public sealed partial class IconTagHelper : TagHelper
 {
-    /// <summary>Icon key from <see cref="Icons"/>.</summary>
+    [GeneratedRegex("^[a-z0-9-]+$")]
+    private static partial Regex NameRegex();
+
+    /// <summary>Icon name from the sprite (e.g. "save", "trash").</summary>
     public string Name { get; set; } = string.Empty;
 
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {
-        if (!Icons.TryGet(Name, out var inner))
+        if (!NameRegex().IsMatch(Name))
         {
-            output.SuppressOutput();
-            return;
+            throw new InvalidOperationException($"'{Name}' is not an icon name.");
         }
 
         output.TagName = "svg";
         output.TagMode = TagMode.StartTagAndEndTag;
-
         var existingClass = output.Attributes["class"]?.Value?.ToString();
         output.Attributes.SetAttribute("class", string.IsNullOrEmpty(existingClass) ? "mat-icon" : $"mat-icon {existingClass}");
-        output.Attributes.SetAttribute("viewBox", "0 0 24 24");
-        output.Attributes.SetAttribute("fill", "none");
-        output.Attributes.SetAttribute("stroke", "currentColor");
-        output.Attributes.SetAttribute("stroke-width", "2");
-        output.Attributes.SetAttribute("stroke-linecap", "round");
-        output.Attributes.SetAttribute("stroke-linejoin", "round");
-        output.Attributes.SetAttribute("width", "1em");
-        output.Attributes.SetAttribute("height", "1em");
         output.Attributes.SetAttribute("aria-hidden", "true");
         output.Attributes.SetAttribute("focusable", "false");
-        output.Content.SetHtmlContent(inner);
+        output.Content.SetHtmlContent($"<use href=\"#mat-i-{Name}\"></use>");
     }
 }

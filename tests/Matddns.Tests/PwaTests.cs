@@ -45,13 +45,63 @@ public class PwaTests
         Assert.Equal("no-cache", response.Headers.CacheControl?.ToString());
     }
 
-    [Fact]
-    public async Task Assets_that_carry_a_build_tag_are_cached_for_good()
+    [Theory]
+    [InlineData("/matui/matui.css?v=test")]
+    [InlineData("/matui/matui.js?v=test")]
+    [InlineData("/matui/matui.boot.js?v=test")]
+    [InlineData("/css/matddns.css?v=test")]
+    [InlineData("/js/matddns.js?v=test")]
+    public async Task Assets_that_carry_a_build_tag_are_cached_for_good(string path)
     {
-        var response = await _app.NewClient().GetAsync("/css/site.css?v=test");
+        var response = await _app.NewClient().GetAsync(path);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("immutable", response.Headers.CacheControl?.ToString());
+    }
+
+    [Fact]
+    public async Task Assets_without_a_build_tag_are_revalidated()
+    {
+        var response = await _app.NewClient().GetAsync("/matui/matui.css");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.DoesNotContain("immutable", response.Headers.CacheControl?.ToString());
+    }
+
+    [Fact]
+    public async Task The_service_worker_only_precaches_files_that_exist()
+    {
+        var client = _app.NewClient();
+        var worker = await (await client.GetAsync("/sw.js")).Content.ReadAsStringAsync();
+        var offlineUrl = Regex.Match(worker, @"const OFFLINE_URL = '([^']+)'").Groups[1].Value;
+        var precache = Regex.Match(worker, @"const PRECACHE = \[(.*?)\];", RegexOptions.Singleline).Groups[1].Value
+            .Replace("OFFLINE_URL", $"'{offlineUrl}'");
+
+        var paths = Regex.Matches(precache, @"'(/[^']+)'").Select(m => m.Groups[1].Value).ToList();
+
+        Assert.Contains("/offline.html", paths);
+        Assert.Contains("/matui/matui.css?v=", paths);
+        foreach (var path in paths)
+            Assert.True((await client.GetAsync(path.EndsWith("?v=") ? path + "test" : path)).StatusCode == HttpStatusCode.OK, $"{path} is not served");
+    }
+
+    [Fact]
+    public async Task The_offline_page_stands_on_its_own_and_only_needs_what_the_service_worker_keeps()
+    {
+        var client = _app.NewClient();
+        var page = await (await client.GetAsync("/offline.html")).Content.ReadAsStringAsync();
+        var worker = await (await client.GetAsync("/sw.js")).Content.ReadAsStringAsync();
+
+        var needed = Regex.Matches(page, @"(?:src|href)=""(/[^""#]+)""").Select(m => m.Groups[1].Value).Where(p => !p.StartsWith("/offline")).ToList();
+
+        Assert.DoesNotMatch(@"<script(?![^>]*\ssrc=)", page);   // no inline script or style: the app's content security rules apply to this page too
+        Assert.DoesNotMatch(@"<style|\sstyle=", page);
+        Assert.Contains("matui.css", string.Concat(needed));
+        foreach (var path in needed)
+        {
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(path)).StatusCode);
+            Assert.Contains(path, worker);   // listed in the precache, so it is there when the network is not
+        }
     }
 
     [Fact]
@@ -64,6 +114,7 @@ public class PwaTests
         Assert.Contains("rel=\"manifest\"", html);
         Assert.Contains("rel=\"apple-touch-icon\"", html);
         Assert.Contains("name=\"apple-mobile-web-app-capable\"", html);
+        Assert.Contains("name=\"apple-mobile-web-app-status-bar-style\" content=\"default\"", html);   // the bar keeps the colour of the page (the toolkit's light/dark themes)
         Assert.Contains("name=\"theme-color\"", html);
         var viewport = Regex.Match(html, "<meta name=\"viewport\" content=\"([^\"]*)\"").Groups[1].Value;
         Assert.Contains("viewport-fit=cover", viewport);   // use the whole screen, safe areas are handled in CSS

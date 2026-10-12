@@ -3,66 +3,62 @@
 @{
     var isNew = Model.IsNew;
     ViewData["Title"] = isNew ? "New user" : Model.Username;
+    ViewData["Crumbs"] = Crumbs.Of(("Users", "/Users"), (isNew ? "New user" : Model.Username!, null));
+    ViewData["Width"] = "narrow";
+    ViewData["ActiveHref"] = "/Users";
 }
 
-<div class="page-head">
-    <div class="page-head__title">
-        <h1>@(isNew ? "New user" : Model.Username)</h1>
-    </div>
-</div>
+@if (isNew)
+{
+    <form method="post" asp-page-handler="Create" class="mat-form" novalidate>
+        <partial name="_ValidationSummary" />
 
-@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert alert--success"><icon name="check-circle" /><span>@Model.Notice</span></div> }
-@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert alert--error"><icon name="x-circle" /><span>@Model.Error</span></div> }
+        <div class="mat-card">
+            <div class="mat-card__body">
+                <div class="mat-form__grid">
+                    <mat-field label="Username" for-id="NewUsername" required="true">
+                        <input type="text" id="NewUsername" name="NewUsername" class="mat-input" autocomplete="off" autocapitalize="none" spellcheck="false" required data-msg-required="Please enter a username." />
+                    </mat-field>
+                    <mat-field label="Password" for-id="NewPassword" required="true">
+                        <input type="password" id="NewPassword" name="NewPassword" class="mat-input" autocomplete="new-password" required pattern=".{8,}" data-msg-required="Please enter a password." data-msg-pattern="Please use at least 8 characters." />
+                    </mat-field>
+                </div>
+            </div>
+        </div>
 
-<div class="card" style="max-width:640px;">
-    <div class="card__body">
-        @if (isNew)
-        {
-            <form method="post" asp-page-handler="Create" class="mat-form">
-                <div class="form-grid">
-                    <div class="mat-field">
-                        <label class="mat-label" for="NewUsername">Username</label>
-                        <input type="text" id="NewUsername" name="NewUsername" class="mat-input" required autocomplete="off" autocapitalize="none" spellcheck="false" />
-                    </div>
-                    <div class="mat-field">
-                        <label class="mat-label" for="NewPassword">Password</label>
-                        <input type="password" id="NewPassword" name="NewPassword" class="mat-input" required autocomplete="new-password" />
-                    </div>
+        <div class="mat-btn-row">
+            <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Create user</span></button>
+            <a class="mat-btn mat-btn--secondary" href="/Users"><icon name="back" /><span>Back</span></a>
+        </div>
+    </form>
+}
+else
+{
+    <form method="post" asp-page-handler="Save" class="mat-form" novalidate>
+        <input type="hidden" name="Name" value="@Model.Username" />
+        <partial name="_ValidationSummary" />
+
+        <div class="mat-card">
+            <div class="mat-card__body">
+                <div class="mat-form__grid">
+                    <mat-field label="Username" for-id="Username">
+                        <input type="text" id="Username" value="@Model.Username" class="mat-input" readonly />
+                    </mat-field>
+                    <mat-field label="New password" for-id="NewPassword">
+                        <input type="password" id="NewPassword" name="NewPassword" class="mat-input" autocomplete="new-password" placeholder="Leave empty to keep the current one" pattern=".{8,}" data-msg-pattern="Please use at least 8 characters." />
+                    </mat-field>
                 </div>
-                <div class="mat-buttons">
-                    <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Create user</span></button>
-                    <a class="mat-btn mat-btn--ghost" href="/System"><icon name="back" /><span>Back</span></a>
-                </div>
-            </form>
-        }
-        else
-        {
-            <form method="post" asp-page-handler="Save" class="mat-form">
-                <input type="hidden" name="Name" value="@Model.Username" />
-                <div class="form-grid">
-                    <div class="mat-field">
-                        <label class="mat-label">Username</label>
-                        <input type="text" value="@Model.Username" class="mat-input" disabled />
-                    </div>
-                    <div class="mat-field">
-                        <label class="mat-label" for="NewPassword">New password</label>
-                        <input type="password" id="NewPassword" name="NewPassword" class="mat-input" placeholder="leave empty = unchanged" autocomplete="new-password" />
-                    </div>
-                </div>
-                <div class="mat-buttons">
-                    <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
-                    <a class="mat-btn mat-btn--ghost" href="/System"><icon name="back" /><span>Back</span></a>
-                    <span class="mat-buttons__spacer"></span>
-                    @if (Model.IsCurrentUser)
-                    {
-                        <span class="text-muted small">You can't delete the account you're logged in as.</span>
-                    }
-                    else
-                    {
-                        <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Delete" asp-route-Name="@Model.Username" data-confirm="Delete user @Model.Username?"><icon name="trash" /><span>Delete user</span></button>
-                    }
-                </div>
-            </form>
-        }
-    </div>
-</div>
+            </div>
+        </div>
+
+        <div class="mat-btn-row">
+            <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
+            <a class="mat-btn mat-btn--secondary" href="/Users"><icon name="back" /><span>Back</span></a>
+            @if (!Model.IsCurrentUser)
+            {
+                <span class="mat-btn-row__spacer"></span>
+                <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Delete" asp-route-Name="@Model.Username" data-confirm="Delete the user @Model.Username? They can no longer sign in." data-confirm-ok="Delete"><icon name="trash" /><span>Delete</span></button>
+            }
+        </div>
+    </form>
+}

@@ -3,132 +3,125 @@
 @{
     ViewData["Title"] = "Rules";
     ViewData["Reconnect"] = "reload";
+    ViewData["Crumbs"] = Crumbs.Of(("Rules", null));
+    var list = Model.List;
 }
 
-<div class="page-head">
-    <div class="page-head__title"><h1>Rules</h1></div>
-</div>
+<div class="mat-list">
+    <partial name="_Toolbar" model="list.Toolbar" />
 
-@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert alert--success"><icon name="check-circle" /><span>@Model.Notice</span></div> }
-@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert alert--error"><icon name="x-circle" /><span>@Model.Error</span></div> }
-
-@if (Model.Rules.Count == 0)
-{
-    <div class="card">
-        <div class="empty-state">
-            <div><icon name="route" /></div>
-            <p>No rules yet.</p>
-            <a class="mat-btn mat-btn--primary" href="/Rules/Edit"><icon name="plus" /><span>Create the first rule</span></a>
-        </div>
-    </div>
-}
-else
-{
-    <div class="mat-table" data-dt>
-        <div class="mat-table__toolbar">
-            <div class="search">
-                <icon name="search" />
-                <input type="search" data-dt-search class="mat-input" placeholder="Search rules…" autocomplete="off" enterkeyhint="search" />
-            </div>
-            <div class="toolbar-field">
-                <label for="filter-status">Status</label>
-                <select id="filter-status" data-dt-filter="status" class="mat-select">
-                    <option value="">All states</option>
-                    <option value="ok">OK</option>
-                    <option value="issue">Issues</option>
-                    <option value="disabled">Disabled</option>
-                </select>
-            </div>
-            <span class="mat-table__count" data-dt-count></span>
-        </div>
-        <div class="mat-table__scroll">
-        <table class="data dtable">
-            <thead>
-                <tr><th>Record</th><th class="hide-sm">Source</th><th>IP</th><th>Status</th><th></th></tr>
-            </thead>
-            @foreach (var r in Model.Rules)
+    @if (list.Items.Count == 0)
+    {
+        <div class="mat-empty">
+            <span class="mat-empty__icon"><icon name="route" /></span>
+            @if (list.Toolbar.Total == 0)
             {
-                if (r.Dynamic)
+                <div class="mat-empty__title">No rules yet</div>
+                <a class="mat-btn mat-btn--primary" href="/Rules/Edit"><icon name="plus" /><span>Create the first rule</span></a>
+            }
+            else
+            {
+                <div class="mat-empty__title">Nothing matches</div>
+                <p>No rule matches. Change the search or the filter.</p>
+                <a class="mat-btn mat-btn--secondary" href="/Rules">Reset the tools</a>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">Rules</caption>
+                <thead>
+                    <tr><th scope="col">Record</th><th scope="col" class="mat-hide-sm">Source</th><th scope="col">Address</th><th scope="col">Status</th><th scope="col"><span class="mat-sr-only">Actions</span></th></tr>
+                </thead>
+                <tbody>
+                @foreach (var r in list.Items)
                 {
-                    var dsrc = Model.AllSources.FirstOrDefault(s => s.Id == r.DynamicSourceId);
-                    var dzone = Model.AllDomains.FirstOrDefault(d => d.Id == r.DomainGroupId);
-                    var dstatus = r.Enabled ? "ok" : "disabled";
-                    <tbody class="dt-group" data-search="@($"{r.DynamicBaseFqdn} {dsrc?.Name} {dzone?.Name} dynamic {dstatus}")" data-status="@dstatus" data-href="/Rules/Dynamic?id=@r.Id">
-                        <tr class="dt-parent">
-                            <td class="dt-name mono">*.@r.DynamicBaseFqdn</td>
-                            <td class="cell-muted hide-sm">@(dsrc?.Name ?? "?") <span class="mat-badge">dynamic</span></td>
-                            <td class="mono">→ @(dzone?.Name ?? "?")</td>
-                            <td><span class="pill @Ui.Pill(r.Enabled ? "ok" : "muted")">@dstatus</span></td>
-                            <td class="dt-go"><icon name="chevron-right" /></td>
+                    var statusKey = IndexModel.StatusKey(r);
+                    var state = statusKey switch { "ok" => "ok", "issue" => "err", "pending" => "warn", _ => "none" };
+                    var statusText = statusKey switch { "ok" => "OK", "issue" => "Problem", "pending" => "Pending", _ => "Disabled" };
+                    if (r.Dynamic)
+                    {
+                        var dsrc = Model.AllSources.FirstOrDefault(s => s.Id == r.DynamicSourceId);
+                        var dzone = Model.AllDomains.FirstOrDefault(d => d.Id == r.DomainGroupId);
+                        <tr class="md-parent">
+                            <td data-label="Record"><div class="mat-table__name"><a class="mat-mono" href="/Rules/Dynamic?id=@r.Id">@Model.RecordText(r)</a></div></td>
+                            <td data-label="Source" class="mat-hide-sm mat-muted">@(dsrc?.Name ?? "?") <span class="mat-tag">dynamic</span></td>
+                            <td data-label="Writes to" class="mat-muted">@(dzone?.Name ?? "?")</td>
+                            <td data-label="Status"><span class="@Ui.Pill(state)">@statusText</span></td>
+                            <td class="mat-table__cell-actions">
+                                <div class="mat-table__actions">
+                                    <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Rules/Dynamic?id=@r.Id" aria-label="Edit the dynamic rule @Model.RecordText(r)" data-tip="Edit"><icon name="edit" /></a>
+                                </div>
+                            </td>
                         </tr>
-                    </tbody>
-                    continue;
-                }
-                var dg = Model.AllDomains.FirstOrDefault(d => d.Id == r.DomainGroupId);
-                var de = dg?.Entries.FirstOrDefault(e => e.Id == r.DomainEntryId);
-                var sourceIds = r.SourceEntryIdsInOrder;
-                var sourceLabels = sourceIds.Select(Model.SourceLabel).ToList();
-                var statusKey = !r.Enabled ? "disabled"
-                    : (!string.IsNullOrEmpty(r.LastResult) && r.LastResult.StartsWith("ok", StringComparison.OrdinalIgnoreCase)) ? "ok"
-                    : (!string.IsNullOrEmpty(r.LastResult) && (r.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase) || r.LastResult == "no source" || r.LastResult == "target missing")) ? "issue"
-                    : "pending";
-                var dot = statusKey switch { "ok" => "ok", "issue" => "err", "disabled" => "muted", _ => "warn" };
-                var triggerText = (r.OnChange, r.IntervalSeconds > 0) switch
-                {
-                    (true, true) => $"on change · every {r.IntervalSeconds}s",
-                    (true, false) => "on change",
-                    (false, true) => $"every {r.IntervalSeconds}s",
-                    _ => "manual"
-                };
-                var recordText = de != null ? de.Display : "(domain missing)";
-                var activeLabel = !string.IsNullOrEmpty(r.LastUsedSourceId) && Model.SourceLookup.TryGetValue(r.LastUsedSourceId, out var av)
-                    ? av.Entry.Label
-                    : (sourceIds.Count > 0 ? Model.SourceLabel(sourceIds[0]) : null);
-                var search = $"{recordText} {dg?.Name} {string.Join(' ', sourceLabels)} {r.LastValue} {statusKey}";
-                <tbody class="dt-group" data-search="@search" data-status="@statusKey" data-href="/Rules/Edit?id=@r.Id">
-                    <tr class="dt-parent @(sourceIds.Count > 0 ? "has-children" : "")">
-                        <td class="dt-name mono">@recordText</td>
-                        <td class="cell-muted hide-sm">@(activeLabel ?? "no sources")</td>
-                        <td class="mono">@(!string.IsNullOrEmpty(r.LastValue) ? r.LastValue : "—")</td>
-                        <td><span class="pill @Ui.Pill(dot)">@statusKey</span> <span class="text-muted small hide-sm">· @triggerText</span></td>
-                        <td class="dt-go"><icon name="chevron-right" /></td>
+                        continue;
+                    }
+
+                    var sourceIds = r.SourceEntryIdsInOrder;
+                    var triggerText = (r.OnChange, r.IntervalSeconds > 0) switch
+                    {
+                        (true, true) => $"on change, every {r.IntervalSeconds} s",
+                        (true, false) => "on change",
+                        (false, true) => $"every {r.IntervalSeconds} s",
+                        _ => "manual"
+                    };
+                    var activeLabel = !string.IsNullOrEmpty(r.LastUsedSourceId) && Model.SourceLookup.TryGetValue(r.LastUsedSourceId, out var av)
+                        ? av.Entry.Label
+                        : (sourceIds.Count > 0 ? Model.SourceLabel(sourceIds[0]) : null);
+                    <tr class="md-parent @(sourceIds.Count > 0 ? "has-children" : "")">
+                        <td data-label="Record"><div class="mat-table__name"><a class="mat-mono" href="/Rules/Edit?id=@r.Id">@Model.RecordText(r)</a></div></td>
+                        <td data-label="Source" class="mat-hide-sm mat-muted">@(activeLabel ?? "no sources")</td>
+                        <td data-label="Address" class="mat-mono">@(!string.IsNullOrEmpty(r.LastValue) ? r.LastValue : "–")</td>
+                        <td data-label="Status"><span class="@Ui.Pill(state)">@statusText</span> <span class="mat-muted mat-hide-sm">@triggerText</span></td>
+                        <td class="mat-table__cell-actions">
+                            <div class="mat-table__actions">
+                                <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Rules/Edit?id=@r.Id" aria-label="Edit the rule @Model.RecordText(r)" data-tip="Edit"><icon name="edit" /></a>
+                            </div>
+                        </td>
                     </tr>
                     @if (sourceIds.Count > 0)
                     {
-                        for (int i = 0; i < sourceIds.Count; i++)
+                        for (var i = 0; i < sourceIds.Count; i++)
                         {
                             var sid = sourceIds[i];
                             var resolved = Model.SourceLookup.TryGetValue(sid, out var rv) ? rv : null;
                             var label = resolved?.Entry.Label ?? "(unknown source)";
-                            var grp = resolved?.Group.Name ?? "";
                             var sip = resolved?.Entry.CurrentIp ?? resolved?.Entry.CurrentIpv6;
                             var hasIp = !string.IsNullOrEmpty(sip);
                             var isActive = r.Enabled && sid == r.LastUsedSourceId;
-                            var cdot = isActive ? "ok" : (hasIp ? "muted" : "warn");
-                            var cstate = isActive ? "active" : (hasIp ? "standby" : "no ip");
-                            <tr class="dt-child @(i == sourceIds.Count - 1 ? "last" : "")">
-                                <td><span class="dt-sub">#@(i + 1) @label</span></td>
-                                <td class="cell-muted hide-sm">@grp</td>
-                                <td class="mono cell-muted">@(sip ?? "—")</td>
-                                <td><span class="pill @Ui.Pill(cdot)">@cstate</span></td>
+                            var childState = isActive ? "ok" : (hasIp ? "none" : "warn");
+                            var childText = isActive ? "Active" : (hasIp ? "Standby" : "No IP");
+                            <tr class="md-child @(i == sourceIds.Count - 1 ? "is-last" : "")">
+                                <td data-label="Source"><span class="md-child__name">#@(i + 1) @label</span></td>
+                                <td data-label="Group" class="mat-hide-sm">@(resolved?.Group.Name ?? "")</td>
+                                <td data-label="Address" class="mat-mono">@(sip ?? "–")</td>
+                                <td data-label="Status"><span class="@Ui.Pill(childState)">@childText</span></td>
                                 <td></td>
                             </tr>
                         }
                     }
                     else
                     {
-                        <tr class="dt-child last">
-                            <td colspan="5"><span class="dt-sub cell-muted">no sources — add failover sources</span></td>
+                        <tr class="md-child is-last">
+                            <td data-label="Source"><span class="md-child__name">No sources: add them to the failover order</span></td>
+                            <td data-label="Group" class="mat-hide-sm"></td>
+                            <td data-label="Address"></td>
+                            <td data-label="Status"></td>
+                            <td></td>
                         </tr>
                     }
+                }
                 </tbody>
-            }
-            <tbody class="dt-empty" hidden><tr><td colspan="5">No rules match your search.</td></tr></tbody>
-        </table>
+            </table>
         </div>
-        <div class="mat-table__actions">
-            <a class="mat-btn mat-btn--primary" href="/Rules/Edit"><icon name="plus" /><span>New rule</span></a>
-            <a class="mat-btn mat-btn--ghost" href="/Rules/Dynamic"><icon name="plus" /><span>Dynamic rule</span></a>
-        </div>
+    }
+
+    <partial name="_Pager" model="list.Pager" />
+
+    <div class="mat-actions">
+        <a href="/Rules/Edit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>New rule</span></a>
+        <a href="/Rules/Dynamic" class="mat-btn mat-btn--secondary"><icon name="plus" /><span>Dynamic rule</span></a>
     </div>
-}
+</div>
