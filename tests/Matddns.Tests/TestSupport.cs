@@ -28,7 +28,7 @@ internal sealed class TestEnvironment : IDisposable
     }
 }
 
-internal record RecordedCall(Uri Uri, string? Authorization, string Body);
+internal record RecordedCall(Uri Uri, string? Authorization, string Body, string Method = "GET");
 
 /// <summary>Answers every request from a delegate and records what was sent.</summary>
 internal sealed class StubHandler : HttpMessageHandler
@@ -43,7 +43,7 @@ internal sealed class StubHandler : HttpMessageHandler
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var body = request.Content == null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
-        var call = new RecordedCall(request.RequestUri!, request.Headers.Authorization?.ToString(), body);
+        var call = new RecordedCall(request.RequestUri!, request.Headers.Authorization?.ToString(), body, request.Method.Method);
         Calls.Add(call);
         return _respond(call);
     }

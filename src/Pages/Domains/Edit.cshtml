@@ -90,7 +90,7 @@
 
             <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="Hetzner" hidden="@(kind != DomainKind.Hetzner)">
                 <mat-field label="API token" for-id="HzToken" full="true">
-                    <input type="password" id="HzToken" name="HzToken" class="mat-input" placeholder="@(isNew ? "Hetzner DNS API token" : keep)" autocomplete="new-password" />
+                    <input type="password" id="HzToken" name="HzToken" class="mat-input" placeholder="@(isNew ? "Cloud API token (read & write)" : keep)" autocomplete="new-password" />
                 </mat-field>
                 <div class="mat-field mat-field--full">
                     <label class="mat-check"><input type="checkbox" id="HzAllowDynamic" name="HzAllowDynamic" value="true" checked="@(g?.Hetzner?.AllowDynamic == true)" /><span class="mat-check__text">Allow dynamic records (create them on demand)</span></label>

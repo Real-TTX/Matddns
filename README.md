@@ -222,7 +222,7 @@ is never pushed to DNS.
 | DynDNS | any provider via an update URL with `{ipv4}`, `{ipv6}`, `{hostname}`, `{user}`, `{password}` placeholders (empty ones are dropped, so one URL covers A and AAAA); presets prefill the URL |
 | Netcup | the Netcup DNS API (record + zone) |
 | Cloudflare | the Cloudflare API (API token with Zone.DNS edit) |
-| Hetzner DNS | the Hetzner DNS API (Auth-API-Token) |
+| Hetzner DNS | the DNS API of the Hetzner Cloud: a Cloud API token (read & write) of the project that holds the zone; tokens of the retired DNS Console do not work. A record set must hold exactly one record, the TTL is set to 60 s |
 | GoDaddy | the GoDaddy DNS API (API key + secret) |
 | Matddns peer | pushes the chosen IP to another Matddns instance over its JSON API |
 

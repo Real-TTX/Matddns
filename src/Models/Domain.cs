@@ -45,7 +45,7 @@ public class CloudflareSettings
 
 public class HetznerSettings
 {
-    public string ApiToken { get; set; } = "";   // Hetzner DNS API token (Auth-API-Token header)
+    public string ApiToken { get; set; } = "";   // Hetzner Cloud API token of the project that holds the zone (Bearer, read & write); old DNS Console tokens do not work
     public bool AllowDynamic { get; set; }
 }
 
