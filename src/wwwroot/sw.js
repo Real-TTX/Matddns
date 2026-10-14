@@ -17,6 +17,8 @@ const PRECACHE = [
   OFFLINE_URL,
   '/favicon.svg',
   '/img/icon-192.png',
+  '/img/logo.svg?v=' + VERSION,
+  '/img/logo-detail.svg?v=' + VERSION,
   '/matui/matui.css?v=' + VERSION,
   '/matui/matui.js?v=' + VERSION,
   '/matui/matui.boot.js?v=' + VERSION,

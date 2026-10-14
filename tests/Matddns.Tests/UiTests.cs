@@ -196,6 +196,20 @@ public partial class UiTests
         Assert.Contains(Ui.App.Accent, manifest, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task The_logo_of_the_menu_and_of_the_sign_in_page_is_the_icon_of_the_app()
+    {
+        var client = _app.NewClient();
+
+        var login = await (await client.GetAsync("/Login")).Content.ReadAsStringAsync();
+        var menu = await (await (await _app.AdminAsync()).GetAsync("/System")).Content.ReadAsStringAsync();
+
+        Assert.Contains("/img/logo-detail.svg?v=", login);
+        Assert.Contains("/img/logo.svg?v=", menu);
+        foreach (var file in new[] { "/img/logo.svg", "/img/logo-detail.svg" })
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(file)).StatusCode);
+    }
+
     [Theory]
     [InlineData("/", "/")]
     [InlineData("/Sources", "/Sources")]

@@ -22,9 +22,15 @@ public static partial class Ui
         return new HtmlString($"<svg class=\"{cls}\" aria-hidden=\"true\" focusable=\"false\"><use href=\"#mat-i-{name}\"></use></svg>");
     }
 
-    /// <summary>The logo tile of the toolkit: the accent of the app with its glyph (the toolkit's registry says which).</summary>
+    /// <summary>
+    /// The logo tile of the toolkit (it rounds and sizes it) with the icon of the app in it: the simple one in the menu, the one with the
+    /// dots where there is room (<c>lg</c>). The files are full-bleed so that no edge of the accent shows around them.
+    /// </summary>
     public static IHtmlContent Logo(string size = "md")
-        => new HtmlString($"<span class=\"mat-logo mat-logo--{size}\" role=\"img\" aria-label=\"{App.Name}\"><svg class=\"mat-icon\" aria-hidden=\"true\" focusable=\"false\"><use href=\"#mat-i-{App.Glyph}\"></use></svg></span>");
+    {
+        var file = size == "md" || size == "sm" ? "logo.svg" : "logo-detail.svg";
+        return new HtmlString($"<span class=\"mat-logo mat-logo--{size}\" role=\"img\" aria-label=\"{App.Name}\"><img src=\"/img/{file}?v={Matddns.Services.BuildInfo.CacheTag}\" alt=\"\" /></span>");
+    }
 
     /// <summary>The first letters of a name, for an avatar.</summary>
     public static string Initials(string name)
