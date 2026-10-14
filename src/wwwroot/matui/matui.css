@@ -2489,7 +2489,7 @@ dialog.mat-dialog--start[open] { animation-name: mat-panel-in-start; }
 [data-app="matdock"]     { --mat-app-accent: #1d78be; }
 [data-app="matos"]       { --mat-app-accent: #8558ec; }
 [data-app="matcad"]      { --mat-app-accent: #2f6feb; }
-[data-app="matddns"]     { --mat-app-accent: #4173d1; }
+[data-app="matddns"]     { --mat-app-accent: #204db6; }
 [data-app="matfile"]     { --mat-app-accent: #3472d8; }
 [data-app="matmail"]     { --mat-app-accent: #1a56db; }
 [data-app="matpaper"]    { --mat-app-accent: #268538; }

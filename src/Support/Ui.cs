@@ -52,6 +52,6 @@ public static partial class Ui
         public const string Glyph = "globe";
 
         /// <summary>The accent as the toolkit registry has it; it colours the bar of the browser. A unit test compares it with <c>matui.css</c>.</summary>
-        public const string Accent = "#4173d1";
+        public const string Accent = "#204db6";
     }
 }
