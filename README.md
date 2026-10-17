@@ -53,6 +53,9 @@ its IP into Matddns just like it would to any DynDNS provider.
 - **Dual-stack**: every source carries an optional IPv4 and IPv6 (IPv6-only works too)
 - **Multi-user login** with **rate-limited sign-in**, a per-install **time zone**, an adjustable
   **log level** with retention, and an optional **read-only public dashboard**
+- **Installable web app (PWA)** for phone and desktop: light/dark/system theme, safe-area aware on
+  iOS and Android, and an offline mode that shows the last known dashboard (see
+  [Install as an app](#install-as-an-app-pwa))
 - **Monitoring API** (`/api/health`, `/api/state`), an optional key-protected
   [management API](#management-api-for-mattiverse) to provision sources, domains and rules,
   and one **.NET 8 container** with a single `/data` volume; CI publishes the image to GHCR on every push
@@ -79,8 +82,15 @@ ping/TCP validation and the check interval are set per rule.
 |---|---|
 | ![The domains list grouped by zone](docs/images/domains.png) | ![The system settings tabs](docs/images/system.png) |
 
-Domains group your records per provider zone; System holds general settings, users and the
-API docs.
+Domains group your records per provider zone; System holds the general settings and the API
+docs, Users and Log sit next to it under Administration.
+
+### On the phone
+
+![The dashboard on a phone in light and dark, and the menu](docs/images/mobile.png)
+
+The same pages work at phone width: the menu becomes a drawer, wide tables keep their key
+columns, and the theme follows the system unless you pick one in the menu.
 
 ## Quick start
 
@@ -123,7 +133,7 @@ docker compose up -d
 ```
 
 Open **http://localhost:4060** and sign in with **`admin` / `admin`**. Change the password
-under *System → Users* before exposing Matddns beyond localhost. An update is just
+under *Users* (or the user menu, *Change password*) before exposing Matddns beyond localhost. An update is just
 `docker compose pull && docker compose up -d`; the `./data` folder keeps the config, log and
 session keys.
 
@@ -171,6 +181,10 @@ dotnet run --project src
 
 The in-container port is `8080` (mapped to `4060` above). The UI is English throughout.
 
+**Lost the password?** There is no e-mail reset (no mail server involved). Stop the container, empty
+the `users` list in `data/config.json`, and start it again: `admin` is re-created with
+`MATDDNS_ADMIN_PASSWORD` (default `admin`). User names are free text, so an e-mail address works as one.
+
 ### The `/data` volume
 
 ```
@@ -210,7 +224,7 @@ is never pushed to DNS.
 | DynDNS | any provider via an update URL with `{ipv4}`, `{ipv6}`, `{hostname}`, `{user}`, `{password}` placeholders (empty ones are dropped, so one URL covers A and AAAA); presets prefill the URL |
 | Netcup | the Netcup DNS API (record + zone) |
 | Cloudflare | the Cloudflare API (API token with Zone.DNS edit) |
-| Hetzner DNS | the Hetzner DNS API (Auth-API-Token) |
+| Hetzner DNS | the DNS API of the Hetzner Cloud: a Cloud API token (read & write) of the project that holds the zone; tokens of the retired DNS Console do not work. A record set must hold exactly one record, the TTL is set to 60 s |
 | GoDaddy | the GoDaddy DNS API (API key + secret) |
 | Matddns peer | pushes the chosen IP to another Matddns instance over its JSON API |
 
@@ -427,12 +441,50 @@ docker run -d --name matddns-test -p 18702:8080 -e MATDDNS_API_KEY=testkey matdd
 scripts/api-test.sh http://localhost:18702 testkey
 ```
 
+## Install as an app (PWA)
+
+Matddns is an installable web app. Installing needs **HTTPS** (or `localhost`) – put it behind a
+TLS reverse proxy and set `MATDDNS_FORWARDED_HEADERS=true`.
+
+| Platform | How |
+|---|---|
+| Android / Chrome, desktop Chrome / Edge | the **Install app** button in the menu (or the browser's install icon) |
+| iOS / Safari | **Share → Add to Home Screen** (iOS has no install button for web apps) |
+
+**Offline and reconnecting**
+
+- Offline, the **dashboard** shows the last copy that was loaded, marked as "last known state".
+  Every other page shows an offline screen that retries by itself and opens the page you wanted as
+  soon as the server answers.
+- Forms are **not** sent while offline (nothing is queued or replayed): the page stays as it is so
+  nothing you typed is lost, and a banner says so.
+- When the connection returns, read-only pages reload so no stale data stays on screen. The dashboard
+  also refreshes itself every 30 s while it is visible, and when the app comes back to the foreground.
+- Only the dashboard copy and the app files (styles, scripts, icons) are kept on the device. **Signing
+  out deletes the dashboard copy.** Pages with tokens or credentials are never stored.
+- A short "loading" bar and a busy button show that a request is running, so a slow DynDNS call can't be
+  sent twice by a second tap.
+
+**On phones:** pinch zoom stays available, form fields are 16 px so iOS doesn't zoom when one gets
+focus, and the layout respects the notch and the home indicator. The status bar follows the chosen
+accent (`theme-color`); on iOS the installed app keeps the standard status bar, so it stays readable in light and dark.
+
 ## How it is built
 
 - **.NET 8 / ASP.NET Core Razor Pages**, cookie auth (the management API uses a key instead), a hosted background updater service
+- UI on **MatUi**, the toolkit of the Mat design system (MatDesign): plain CSS and JavaScript, no
+  build step, one inline SVG icon sprite, light/dark/system theme. The toolkit files in
+  `src/wwwroot/matui` are a copy, not a link, so the app also works offline and as an installed app;
+  `scripts/update-matui.ps1` fetches a newer release from a running MatDesign. The few styles only
+  Matddns needs are in `src/wwwroot/css/matddns.css` (prefix `md-`); the service worker (`sw.js`) is
+  versioned with the build
 - `System.Text.Json` config in `/data/config.json` (atomic + fsync'd, schema-migrated on load);
   DataProtection keys in `/data/keys`
-- Passwords hashed with **PBKDF2-SHA256**; per-IP **rate limiting** on the login and push endpoints
+- Passwords hashed with **PBKDF2-SHA256** (600,000 iterations; older hashes are upgraded on the next
+  login, minimum length 8). Changing a password or deleting a user ends that account's sessions.
+- Per-IP **rate limiting** on the login page, the push endpoints and the monitoring API; request URLs
+  (which carry tokens) are kept out of the application log
+- Tests: `dotnet test tests/Matddns.Tests` (unit tests plus integration tests against the real app)
 - Docker (`mcr.microsoft.com/dotnet/aspnet:8.0`, non-root, `tzdata` for time zones)
 - GitHub Actions publishing to GHCR on every push to `main`
 

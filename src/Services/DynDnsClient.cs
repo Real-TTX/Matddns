@@ -45,7 +45,7 @@ public class DynDnsClient
             using var resp = await client.GetAsync(url, ct);
             var body = await resp.Content.ReadAsStringAsync(ct);
             var ok = resp.IsSuccessStatusCode && !IsDynDnsFailure(body);
-            return (ok, body.Trim());
+            return (ok, Shorten(body.Trim()));
         }
         catch (Exception ex)
         {
@@ -67,6 +67,12 @@ public class DynDnsClient
         var first = body.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
         return first != null && DynDnsFailureCodes.Contains(first);
     }
+
+    // The response ends up in the rule status, the log and /api/state: an HTML error page must not be stored in full.
+    private const int MaxResponseLength = 200;
+
+    private static string Shorten(string response) =>
+        response.Length <= MaxResponseLength ? response : response[..MaxResponseLength] + "…";
 
     // Removes query params with an empty value, e.g. an A-record push leaves "&myipv6=" -> dropped,
     // so the unused family is never sent (some providers would clear the record otherwise).

@@ -26,8 +26,9 @@ public class IndexModel : PageModel
         if (User.Identity?.IsAuthenticated != true && !_config.Read(c => c.Settings.AnonymousDashboard))
             return RedirectToPage("/Login");
         Snapshot = _status.Build(15);
-        Domains = _config.Read(c => c.Domains.ToList());
-        DynamicRules = _config.Read(c => c.Rules.Where(r => r.Dynamic).ToList());
+        var cfg = _config.Current;
+        Domains = cfg.Domains;
+        DynamicRules = cfg.Rules.Where(r => r.Dynamic).ToList();
         return Page();
     }
 }

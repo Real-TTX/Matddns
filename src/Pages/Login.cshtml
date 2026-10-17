@@ -1,27 +1,35 @@
 @page
 @model LoginModel
 @{
-    ViewData["Title"] = "Login – Matddns";
+    Layout = "_Bare";
+    ViewData["Title"] = "Sign in";
 }
-<div class="login-card">
-    <div class="brand">
-        <span class="logo">◈</span>
-        <span class="title">Matddns</span>
+
+<div class="mat-auth__card">
+    <div class="mat-auth__brand">
+        @Ui.Logo("lg")
+        <h1>@Ui.App.Name</h1>
+        <p class="mat-muted">@Ui.App.Tagline</p>
     </div>
-    <h1>Sign in</h1>
+
     @if (!string.IsNullOrEmpty(Model.Error))
     {
-        <div class="alert err">@Model.Error</div>
+        <div class="mat-alert mat-alert--danger" role="alert"><icon name="x-circle" /><div class="mat-alert__body">@Model.Error</div></div>
     }
-    <form method="post">
-        <div class="field">
-            <label for="Username">Username</label>
-            <input type="text" id="Username" name="Username" value="@Model.Username" autofocus autocomplete="username" />
+
+    <form method="post" class="mat-form" novalidate>
+        <partial name="_ValidationSummary" />
+
+        <mat-field label="Username" for-id="Username">
+            <input type="text" id="Username" name="Username" value="@Model.Username" class="mat-input" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required data-msg-required="Please enter your username." />
+        </mat-field>
+
+        <mat-field label="Password" for-id="Password">
+            <input type="password" id="Password" name="Password" class="mat-input" autocomplete="current-password" required data-msg-required="Please enter your password." />
+        </mat-field>
+
+        <div class="mat-btn-row mat-btn-row--plain">
+            <button type="submit" class="mat-btn mat-btn--primary mat-btn--block"><icon name="login" /><span>Sign in</span></button>
         </div>
-        <div class="field">
-            <label for="Password">Password</label>
-            <input type="password" id="Password" name="Password" autocomplete="current-password" />
-        </div>
-        <button type="submit">Sign in</button>
     </form>
 </div>

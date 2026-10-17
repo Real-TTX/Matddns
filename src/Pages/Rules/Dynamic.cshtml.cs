@@ -30,7 +30,7 @@ public class DynamicModel : PageModel
         Load();
         if (!string.IsNullOrEmpty(id))
         {
-            RuleItem = _config.Read(c => c.Rules.FirstOrDefault(r => r.Id == id && r.Dynamic));
+            RuleItem = _config.Current.Rules.FirstOrDefault(r => r.Id == id && r.Dynamic);
             if (RuleItem == null) { Error = "Dynamic rule not found"; return RedirectToPage("Index"); }
         }
         return Page();

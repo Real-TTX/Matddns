@@ -1,0 +1,51 @@
+@page
+@model Matddns.Pages.Users.IndexModel
+@{
+    ViewData["Title"] = "Users";
+    ViewData["Reconnect"] = "reload";
+    ViewData["Crumbs"] = Crumbs.Of(("Users", null));
+    var list = Model.List;
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="list.Toolbar" />
+
+    @if (list.Items.Count == 0)
+    {
+        <div class="mat-empty">
+            <span class="mat-empty__icon"><icon name="users" /></span>
+            <div class="mat-empty__title">Nothing matches</div>
+            <p>No user matches the search.</p>
+            <a class="mat-btn mat-btn--secondary" href="/Users">Reset the tools</a>
+        </div>
+    }
+    else
+    {
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">Users</caption>
+                <thead><tr><th scope="col">Username</th><th scope="col"><span class="mat-sr-only">Actions</span></th></tr></thead>
+                <tbody>
+                @foreach (var name in list.Items)
+                {
+                    var isYou = string.Equals(name, User.Identity?.Name, StringComparison.OrdinalIgnoreCase);
+                    <tr>
+                        <td data-label="Username"><div class="mat-table__name"><a href="/Users/Edit?name=@Uri.EscapeDataString(name)">@name</a>@if (isYou) { <span class="mat-tag">you</span> }</div></td>
+                        <td class="mat-table__cell-actions">
+                            <div class="mat-table__actions">
+                                <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Users/Edit?name=@Uri.EscapeDataString(name)" aria-label="Edit @name" data-tip="Edit"><icon name="edit" /></a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <partial name="_Pager" model="list.Pager" />
+
+    <div class="mat-actions">
+        <a href="/Users/Edit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>New user</span></a>
+    </div>
+</div>

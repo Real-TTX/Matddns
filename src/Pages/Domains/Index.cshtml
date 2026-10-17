@@ -1,90 +1,88 @@
 @page
 @model Matddns.Pages.Domains.IndexModel
 @{
-    ViewData["Title"] = "Domains – Matddns";
+    ViewData["Title"] = "Domains";
+    ViewData["Reconnect"] = "reload";
+    ViewData["Crumbs"] = Crumbs.Of(("Domains", null));
+    var list = Model.List;
 }
 
-<div class="page-header">
-    <div><h1>Domains</h1></div>
-    <a class="button" href="/Domains/Edit">+ New domain group</a>
-</div>
+<div class="mat-list">
+    <partial name="_Toolbar" model="list.Toolbar" />
 
-@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
-@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert err">@Model.Error</div> }
-
-@if (Model.Groups.Count == 0)
-{
-    <div class="empty-state">
-        No domain groups yet.<br />
-        <a class="button" style="margin-top:12px;" href="/Domains/Edit">Create the first group</a>
-    </div>
-}
-else
-{
-    <div data-dt>
-        <div class="table-toolbar">
-            <div class="dt-search">
-                <span class="ico">⌕</span>
-                <input type="text" data-dt-search placeholder="Search domains, records…" autocomplete="off" />
-            </div>
-            <select data-dt-filter="kind" aria-label="Filter by provider">
-                <option value="">All providers</option>
-                <option value="dyndns">DynDNS</option>
-                <option value="netcup">Netcup</option>
-                <option value="cloudflare">Cloudflare</option>
-                <option value="hetzner">Hetzner DNS</option>
-                <option value="godaddy">GoDaddy</option>
-                <option value="matddns">Matddns peer</option>
-            </select>
-            <span class="dt-count" data-dt-count></span>
+    @if (list.Items.Count == 0)
+    {
+        <div class="mat-empty">
+            <span class="mat-empty__icon"><icon name="globe" /></span>
+            @if (list.Toolbar.Total == 0)
+            {
+                <div class="mat-empty__title">No domain groups yet</div>
+                <a class="mat-btn mat-btn--primary" href="/Domains/Edit"><icon name="plus" /><span>Create the first group</span></a>
+            }
+            else
+            {
+                <div class="mat-empty__title">Nothing matches</div>
+                <p>No group matches. Change the search or the filter.</p>
+                <a class="mat-btn mat-btn--secondary" href="/Domains">Reset the tools</a>
+            }
         </div>
-        <div class="dtable-wrap">
-            <table class="dtable">
+    }
+    else
+    {
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">Domain groups and their records</caption>
                 <thead>
-                    <tr><th>Name</th><th class="hide-sm">Provider</th><th>Record</th><th>Type</th><th></th></tr>
+                    <tr><th scope="col">Name</th><th scope="col" class="mat-hide-sm">Provider</th><th scope="col">Record</th><th scope="col">Type</th><th scope="col"><span class="mat-sr-only">Actions</span></th></tr>
                 </thead>
-                @foreach (var g in Model.Groups)
+                <tbody>
+                @foreach (var g in list.Items)
                 {
-                    var kindKey = g.Kind switch { DomainKind.Netcup => "netcup", DomainKind.Cloudflare => "cloudflare", DomainKind.Hetzner => "hetzner", DomainKind.GoDaddy => "godaddy", DomainKind.Matddns => "matddns", _ => "dyndns" };
-                    var kindLabel = g.Kind switch { DomainKind.Netcup => "Netcup API", DomainKind.Cloudflare => "Cloudflare", DomainKind.Hetzner => "Hetzner DNS", DomainKind.GoDaddy => "GoDaddy", DomainKind.Matddns => "Matddns peer", _ => "DynDNS" };
                     var entries = g.Entries.ToList();
                     var dynForZone = Model.DynamicRules.Where(r => r.DomainGroupId == g.Id).ToList();
                     var childCount = entries.Count + dynForZone.Count;
-                    var search = $"{g.Name} {kindLabel} {string.Join(' ', entries.Select(e => $"{e.Hostname} {e.Type}"))} {string.Join(' ', dynForZone.Select(r => r.DynamicBaseFqdn))}";
-                    <tbody class="dt-group" data-search="@search" data-kind="@kindKey" data-href="/Domains/Edit?id=@g.Id">
-                        <tr class="dt-parent @(childCount > 0 ? "has-children" : "")">
-                            <td class="dt-name">@g.Name<partial name="_ManagedBadge" model="g.ManagedBy" /></td>
-                            <td class="hide-sm"><span class="badge @(g.Kind == DomainKind.DynDns ? "info" : "update")">@kindLabel</span> @if (dynForZone.Count > 0) { <span class="badge info">dynamic</span> }</td>
-                            <td class="cell-muted">@entries.Count record@(entries.Count == 1 ? "" : "s")</td>
+                    <tr class="md-parent @(childCount > 0 ? "has-children" : "")">
+                        <td data-label="Name"><div class="mat-table__name"><a href="/Domains/Edit?id=@g.Id">@g.Name</a><partial name="_ManagedBadge" model="g.ManagedBy" /></div></td>
+                        <td data-label="Provider" class="mat-hide-sm"><span class="mat-tag">@Labels.Domain(g.Kind)</span> @if (dynForZone.Count > 0) { <span class="mat-tag">dynamic</span> }</td>
+                        <td data-label="Records" class="mat-muted">@entries.Count record@(entries.Count == 1 ? "" : "s")</td>
+                        <td data-label="Type"></td>
+                        <td class="mat-table__cell-actions">
+                            <div class="mat-table__actions">
+                                <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Domains/Edit?id=@g.Id" aria-label="Edit @g.Name" data-tip="Edit"><icon name="edit" /></a>
+                            </div>
+                        </td>
+                    </tr>
+                    @for (var i = 0; i < entries.Count; i++)
+                    {
+                        var e = entries[i];
+                        <tr class="md-child @(i == childCount - 1 ? "is-last" : "")">
+                            <td data-label="Group"></td>
+                            <td data-label="Provider" class="mat-hide-sm"></td>
+                            <td data-label="Record" class="mat-mono"><span class="md-child__name">@e.Hostname</span></td>
+                            <td data-label="Type"><span class="mat-tag">@e.Type</span></td>
                             <td></td>
-                            <td class="dt-go">›</td>
                         </tr>
-                        @for (int i = 0; i < entries.Count; i++)
-                        {
-                            var e = entries[i];
-                            <tr class="dt-child @(i == childCount - 1 ? "last" : "")">
-                                <td></td>
-                                <td class="hide-sm"></td>
-                                <td class="mono"><span class="dt-sub">@e.Hostname</span></td>
-                                <td><span class="badge muted">@e.Type</span></td>
-                                <td></td>
-                            </tr>
-                        }
-                        @for (int j = 0; j < dynForZone.Count; j++)
-                        {
-                            var dr = dynForZone[j];
-                            <tr class="dt-child @(entries.Count + j == childCount - 1 ? "last" : "")">
-                                <td></td>
-                                <td class="hide-sm"></td>
-                                <td class="mono"><span class="dt-sub">*.@dr.DynamicBaseFqdn</span></td>
-                                <td><span class="badge info">dynamic</span></td>
-                                <td></td>
-                            </tr>
-                        }
-                    </tbody>
+                    }
+                    @for (var j = 0; j < dynForZone.Count; j++)
+                    {
+                        var dr = dynForZone[j];
+                        <tr class="md-child @(entries.Count + j == childCount - 1 ? "is-last" : "")">
+                            <td data-label="Group"></td>
+                            <td data-label="Provider" class="mat-hide-sm"></td>
+                            <td data-label="Record" class="mat-mono"><span class="md-child__name">*.@dr.DynamicBaseFqdn</span></td>
+                            <td data-label="Type"><span class="mat-tag">dynamic</span></td>
+                            <td></td>
+                        </tr>
+                    }
                 }
-                <tbody class="dt-empty" hidden><tr><td colspan="5">No domains match your search.</td></tr></tbody>
+                </tbody>
             </table>
         </div>
+    }
+
+    <partial name="_Pager" model="list.Pager" />
+
+    <div class="mat-actions">
+        <a href="/Domains/Edit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>New domain group</span></a>
     </div>
-}
+</div>

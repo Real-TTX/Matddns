@@ -14,267 +14,221 @@
     var isNew = Model.IsNew;
     var de = Model.TargetEntry;
     var isCname = de?.Type == DnsRecordType.CNAME;
-    ViewData["Title"] = (isNew ? "New rule" : $"{de?.Type} {de?.Hostname}") + " – Matddns";
+    var title = isNew ? "New rule" : $"{de?.Type} {de?.Hostname ?? "(target missing)"}";
+    ViewData["Title"] = title;
+    ViewData["ManagedBy"] = r?.ManagedBy;
+    ViewData["Crumbs"] = Crumbs.Of(("Rules", "/Rules"), (title, null));
+    ViewData["ActiveHref"] = "/Rules";
 }
-
-<a class="back-link" href="/Rules">‹ back to Rules</a>
-
-<div class="page-header">
-    <div>
-        <h1>
-            @if (isNew) { <text>New rule</text> }
-            else
-            {
-                <span class="badge info">@(de?.Type.ToString() ?? "?")</span>
-                <span class="mono">@(de?.Hostname ?? "(target missing)")</span>
-                <partial name="_ManagedBadge" model="r!.ManagedBy" />
-            }
-        </h1>
-    </div>
-</div>
-
-@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
-@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert err">@Model.Error</div> }
 
 @if (isNew && !Model.HasAnyRecord)
 {
-    <div class="alert err">No record yet – first create a record under <a href="/Domains">Domains</a> (e.g. <span class="mono">home1.example.com (A)</span>).</div>
+    <div class="mat-alert mat-alert--danger" role="alert">
+        <icon name="x-circle" />
+        <div class="mat-alert__body">No record yet. First create a record under <a href="/Domains">Domains</a>, for example <span class="mat-mono">home1.example.com (A)</span>.</div>
+    </div>
+    <div class="mat-actions"><a class="mat-btn mat-btn--secondary" href="/Rules"><icon name="back" /><span>Back</span></a></div>
 }
 else
 {
     @if (!isNew && !string.IsNullOrEmpty(r!.LastResult))
     {
-        var cls = r.LastResult.StartsWith("ok", StringComparison.OrdinalIgnoreCase) ? "ok"
+        var state = r.LastResult.StartsWith("ok", StringComparison.OrdinalIgnoreCase) ? "ok"
             : r.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase) ? "err" : "warn";
-        <div class="muted-small" style="margin-bottom:12px;">Last run @Tz.Format(r.LastRun) (@Tz.Label()) · <span class="badge @cls">@r.LastResult</span></div>
+        <p class="mat-muted">Last run @Tz.Format(r.LastRun) (@Tz.Label()) · <span class="@Ui.Pill(state)">@r.LastResult</span></p>
     }
 
-    <form method="post" asp-page-handler="@(isNew ? "Create" : "Save")">
+    <form method="post" asp-page-handler="@(isNew ? "Create" : "Save")" class="mat-form" novalidate>
         @if (!isNew) { <input type="hidden" name="Id" value="@r!.Id" /> }
+        <partial name="_ValidationSummary" />
 
-        <div class="card">
-            <div class="form-grid">
-                <div class="field full">
-                    <label>Domain</label>
-                    <select name="DomainEntryRef" required>
-                        @if (isNew) { <option value="">— select —</option> }
-                        @foreach (var d in Model.AllDomains)
-                        {
-                            foreach (var entry in d.Entries)
+        <div class="mat-card">
+            <div class="mat-card__body mat-stack">
+                <div class="mat-form__grid">
+                    <mat-field label="Domain" for-id="DomainEntryRef" required="true" full="true">
+                        <select id="DomainEntryRef" name="DomainEntryRef" class="mat-select" required data-msg-required="Please select a record.">
+                            @if (isNew) { <option value="">Select a record</option> }
+                            @foreach (var d in Model.AllDomains)
                             {
-                                var sel = r != null && d.Id == r.DomainGroupId && entry.Id == r.DomainEntryId;
-                                <option value="@(d.Id):@(entry.Id)" selected="@sel">@entry.Display · @d.Name</option>
+                                foreach (var entry in d.Entries)
+                                {
+                                    var sel = r != null && d.Id == r.DomainGroupId && entry.Id == r.DomainEntryId;
+                                    <option value="@(d.Id):@(entry.Id)" selected="@sel">@entry.Display · @d.Name</option>
+                                }
                             }
-                        }
-                    </select>
-                </div>
-
-                @if (!isNew)
-                {
-                    <div class="field">
-                        <label>Status</label>
-                        <select name="Enabled">
-                            <option value="true" selected="@r!.Enabled">enabled</option>
-                            <option value="false" selected="@(!r.Enabled)">disabled</option>
                         </select>
+                    </mat-field>
+
+                    <div class="mat-field">
+                        <label class="mat-label" for="IntervalSeconds">Re-check every (seconds)</label>
+                        <input type="number" id="IntervalSeconds" name="IntervalSeconds" value="@(r?.IntervalSeconds ?? 300)" min="0" max="86400" class="mat-input mat-mono" inputmode="numeric" />
+                        <span class="mat-error" aria-live="polite"></span>
                     </div>
-                }
-            </div>
-        </div>
 
-        <div class="section-title"><h2>Checks &amp; failover</h2></div>
-        <div class="card">
-            <div class="form-grid">
-                <div class="field full checkbox-field">
-                    <input type="checkbox" name="OnChange" value="true" id="onChange" checked="@(r == null || r.OnChange)" />
-                    <label for="onChange">React immediately when a source IP changes</label>
+                    <div class="mat-field mat-field--full">
+                        <label class="mat-check"><input type="checkbox" id="OnChange" name="OnChange" value="true" checked="@(r == null || r.OnChange)" /><span class="mat-check__text">React immediately when a source IP changes</span></label>
+                        @if (!isNew)
+                        {
+                            <label class="mat-check"><input type="checkbox" id="Enabled" name="Enabled" value="true" checked="@r!.Enabled" /><span class="mat-check__text">Enabled</span></label>
+                        }
+                    </div>
                 </div>
 
-                <div class="field">
-                    <label>Re-check every (sec.)</label>
-                    <input type="number" name="IntervalSeconds" value="@(r?.IntervalSeconds ?? 300)" min="0" max="86400" />
-                </div>
-
-                <div class="field full">
-                    <label>Failover validation</label>
-                    <label class="checkbox-row">
-                        <input type="checkbox" name="ValidatePing" value="true" checked="@(r != null && r.ValidatePing)" />
-                        <span>Ping (ICMP)</span>
-                    </label>
-                    <label class="checkbox-row">
-                        <input type="checkbox" name="ValidateTcp" value="true" data-validation checked="@(r != null && r.ValidateTcp)" />
-                        <span>TCP port open</span>
-                    </label>
-                </div>
-
-                <div class="field validation-port-field">
-                    <label>Port</label>
-                    <input type="number" name="ValidationPort" value="@(r?.ValidationPort ?? 443)" min="1" max="65535" />
-                </div>
-
+                <fieldset class="mat-fieldset">
+                    <legend class="mat-label">Failover validation</legend>
+                    <div class="mat-form__grid">
+                        <div class="mat-field mat-field--full">
+                            <label class="mat-check"><input type="checkbox" id="ValidatePing" name="ValidatePing" value="true" checked="@(r != null && r.ValidatePing)" /><span class="mat-check__text">Ping (ICMP)</span></label>
+                            <label class="mat-check"><input type="checkbox" id="validateTcp" name="ValidateTcp" value="true" checked="@(r != null && r.ValidateTcp)" /><span class="mat-check__text">TCP port open</span></label>
+                        </div>
+                        <div class="mat-field" data-show-if="#validateTcp" data-show-value="true" hidden="@(r == null || !r.ValidateTcp)">
+                            <label class="mat-label" for="ValidationPort">Port</label>
+                            <input type="number" id="ValidationPort" name="ValidationPort" value="@(r?.ValidationPort ?? 443)" min="1" max="65535" class="mat-input mat-mono" inputmode="numeric" />
+                            <span class="mat-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                </fieldset>
             </div>
         </div>
 
         @if (isNew)
         {
-            <div class="section-title"><h2>Failover sources</h2></div>
-            <div class="card">
+            <section class="mat-section">
+                <div class="mat-section__head"><h2>Failover sources</h2></div>
                 @if (Model.AllSources.SelectMany(s => s.Entries).Any())
                 {
-                    <div id="newSrcList" class="failover-list"></div>
-                    <div class="inline-form" style="margin-top:10px;">
-                        <div class="col">
-                            <select id="newSrcSelect">
-                                <option value="">— select source —</option>
-                                @foreach (var sg in Model.AllSources)
-                                {
-                                    foreach (var se in sg.Entries)
-                                    {
-                                        var lbl = SrcOption(sg, se);
-                                        <option value="@se.Id" data-label="@lbl">@lbl</option>
-                                    }
-                                }
-                            </select>
+                    <div class="mat-card" data-failover-picker>
+                        <div class="mat-card__body mat-stack">
+                            <div data-failover-list></div>
+                            <div class="mat-form__grid">
+                                <div class="mat-field mat-field--full">
+                                    <label class="mat-label" for="newSrcSelect">Add a source</label>
+                                    <div class="mat-input-group">
+                                        <select id="newSrcSelect" class="mat-select" data-failover-select>
+                                            <option value="">Select a source</option>
+                                            @foreach (var sg in Model.AllSources)
+                                            {
+                                                foreach (var se in sg.Entries)
+                                                {
+                                                    var lbl = SrcOption(sg, se);
+                                                    <option value="@se.Id" data-label="@lbl">@lbl</option>
+                                                }
+                                            }
+                                        </select>
+                                        <button type="button" class="mat-btn mat-btn--secondary" data-failover-add><icon name="plus" /><span>Add</span></button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div><button type="button" id="newSrcAdd">+ Add</button></div>
                     </div>
                 }
                 else
                 {
-                    <p class="muted-small" style="margin-top:0;">No sources yet — <a href="/Sources/Edit">add a source</a> first.</p>
+                    <p class="mat-muted">No sources yet. <a href="/Sources/Edit">Add a source</a> first.</p>
                 }
-            </div>
+            </section>
         }
 
-        <div class="actions">
-            <button type="submit">@(isNew ? "Create" : "Save")</button>
-            <a class="button ghost" href="/Rules">Cancel</a>
+        <div class="mat-btn-row">
+            <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>@(isNew ? "Create" : "Save")</span></button>
             @if (!isNew)
             {
-                <button type="submit" class="ghost" asp-page-handler="RunNow" asp-route-Id="@r!.Id">Run now</button>
-                <button type="submit" class="danger" asp-page-handler="Delete" asp-route-Id="@r.Id" onclick="return confirm('Delete rule?');">Delete rule</button>
+                <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="RunNow" asp-route-Id="@r!.Id"><icon name="play" /><span>Run now</span></button>
+            }
+            <a class="mat-btn mat-btn--secondary" href="/Rules"><icon name="back" /><span>Back</span></a>
+            @if (!isNew)
+            {
+                <span class="mat-btn-row__spacer"></span>
+                <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Delete" asp-route-Id="@r!.Id" data-confirm="Delete this rule?" data-confirm-ok="Delete rule"><icon name="trash" /><span>Delete</span></button>
             }
         </div>
     </form>
 
     @if (!isNew)
     {
-        <div class="section-title"><h2>Failover order</h2></div>
-        <div class="card">
-            <form method="post" asp-page-handler="SaveSources">
+        <section class="mat-section">
+            <div class="mat-section__head"><h2>Failover order</h2></div>
+            <form method="post" asp-page-handler="SaveSources" class="mat-form" novalidate>
                 <input type="hidden" name="Id" value="@r!.Id" />
-
-                <div class="failover-list">
-                @for (int i = 0; i < r.SourceEntryIdsInOrder.Count; i++)
+                <div class="mat-card">
+                    <div class="mat-card__body">
+                        @if (r.SourceEntryIdsInOrder.Count == 0)
+                        {
+                            <p class="mat-muted">No sources yet. Add one below.</p>
+                        }
+                        else
+                        {
+                            <div>
+                            @for (int i = 0; i < r.SourceEntryIdsInOrder.Count; i++)
+                            {
+                                var sid = r.SourceEntryIdsInOrder[i];
+                                var info = Model.SourceLookup.TryGetValue(sid, out var v) ? v : null;
+                                var ip = info?.Entry.CurrentIp;
+                                var status = info == null ? "none" : (string.IsNullOrEmpty(ip) ? "warn" : "ok");
+                                var cname = i < r.CnameTargets.Count ? r.CnameTargets[i] : "";
+                                var name = info != null ? $"{info.Group.Name} · {info.Entry.Label}" : "(unknown source)";
+                                <div class="md-failover__row @(isCname ? "md-failover__row--cname" : "")">
+                                    <span class="md-failover__index mat-mono">#@(i + 1)</span>
+                                    <div class="md-failover__name">
+                                        <div>@name</div>
+                                        <span class="@Ui.Pill(status) mat-mono">@(ip ?? "–")</span>
+                                    </div>
+                                    @if (isCname)
+                                    {
+                                        <div><input name="CnameTargets" value="@cname" class="mat-input mat-mono" placeholder="target.example.com" aria-label="CNAME target of @name" autocapitalize="none" spellcheck="false" /></div>
+                                    }
+                                    else
+                                    {
+                                        <input type="hidden" name="CnameTargets" value="@cname" />
+                                    }
+                                    <div class="md-failover__actions">
+                                        <button type="submit" class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" asp-page-handler="MoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid" asp-route-Dir="-1" data-tip="Move up" aria-label="Move @name up" disabled="@(i == 0)"><icon name="arrow-up" /></button>
+                                        <button type="submit" class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" asp-page-handler="MoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid" asp-route-Dir="1" data-tip="Move down" aria-label="Move @name down" disabled="@(i == r.SourceEntryIdsInOrder.Count - 1)"><icon name="arrow-down" /></button>
+                                        <button type="submit" class="mat-btn mat-btn--danger mat-btn--icon mat-btn--sm" asp-page-handler="RemoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid" data-confirm="Remove @name from this rule?" data-confirm-ok="Remove" data-tip="Remove" aria-label="Remove @name"><icon name="x" /></button>
+                                    </div>
+                                    <input type="hidden" name="SourceEntryIdsInOrder" value="@sid" />
+                                </div>
+                            }
+                            </div>
+                        }
+                    </div>
+                </div>
+                @if (r.SourceEntryIdsInOrder.Count > 0)
                 {
-                    var sid = r.SourceEntryIdsInOrder[i];
-                    var info = Model.SourceLookup.TryGetValue(sid, out var v) ? v : null;
-                    var ip = info?.Entry.CurrentIp;
-                    var status = info == null ? "muted" : (string.IsNullOrEmpty(ip) ? "warn" : "ok");
-                    var cname = i < r.CnameTargets.Count ? r.CnameTargets[i] : "";
-                    <div class="failover-row">
-                        <span class="idx">#@(i + 1)</span>
-                        <div>
-                            <div>@(info != null ? $"{info.Group.Name} · {info.Entry.Label}" : "(unknown source)")</div>
-                            <div class="status-pill"><span class="status-dot @status"></span><span class="mono">@(ip ?? "–")</span></div>
-                        </div>
-                        <div>
-                            @if (isCname)
-                            {
-                                <input name="CnameTargets" value="@cname" placeholder="target.example.com" />
-                            }
-                            else
-                            {
-                                <input type="hidden" name="CnameTargets" value="@cname" />
-                            }
-                        </div>
-                        <div class="move-btns">
-                            <button type="submit" class="ghost" asp-page-handler="MoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid" asp-route-Dir="-1" title="up" disabled="@(i == 0)">↑</button>
-                            <button type="submit" class="ghost" asp-page-handler="MoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid" asp-route-Dir="1" title="down" disabled="@(i == r.SourceEntryIdsInOrder.Count - 1)">↓</button>
-                        </div>
-                        <button type="submit" class="danger" asp-page-handler="RemoveSource" asp-route-Id="@r.Id" asp-route-SourceId="@sid">Remove</button>
-                        <input type="hidden" name="SourceEntryIdsInOrder" value="@sid" />
+                    <div class="mat-actions">
+                        <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>@(isCname ? "Save order and CNAME targets" : "Save order")</span></button>
                     </div>
                 }
-                </div>
-                @if (r.SourceEntryIdsInOrder.Count == 0)
-                {
-                    <div class="muted">No sources yet – add below.</div>
-                }
-                else
-                {
-                    <div class="actions"><button type="submit">@(isCname ? "Save order & CNAME targets" : "Save order")</button></div>
-                }
             </form>
+        </section>
 
-            <form method="post" asp-page-handler="AddSource" class="inline-form" style="margin-top:16px;">
+        <section class="mat-section">
+            <div class="mat-section__head"><h2>Add a source</h2></div>
+            <form method="post" asp-page-handler="AddSource" class="mat-form" novalidate>
                 <input type="hidden" name="Id" value="@r!.Id" />
-                <div class="col">
-                    <label>Add source</label>
-                    <select name="SourceEntryId" required>
-                        <option value="">— select —</option>
-                        @foreach (var sg in Model.AllSources)
-                        {
-                            foreach (var se in sg.Entries)
-                            {
-                                if (r.SourceEntryIdsInOrder.Contains(se.Id)) continue;
-                                <option value="@se.Id">@SrcOption(sg, se)</option>
-                            }
-                        }
-                    </select>
+                <div class="mat-card">
+                    <div class="mat-card__body">
+                        <div class="mat-form__grid">
+                            <mat-field label="Source" for-id="SourceEntryId" required="true" full="true">
+                                <select id="SourceEntryId" name="SourceEntryId" class="mat-select" required data-msg-required="Please select a source.">
+                                    <option value="">Select a source</option>
+                                    @foreach (var sg in Model.AllSources)
+                                    {
+                                        foreach (var se in sg.Entries)
+                                        {
+                                            if (r.SourceEntryIdsInOrder.Contains(se.Id)) continue;
+                                            <option value="@se.Id">@SrcOption(sg, se)</option>
+                                        }
+                                    }
+                                </select>
+                            </mat-field>
+                        </div>
+                    </div>
                 </div>
-                <div><button type="submit">+ Add</button></div>
+                <div class="mat-actions">
+                    <button type="submit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>Add source</span></button>
+                </div>
             </form>
-        </div>
+        </section>
     }
 }
-
-<script>
-    (function () {
-        var tcp = document.querySelector('input[data-validation]');
-        var portField = document.querySelector('.validation-port-field');
-        if (!tcp || !portField) return;
-        function sync() { portField.style.display = tcp.checked ? '' : 'none'; }
-        tcp.addEventListener('change', sync);
-        sync();
-    })();
-
-    // ordered failover-source picker on the new-rule form
-    (function () {
-        var sel = document.getElementById('newSrcSelect');
-        var add = document.getElementById('newSrcAdd');
-        var list = document.getElementById('newSrcList');
-        if (!sel || !add || !list) return;
-        var items = [];
-        function swap(i, j) { var t = items[i]; items[i] = items[j]; items[j] = t; render(); }
-        function render() {
-            list.innerHTML = '';
-            items.forEach(function (it, i) {
-                var row = document.createElement('div');
-                row.className = 'failover-row';
-                var idx = document.createElement('span'); idx.className = 'idx'; idx.textContent = '#' + (i + 1);
-                var name = document.createElement('div'); name.textContent = it.label;
-                var spacer = document.createElement('div');
-                var moves = document.createElement('div'); moves.className = 'move-btns';
-                var up = document.createElement('button'); up.type = 'button'; up.textContent = '↑'; up.disabled = i === 0;
-                up.addEventListener('click', function () { swap(i, i - 1); });
-                var down = document.createElement('button'); down.type = 'button'; down.textContent = '↓'; down.disabled = i === items.length - 1;
-                down.addEventListener('click', function () { swap(i, i + 1); });
-                moves.appendChild(up); moves.appendChild(down);
-                var rm = document.createElement('button'); rm.type = 'button'; rm.className = 'danger'; rm.textContent = '✕';
-                rm.addEventListener('click', function () { items.splice(i, 1); render(); });
-                var hid = document.createElement('input'); hid.type = 'hidden'; hid.name = 'SourceEntryIdsInOrder'; hid.value = it.id;
-                [idx, name, spacer, moves, rm, hid].forEach(function (el) { row.appendChild(el); });
-                list.appendChild(row);
-            });
-        }
-        add.addEventListener('click', function () {
-            var v = sel.value;
-            if (!v || items.some(function (x) { return x.id === v; })) return;
-            var opt = sel.options[sel.selectedIndex];
-            items.push({ id: v, label: opt.getAttribute('data-label') || opt.text });
-            sel.value = '';
-            render();
-        });
-    })();
-</script>

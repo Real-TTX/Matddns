@@ -19,7 +19,6 @@ public class SystemModel : PageModel
     public string CurrentTimeZone { get; private set; } = "";
     public bool AnonymousDashboard { get; private set; }
     public List<TimeZoneInfo> Zones { get; private set; } = new();
-    public List<string> Users { get; private set; } = new();
     public long LogFileBytes { get; private set; }
 
     [TempData] public string? Notice { get; set; }
@@ -32,7 +31,6 @@ public class SystemModel : PageModel
         CurrentTimeZone = tz ?? "";
         AnonymousDashboard = anon;
         Zones = TimeZoneInfo.GetSystemTimeZones().OrderBy(z => z.Id, StringComparer.Ordinal).ToList();
-        Users = _config.Read(c => c.Users.Select(u => u.Username).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList());
         LogFileBytes = _log.LogFileBytes();
     }
 

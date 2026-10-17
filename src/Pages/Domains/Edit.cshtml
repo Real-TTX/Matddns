@@ -3,319 +3,220 @@
 @{
     var g = Model.Group;
     var isNew = Model.IsNew;
-    ViewData["Title"] = (isNew ? "New domain group" : g!.Name) + " – Matddns";
+    ViewData["Title"] = isNew ? "New domain group" : g!.Name;
+    ViewData["ManagedBy"] = g?.ManagedBy;
+    ViewData["Crumbs"] = Crumbs.Of(("Domains", "/Domains"), (isNew ? "New domain group" : g!.Name, null));
+    ViewData["ActiveHref"] = "/Domains";
     var kind = g?.Kind ?? DomainKind.DynDns;
     var zoneBased = kind is DomainKind.Netcup or DomainKind.Cloudflare or DomainKind.Hetzner or DomainKind.GoDaddy;   // record-name + zone, like Netcup
+    var keep = isNew ? "" : "Leave empty to keep the current one";
 }
 
-<a class="back-link" href="/Domains">‹ back to Domains</a>
+<form method="post" asp-page-handler="@(isNew ? "Create" : "Save")" class="mat-form" novalidate>
+    @if (!isNew) { <input type="hidden" name="Id" value="@g!.Id" /> }
+    <partial name="_ValidationSummary" />
 
-<div class="page-header">
-    <div>
-        <h1>@(isNew ? "New domain group" : g!.Name)<partial name="_ManagedBadge" model="g?.ManagedBy" /></h1>
-    </div>
-</div>
+    <div class="mat-card">
+        <div class="mat-card__body mat-stack">
+            <div class="mat-form__grid">
+                <mat-field label="Name" for-id="Name" required="true" full="true">
+                    <input type="text" id="Name" name="Name" value="@(g?.Name ?? "")" class="mat-input" required placeholder="e.g. Netcup main account" data-msg-required="Please enter a name." />
+                </mat-field>
 
-@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
-@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert err">@Model.Error</div> }
-
-<div class="card">
-    <form method="post" asp-page-handler="@(isNew ? "Create" : "Save")">
-        @if (!isNew) { <input type="hidden" name="Id" value="@g!.Id" /> }
-
-        <div class="form-grid">
-            <div class="field full">
-                <label>Name</label>
-                <input type="text" name="Name" value="@(g?.Name ?? "")" required placeholder="e.g. Netcup main account" />
-            </div>
-
-            <div class="field full">
-                <label>Type</label>
                 @if (isNew)
                 {
-                    <select name="Kind" id="kindSelect">
-                        <option value="DynDns">DynDNS</option>
-                        <option value="Netcup">Netcup</option>
-                        <option value="Cloudflare">Cloudflare</option>
-                        <option value="Hetzner">Hetzner DNS</option>
-                        <option value="GoDaddy">GoDaddy</option>
-                        <option value="Matddns">Matddns peer</option>
-                    </select>
+                    <mat-field label="Type" for-id="kindSelect" full="true">
+                        <select name="Kind" id="kindSelect" class="mat-select">
+                            @foreach (var k in Enum.GetValues<DomainKind>())
+                            {
+                                <option value="@k">@Labels.Domain(k)</option>
+                            }
+                        </select>
+                    </mat-field>
                 }
                 else
                 {
-                    var kindLabel = kind switch { DomainKind.Netcup => "Netcup", DomainKind.Cloudflare => "Cloudflare", DomainKind.Hetzner => "Hetzner DNS", DomainKind.GoDaddy => "GoDaddy", DomainKind.Matddns => "Matddns peer", _ => "DynDNS" };
-                    <input type="text" value="@kindLabel" disabled />
+                    <mat-field label="Type" for-id="kindFixed" full="true">
+                        <input type="text" id="kindFixed" value="@Labels.Domain(kind)" class="mat-input mat-input--plain" readonly />
+                    </mat-field>
                 }
             </div>
-        </div>
 
-        <!-- DynDNS fields -->
-        <div class="type-fields @(kind == DomainKind.DynDns ? "active" : "")" data-kind="DynDns">
-            <div class="form-grid" style="margin-top:16px;">
-                <div class="field full">
-                    <label>Provider preset</label>
-                    <select id="dynProvider">
+            @* The type-specific fields: all are in the form, only the block of the chosen type is shown (data-show-if). *@
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="DynDns" hidden="@(kind != DomainKind.DynDns)">
+                <mat-field label="Provider preset" for-id="dynProvider" full="true">
+                    <select id="dynProvider" class="mat-select" data-url-preset="#dynUrlInput">
                         <option value="">Custom / manual</option>
-                        <option value="matddns">Matddns (another instance)</option>
-                        <option value="changeip">ChangeIP</option>
-                        <option value="ddnss">DDNSS.de</option>
-                        <option value="desec">deSEC</option>
-                        <option value="dd24">Domain Discount 24</option>
-                        <option value="duckdns">DuckDNS</option>
-                        <option value="dyndns">DynDNS.org</option>
-                        <option value="dnsomatic">DNS-O-Matic</option>
-                        <option value="dynu">Dynu</option>
-                        <option value="dynv6">DynV6</option>
-                        <option value="easydns">EasyDNS</option>
-                        <option value="freedns">FreeDNS (afraid.org)</option>
-                        <option value="goip">GoIP.de</option>
-                        <option value="henet">Hurricane Electric</option>
-                        <option value="ipv64">ipv64.net</option>
-                        <option value="noip">No-IP</option>
-                        <option value="nowdns">Now-DNS</option>
-                        <option value="opendns">OpenDNS</option>
-                        <option value="selfhost">Selfhost.de</option>
-                        <option value="spdyn">SPDYN</option>
-                        <option value="strato">Strato</option>
-                        <option value="variomedia">Variomedia</option>
-                        <option value="zoneedit">Zoneedit</option>
+                        @foreach (var p in DynDnsPresets.All(Model.BaseUrl))
+                        {
+                            <option value="@p.Key" data-url="@p.Url">@p.Label</option>
+                        }
                     </select>
+                </mat-field>
+                <mat-field label="Update URL" for-id="dynUrlInput" full="true">
+                    <input type="text" id="dynUrlInput" name="DynUrl" value="@(g?.DynDns?.UpdateUrl ?? "")" class="mat-input mat-mono" placeholder="https://example.org/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}" autocapitalize="none" spellcheck="false" />
+                </mat-field>
+                <mat-field label="Username" for-id="DynUser">
+                    <input type="text" id="DynUser" name="DynUser" value="@(g?.DynDns?.Username ?? "")" class="mat-input" autocomplete="off" autocapitalize="none" />
+                </mat-field>
+                <mat-field label="Password or token" for-id="DynPass">
+                    <input type="password" id="DynPass" name="DynPass" class="mat-input" placeholder="@keep" autocomplete="new-password" />
+                </mat-field>
+            </div>
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="Netcup" hidden="@(kind != DomainKind.Netcup)">
+                <mat-field label="Customer number" for-id="NcCustomer">
+                    <input type="text" id="NcCustomer" name="NcCustomer" value="@(g?.Netcup?.CustomerNumber ?? "")" class="mat-input mat-mono" inputmode="numeric" />
+                </mat-field>
+                <mat-field label="API key" for-id="NcKey">
+                    <input type="password" id="NcKey" name="NcKey" class="mat-input" placeholder="@keep" autocomplete="new-password" />
+                </mat-field>
+                <mat-field label="API password" for-id="NcPass" full="true">
+                    <input type="password" id="NcPass" name="NcPass" class="mat-input" placeholder="@keep" autocomplete="new-password" />
+                </mat-field>
+                <div class="mat-field mat-field--full">
+                    <label class="mat-check"><input type="checkbox" id="NcAllowDynamic" name="NcAllowDynamic" value="true" checked="@(g?.Netcup?.AllowDynamic == true)" /><span class="mat-check__text">Allow dynamic records (create them on demand)</span></label>
                 </div>
-                <div class="field full">
-                    <label>Update URL</label>
-                    <input type="text" id="dynUrlInput" name="DynUrl" value="@(g?.DynDns?.UpdateUrl ?? "")" placeholder="https://example.org/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}" />
+            </div>
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="Cloudflare" hidden="@(kind != DomainKind.Cloudflare)">
+                <mat-field label="API token" for-id="CfToken" full="true">
+                    <input type="password" id="CfToken" name="CfToken" class="mat-input" placeholder="@(isNew ? "Cloudflare API token (Zone.DNS edit)" : keep)" autocomplete="new-password" />
+                </mat-field>
+                <div class="mat-field mat-field--full">
+                    <label class="mat-check"><input type="checkbox" id="CfAllowDynamic" name="CfAllowDynamic" value="true" checked="@(g?.Cloudflare?.AllowDynamic == true)" /><span class="mat-check__text">Allow dynamic records (create them on demand)</span></label>
                 </div>
-                <div class="field">
-                    <label>Username</label>
-                    <input type="text" name="DynUser" value="@(g?.DynDns?.Username ?? "")" autocomplete="off" />
+            </div>
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="Hetzner" hidden="@(kind != DomainKind.Hetzner)">
+                <mat-field label="API token" for-id="HzToken" full="true">
+                    <input type="password" id="HzToken" name="HzToken" class="mat-input" placeholder="@(isNew ? "Cloud API token (read & write)" : keep)" autocomplete="new-password" />
+                </mat-field>
+                <div class="mat-field mat-field--full">
+                    <label class="mat-check"><input type="checkbox" id="HzAllowDynamic" name="HzAllowDynamic" value="true" checked="@(g?.Hetzner?.AllowDynamic == true)" /><span class="mat-check__text">Allow dynamic records (create them on demand)</span></label>
                 </div>
-                <div class="field">
-                    <label>Password / Token</label>
-                    <input type="password" name="DynPass" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
+            </div>
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="Matddns" hidden="@(kind != DomainKind.Matddns)">
+                <mat-field label="Peer base URL" for-id="MdUrl" full="true">
+                    <input type="url" id="MdUrl" name="MdUrl" value="@(g?.Matddns?.BaseUrl ?? "")" class="mat-input" placeholder="https://dyndns.example.com" autocapitalize="none" spellcheck="false" data-msg-type="Please enter an address like https://dyndns.example.com." />
+                </mat-field>
+                <mat-field label="Token" for-id="MdToken" full="true">
+                    <input type="password" id="MdToken" name="MdToken" class="mat-input" placeholder="@(isNew ? "A DynDNS Server token on the peer" : keep)" autocomplete="new-password" />
+                </mat-field>
+            </div>
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="GoDaddy" hidden="@(kind != DomainKind.GoDaddy)">
+                <mat-field label="API key" for-id="GdKey">
+                    <input type="password" id="GdKey" name="GdKey" class="mat-input" placeholder="@keep" autocomplete="new-password" />
+                </mat-field>
+                <mat-field label="API secret" for-id="GdSecret">
+                    <input type="password" id="GdSecret" name="GdSecret" class="mat-input" placeholder="@keep" autocomplete="new-password" />
+                </mat-field>
+                <div class="mat-field mat-field--full">
+                    <label class="mat-check"><input type="checkbox" id="GdAllowDynamic" name="GdAllowDynamic" value="true" checked="@(g?.GoDaddy?.AllowDynamic == true)" /><span class="mat-check__text">Allow dynamic records (create them on demand)</span></label>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Netcup fields -->
-        <div class="type-fields @(kind == DomainKind.Netcup ? "active" : "")" data-kind="Netcup">
-            <div class="form-grid" style="margin-top:16px;">
-                <div class="field">
-                    <label>Customer no.</label>
-                    <input type="text" name="NcCustomer" value="@(g?.Netcup?.CustomerNumber ?? "")" />
-                </div>
-                <div class="field">
-                    <label>API key</label>
-                    <input type="password" name="NcKey" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
-                </div>
-                <div class="field full">
-                    <label>API password</label>
-                    <input type="password" name="NcPass" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
-                </div>
-                <div class="field full checkbox-field">
-                    <input type="checkbox" name="NcAllowDynamic" value="true" id="ncDyn" @(g?.Netcup?.AllowDynamic == true ? "checked" : "") />
-                    <label for="ncDyn">Allow dynamic records (create on demand)</label>
-                </div>
-            </div>
-        </div>
-
-        <!-- Cloudflare fields -->
-        <div class="type-fields @(kind == DomainKind.Cloudflare ? "active" : "")" data-kind="Cloudflare">
-            <div class="form-grid" style="margin-top:16px;">
-                <div class="field full">
-                    <label>API token</label>
-                    <input type="password" name="CfToken" placeholder="@(isNew ? "Cloudflare API token (Zone.DNS edit)" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
-                </div>
-                <div class="field full checkbox-field">
-                    <input type="checkbox" name="CfAllowDynamic" value="true" id="cfDyn" @(g?.Cloudflare?.AllowDynamic == true ? "checked" : "") />
-                    <label for="cfDyn">Allow dynamic records (create on demand)</label>
-                </div>
-            </div>
-        </div>
-
-        <!-- Hetzner DNS fields -->
-        <div class="type-fields @(kind == DomainKind.Hetzner ? "active" : "")" data-kind="Hetzner">
-            <div class="form-grid" style="margin-top:16px;">
-                <div class="field full">
-                    <label>API token</label>
-                    <input type="password" name="HzToken" placeholder="@(isNew ? "Hetzner DNS API token" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
-                </div>
-                <div class="field full checkbox-field">
-                    <input type="checkbox" name="HzAllowDynamic" value="true" id="hzDyn" @(g?.Hetzner?.AllowDynamic == true ? "checked" : "") />
-                    <label for="hzDyn">Allow dynamic records (create on demand)</label>
-                </div>
-            </div>
-        </div>
-
-        <!-- Matddns peer fields -->
-        <div class="type-fields @(kind == DomainKind.Matddns ? "active" : "")" data-kind="Matddns">
-            <div class="form-grid" style="margin-top:16px;">
-                <div class="field full">
-                    <label>Peer base URL</label>
-                    <input type="text" name="MdUrl" value="@(g?.Matddns?.BaseUrl ?? "")" placeholder="https://dyndns.example.com" />
-                </div>
-                <div class="field full">
-                    <label>Token</label>
-                    <input type="password" name="MdToken" placeholder="@(isNew ? "a DynDNS-Server token on the peer" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
-                </div>
-            </div>
-        </div>
-
-        <!-- GoDaddy fields -->
-        <div class="type-fields @(kind == DomainKind.GoDaddy ? "active" : "")" data-kind="GoDaddy">
-            <div class="form-grid" style="margin-top:16px;">
-                <div class="field">
-                    <label>API key</label>
-                    <input type="password" name="GdKey" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
-                </div>
-                <div class="field">
-                    <label>API secret</label>
-                    <input type="password" name="GdSecret" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
-                </div>
-                <div class="field full checkbox-field">
-                    <input type="checkbox" name="GdAllowDynamic" value="true" id="gdDyn" @(g?.GoDaddy?.AllowDynamic == true ? "checked" : "") />
-                    <label for="gdDyn">Allow dynamic records (create on demand)</label>
-                </div>
-            </div>
-        </div>
-
-        <div class="actions">
-            <button type="submit">@(isNew ? "Create" : "Save")</button>
-            <a class="button ghost" href="/Domains">Cancel</a>
-            @if (!isNew)
-            {
-                <button type="submit" class="danger" asp-page-handler="Delete" name="Id" value="@g!.Id" onclick="return confirm('Delete group incl. records and related rules?');">Delete group</button>
-            }
-        </div>
-    </form>
-</div>
+    <div class="mat-btn-row">
+        <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>@(isNew ? "Create" : "Save")</span></button>
+        <a class="mat-btn mat-btn--secondary" href="/Domains"><icon name="back" /><span>Back</span></a>
+        @if (!isNew)
+        {
+            <span class="mat-btn-row__spacer"></span>
+            <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Delete" name="Id" value="@g!.Id" data-confirm="Delete the group @g.Name with its records and the rules that use them?" data-confirm-ok="Delete group"><icon name="trash" /><span>Delete</span></button>
+        }
+    </div>
+</form>
 
 @if (!isNew)
 {
-    <div class="section-title"><h2>Records</h2></div>
-    <div class="card">
-        <table>
-            <thead>
-                <tr>
-                    @if (zoneBased)
-                    {
-                        <th>Record (host)</th>
-                        <th>Zone</th>
-                    }
-                    <th>Full name</th>
-                    <th>Type</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var e in g!.Entries)
-            {
-                <tr>
-                    @if (zoneBased)
-                    {
-                        <td class="mono">@(string.IsNullOrEmpty(e.RecordName) ? "@" : e.RecordName)</td>
-                        <td class="mono">@(e.Domain ?? "—")</td>
-                    }
-                    <td class="mono">@e.Hostname</td>
-                    <td><span class="badge info">@e.Type</span></td>
-                    <td style="text-align:right">
-                        <form method="post" asp-page-handler="DeleteEntry" style="display:inline">
-                            <input type="hidden" name="Id" value="@g.Id" />
-                            <input type="hidden" name="EntryId" value="@e.Id" />
-                            <button type="submit" class="danger" onclick="return confirm('Remove record?');">Remove</button>
-                        </form>
-                    </td>
-                </tr>
-            }
-            @if (g.Entries.Count == 0)
-            {
-                <tr><td colspan="@(zoneBased ? 5 : 3)" class="muted">No records yet.</td></tr>
-            }
-            </tbody>
-        </table>
+    <section class="mat-section">
+        <div class="mat-section__head"><h2>Records</h2></div>
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">Records of @g!.Name</caption>
+                <thead>
+                    <tr>
+                        @if (zoneBased)
+                        {
+                            <th scope="col">Record</th>
+                            <th scope="col" class="mat-hide-sm">Zone</th>
+                        }
+                        <th scope="col">Full name</th>
+                        <th scope="col">Type</th>
+                        <th scope="col"><span class="mat-sr-only">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var e in g.Entries)
+                {
+                    <tr>
+                        @if (zoneBased)
+                        {
+                            <td data-label="Record" class="mat-mono">@(string.IsNullOrEmpty(e.RecordName) ? "@" : e.RecordName)</td>
+                            <td data-label="Zone" class="mat-hide-sm mat-mono">@(e.Domain ?? "–")</td>
+                        }
+                        <td data-label="Full name" class="mat-mono">@e.Hostname</td>
+                        <td data-label="Type"><span class="mat-tag">@e.Type</span></td>
+                        <td class="mat-table__cell-actions">
+                            <div class="mat-table__actions">
+                                <form method="post" asp-page-handler="DeleteEntry" data-confirm="Remove the record @e.Hostname (@e.Type) and the rules that use it?" data-confirm-ok="Remove" data-confirm-danger>
+                                    <input type="hidden" name="Id" value="@g.Id" />
+                                    <input type="hidden" name="EntryId" value="@e.Id" />
+                                    <button type="submit" class="mat-btn mat-btn--danger mat-btn--icon mat-btn--sm" aria-label="Remove @e.Hostname (@e.Type)" data-tip="Remove"><icon name="trash" /></button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (g.Entries.Count == 0)
+                {
+                    <tr><td colspan="@(zoneBased ? 5 : 3)" class="mat-muted">No records yet.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
 
-        <form method="post" asp-page-handler="AddEntry" class="form-grid" style="margin-top:16px;">
+    <section class="mat-section">
+        <div class="mat-section__head"><h2>Add a record</h2></div>
+        <form method="post" asp-page-handler="AddEntry" class="mat-form" novalidate>
             <input type="hidden" name="Id" value="@g.Id" />
-            @if (zoneBased)
-            {
-                <div class="field">
-                    <label>Record / subdomain</label>
-                    <input type="text" name="RecordName" placeholder="@@, www or home1" />
+            <div class="mat-card">
+                <div class="mat-card__body">
+                    <div class="mat-form__grid">
+                        @if (zoneBased)
+                        {
+                            <mat-field label="Record or subdomain" for-id="RecordName">
+                                <input type="text" id="RecordName" name="RecordName" class="mat-input mat-mono" placeholder="@@, www or home1" autocapitalize="none" spellcheck="false" />
+                            </mat-field>
+                            <mat-field label="Domain or zone" for-id="DomainZone" required="true">
+                                <input type="text" id="DomainZone" name="DomainZone" class="mat-input mat-mono" required placeholder="example.com" autocapitalize="none" spellcheck="false" data-msg-required="Please enter the zone, for example example.com." />
+                            </mat-field>
+                        }
+                        else
+                        {
+                            <mat-field label="Hostname (FQDN)" for-id="Hostname" required="true" full="true">
+                                <input type="text" id="Hostname" name="Hostname" class="mat-input mat-mono" required placeholder="home1.example.com" autocapitalize="none" spellcheck="false" data-msg-required="Please enter the full hostname." />
+                            </mat-field>
+                        }
+                        <mat-field label="Type" for-id="Type">
+                            <select id="Type" name="Type" class="mat-select">
+                                <option value="A">A</option>
+                                <option value="AAAA">AAAA</option>
+                                @if (zoneBased) { <option value="CNAME">CNAME</option> }
+                            </select>
+                        </mat-field>
+                    </div>
                 </div>
-                <div class="field">
-                    <label>Domain / zone</label>
-                    <input type="text" name="DomainZone" required placeholder="example.com" />
-                </div>
-            }
-            else
-            {
-                <div class="field full">
-                    <label>Hostname (FQDN)</label>
-                    <input type="text" name="Hostname" required placeholder="home1.example.com" />
-                </div>
-            }
-            <div class="field">
-                <label>Type</label>
-                <select name="Type">
-                    <option value="A">A</option>
-                    <option value="AAAA">AAAA</option>
-                    @if (zoneBased) { <option value="CNAME">CNAME</option> }
-                </select>
             </div>
-            <div class="field full">
-                <button type="submit">+ Add record</button>
+            <div class="mat-actions">
+                <button type="submit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>Add record</span></button>
             </div>
         </form>
-    </div>
+    </section>
 }
-
-<script>
-    // type toggle (only on new, where the kind select exists)
-    (function () {
-        var sel = document.getElementById('kindSelect');
-        if (!sel) return;
-        var fields = document.querySelectorAll('.type-fields');
-        function sync() {
-            fields.forEach(function (f) {
-                f.classList.toggle('active', f.getAttribute('data-kind') === sel.value);
-            });
-        }
-        sel.addEventListener('change', sync);
-        sync();
-    })();
-
-    // DynDNS provider presets -> fill update URL
-    (function () {
-        var prov = document.getElementById('dynProvider');
-        var url = document.getElementById('dynUrlInput');
-        if (!prov || !url) return;
-        var presets = {
-            matddns: '@Model.BaseUrl/api/update?token={password}&ipv4={ipv4}&ipv6={ipv6}',
-            changeip: 'https://nic.changeip.com/nic/update?hostname={hostname}&myip={ipv4}',
-            ddnss: 'https://www.ddnss.de/upd.php?key={password}&host={hostname}&ip={ipv4}&ip6={ipv6}',
-            desec: 'https://update.dedyn.io/?hostname={hostname}&myipv4={ipv4}&myipv6={ipv6}',
-            dd24: 'https://dynamicdns.key-systems.net/update.php?hostname={hostname}&password={password}&ip={ipv4}',
-            duckdns: 'https://www.duckdns.org/update?domains={hostname}&token={password}&ip={ipv4}&ipv6={ipv6}',
-            dyndns: 'https://members.dyndns.org/v3/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
-            dnsomatic: 'https://updates.dnsomatic.com/nic/update?hostname={hostname}&myip={ipv4}',
-            dynu: 'https://api.dynu.com/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
-            dynv6: 'https://dynv6.com/api/update?hostname={hostname}&ipv4={ipv4}&ipv6={ipv6}&token={password}',
-            easydns: 'https://api.cp.easydns.com/dyn/tomato.php?hostname={hostname}&myip={ipv4}',
-            freedns: 'https://freedns.afraid.org/dynamic/update.php?{password}',
-            goip: 'https://www.goip.de/setip?subdomain={hostname}&username={user}&password={password}&ip={ipv4}',
-            henet: 'https://dyn.dns.he.net/nic/update?hostname={hostname}&myip={ipv4}',
-            ipv64: 'https://ipv64.net/update.php?key={password}&domain={hostname}&ip={ipv4}&ip6={ipv6}',
-            noip: 'https://dynupdate.no-ip.com/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
-            nowdns: 'https://now-dns.com/update?hostname={hostname}&myip={ipv4}',
-            opendns: 'https://updates.opendns.com/nic/update?hostname={hostname}&myip={ipv4}',
-            selfhost: 'https://carol.selfhost.de/nic/update?hostname={hostname}&myip={ipv4}',
-            spdyn: 'https://update.spdyn.de/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
-            strato: 'https://dyndns.strato.com/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
-            variomedia: 'https://dyndns.variomedia.de/nic/update?hostname={hostname}&myip={ipv4}&myipv6={ipv6}',
-            zoneedit: 'https://dynamic.zoneedit.com/auth/dynamic.html?host={hostname}&dnsto={ipv4}'
-        };
-        prov.addEventListener('change', function () {
-            if (presets[prov.value]) url.value = presets[prov.value];
-        });
-    })();
-</script>
