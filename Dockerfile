@@ -24,5 +24,9 @@ RUN apt-get update \
     && mkdir -p /data && useradd -u 10001 -m matddns && chown -R matddns:matddns /data /app
 COPY --from=build --chown=matddns:matddns /app ./
 USER matddns
+# Healthy while /api/health answers 200: ok or degraded (a source or a DNS provider failing); 503 only when Matddns cannot do its job
+# (config.json unreadable). The health of the Mat platform contract (MatDesign docs/PLATFORM.md): a degraded app must not count as unhealthy.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS -o /dev/null http://127.0.0.1:8080/api/health || exit 1
 VOLUME ["/data"]
 ENTRYPOINT ["dotnet", "Matddns.dll"]

@@ -14,7 +14,11 @@ public class AppConfig
 public class UserAccount
 {
     public string Username { get; set; } = "";
-    public string PasswordHash { get; set; } = "";
+    public string PasswordHash { get; set; } = ""; // empty for an account MatIdentity created: no local sign-in until a password is set
+
+    /// <summary>The claim <c>sub</c> of the person in MatIdentity this account is linked with; null = not linked (then not written to config.json).</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExternalSubject { get; set; }
 }
 
 public class AppSettings

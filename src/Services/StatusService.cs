@@ -128,7 +128,55 @@ public class StatusService
             RuleList = rules
         };
     }
+
+    /// <summary>The values of the platform overview (see <see cref="OverviewStatus"/>).</summary>
+    public OverviewStatus Overview()
+    {
+        var cfg = _config.Current;
+        var records = cfg.Rules.Where(r => !r.Dynamic && r.Enabled).ToList();
+        var entries = cfg.Sources.SelectMany(g => g.Entries.Select(e => (Group: g, Entry: e))).ToList();
+
+        // the failover winner of most records; before the first rule run the first source that has an IP
+        var activeId = records.Where(r => r.LastUsedSourceId != null)
+            .GroupBy(r => r.LastUsedSourceId!)
+            .OrderByDescending(g => g.Count())
+            .Select(g => g.Key)
+            .FirstOrDefault();
+        var active = entries.FirstOrDefault(x => x.Entry.Id == activeId);
+        if (active.Entry == null)
+            active = entries.FirstOrDefault(x => !string.IsNullOrEmpty(x.Entry.CurrentIp) || !string.IsNullOrEmpty(x.Entry.CurrentIpv6));
+
+        var ipv4 = Has(active.Entry?.CurrentIp) ? active.Entry!.CurrentIp : entries.Select(x => x.Entry.CurrentIp).FirstOrDefault(Has);
+        var ipv6 = Has(active.Entry?.CurrentIpv6) ? active.Entry!.CurrentIpv6 : entries.Select(x => x.Entry.CurrentIpv6).FirstOrDefault(Has);
+
+        return new OverviewStatus(
+            ipv4,
+            ipv6,
+            active.Entry == null ? null : $"{active.Group.Name} · {active.Entry.Label}",
+            records.Count(r => r.LastUsedSourceId != null && r.SourceEntryIdsInOrder.Count > 0 && r.LastUsedSourceId != r.SourceEntryIdsInOrder[0]),
+            records.Count,
+            records.Count(r => r.LastResult != null && r.LastResult.StartsWith("ok", StringComparison.OrdinalIgnoreCase)),
+            cfg.Rules.Max(r => r.LastChange),
+            _log.EntriesOfLevel(LogLevel.Error, 1).FirstOrDefault());
+
+        static bool Has(string? s) => !string.IsNullOrEmpty(s);
+    }
 }
+
+/// <summary>
+/// The few values of the overview of the Mat platform contract (the tiles of <c>/api/state</c>): the IPs that are written, where they come from,
+/// how many records are in failover and in sync, when a record was last written and the last error.
+/// </summary>
+/// <param name="Ipv4">The IPv4 of the active source (else of the first source that has one).</param>
+/// <param name="Ipv6">The IPv6 of the active source (else of the first source that has one).</param>
+/// <param name="ActiveSource">"Source · entry" that most enabled records are written from now; without a rule run, the first source with an IP.</param>
+/// <param name="Failovers">Enabled records written from a source other than their first choice.</param>
+/// <param name="Records">Enabled records (non-dynamic rules).</param>
+/// <param name="RecordsInSync">Of those, the ones whose last write succeeded.</param>
+/// <param name="LastUpdate">When a record was last written successfully.</param>
+/// <param name="LastError">The newest entry of the level Error in the log, or null.</param>
+public sealed record OverviewStatus(
+    string? Ipv4, string? Ipv6, string? ActiveSource, int Failovers, int Records, int RecordsInSync, DateTime? LastUpdate, LogEntry? LastError);
 
 public class StatusSnapshot
 {

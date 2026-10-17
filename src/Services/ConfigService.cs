@@ -24,6 +24,12 @@ public class ConfigService
         _auth = auth;
     }
 
+    /// <summary>config.json exists but could not be read nor backed up: Matddns runs on an empty config and saves nothing (platform health: down).</summary>
+    public bool SaveBlocked
+    {
+        get { lock (_lock) return _saveBlocked; }
+    }
+
     public AppConfig Current
     {
         get { lock (_lock) return CloneFrom(_config); }

@@ -9,11 +9,30 @@
         <span class="title">Matddns</span>
     </div>
     <h1>Sign in</h1>
+    @if (Model.PendingLink is not null)
+    {
+        <div class="alert ok" role="status" id="login-link">
+            <p>MatIdentity signed you in, and an account with this name already exists here.</p>
+            <p>Sign in once with the password of that account to connect it with MatIdentity, or cancel.</p>
+        </div>
+    }
+    else if (Model.LinkExpired)
+    {
+        <div class="alert err" role="status" id="login-link-expired">The connection with MatIdentity expired or was cancelled. Sign in again through MatIdentity to start over.</div>
+    }
+    @if (Model.SsoError)
+    {
+        <div class="alert err" role="alert" id="login-sso-error">The sign-in through MatIdentity did not work (or MatIdentity cannot be reached). Sign in with your password.</div>
+    }
+    @if (Model.Denied)
+    {
+        <div class="alert err" role="alert" id="login-denied">MatIdentity signed you in, but Matddns cannot match you to one account. Ask an administrator.</div>
+    }
     @if (!string.IsNullOrEmpty(Model.Error))
     {
         <div class="alert err">@Model.Error</div>
     }
-    <form method="post">
+    <form method="post" id="login-form">
         <div class="field">
             <label for="Username">Username</label>
             <input type="text" id="Username" name="Username" value="@Model.Username" autofocus autocomplete="username" />
@@ -22,6 +41,14 @@
             <label for="Password">Password</label>
             <input type="password" id="Password" name="Password" autocomplete="current-password" />
         </div>
-        <button type="submit">Sign in</button>
+        <button type="submit">@(Model.PendingLink is not null ? "Sign in and connect" : "Sign in")</button>
+        @if (Model.PendingLink is not null)
+        {
+            <button type="submit" class="ghost" asp-page-handler="CancelLink" id="login-link-cancel">Cancel</button>
+        }
     </form>
+    @if (Model.IdentityEnabled)
+    {
+        <p id="login-identity"><a class="button ghost" href="/Login">Sign in with MatIdentity</a></p>
+    }
 </div>

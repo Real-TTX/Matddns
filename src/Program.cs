@@ -1,6 +1,8 @@
 using System.Threading.RateLimiting;
 using Matddns.Api;
+using Matddns.Platform;
 using Matddns.Services;
+using MatPlatform;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -42,6 +44,19 @@ builder.Services.AddSingleton<TimeZoneService>();
 builder.Services.AddSingleton<PushReceiver>();
 builder.Services.AddSingleton<UpdaterService>(); // also injected by the management API (POST /api/v1/run)
 builder.Services.AddHostedService(sp => sp.GetRequiredService<UpdaterService>());
+builder.Services.AddSingleton<SettingsService>();
+builder.Services.AddSingleton<UserService>();
+
+// The Mat platform contract (MatDesign docs/PLATFORM.md): /api, /api/health, /api/state, /api/configure, /api/actions/{id}.
+// Its key is MAT_API_KEY; without it the engine key (MATDDNS_API_KEY, config Matddns:ApiKey) opens /api too, so a caller that has
+// only the engine key (an install from an older Mattiverse catalog) needs no second one. The engine API itself only takes the engine key.
+if (string.IsNullOrWhiteSpace(builder.Configuration[MatPlatformSettings.ApiKeyVariable]))
+{
+    var engineKey = Environment.GetEnvironmentVariable("MATDDNS_API_KEY");
+    if (string.IsNullOrWhiteSpace(engineKey)) engineKey = builder.Configuration["Matddns:ApiKey"];
+    if (!string.IsNullOrWhiteSpace(engineKey)) builder.Configuration[MatPlatformSettings.ApiKeyVariable] = engineKey.Trim();
+}
+var platform = builder.AddMatPlatform<MatddnsPlatform>(MatddnsPlatform.Describe);
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opt =>
@@ -53,6 +68,13 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         opt.LogoutPath = "/Logout";
         opt.ExpireTimeSpan = TimeSpan.FromDays(30);
         opt.SlidingExpiration = true;
+    })
+    // Sign-in through MatIdentity, only with MATIDENTITY_AUTHORITY (nothing changes without it); the local form stays at /Login?local=1.
+    .AddMatIdentitySignIn<MatddnsIdentityUsers>(platform, o =>
+    {
+        o.CookieScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        o.LoginPath = "/Login";
+        o.AccessDeniedPath = "/Login?local=1&denied=1";
     });
 
 builder.Services.AddAuthorization(opt =>
@@ -102,37 +124,17 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
+// An anonymous GET /api/state is a monitor: it gets the old monitoring state (see MonitoringCompatibility).
+app.UseMonitoringState();
 app.MapRazorPages();
 
 // Liveness + public monitoring endpoints (no authentication, for monitoring software).
 app.MapGet("/healthz", () => "ok").AllowAnonymous();
 
-app.MapGet("/api/health", (StatusService status) =>
-{
-    var s = status.Build(5);
-    var body = new
-    {
-        status = s.Ok ? "ok" : "degraded",
-        sources = s.Sources,
-        rules = s.Rules,
-        ipChanges = new { s.IpChanges.Total, s.IpChanges.Last24h, s.IpChanges.Last7d, s.IpChanges.LastChange },
-        time = s.Time
-    };
-    return s.Ok ? Results.Json(body) : Results.Json(body, statusCode: 503);
-}).AllowAnonymous();
-
-app.MapGet("/api/state", (StatusService status) =>
-{
-    var s = status.Build(50);
-    return Results.Json(new
-    {
-        status = s.Ok ? "ok" : "degraded",
-        time = s.Time,
-        sources = s.SourceList,
-        rules = s.RuleList,
-        ipChanges = s.IpChanges
-    });
-}).AllowAnonymous();
+// The platform contract (/api, /api/state with a key or token, /api/configure, /api/actions/{id}) and its /api/health, which also
+// carries the old monitoring fields (sources, rules, ipChanges): one answer for the monitors and the platform.
+app.MapMatPlatform();
+app.MapMonitoringHealth();
 
 // Peer pull: another Matddns instance reads this instance's source entries (IPs only, no secrets),
 // authenticated by any DynDNS-Server token on this instance.
