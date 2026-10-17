@@ -93,7 +93,7 @@ var app = builder.Build();
 if (Environment.GetEnvironmentVariable("MATDDNS_FORWARDED_HEADERS")?.Trim().ToLowerInvariant() is "1" or "true" or "yes")
 {
     var fho = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto };
-    fho.KnownNetworks.Clear(); // trust the proxy in front of us (typical container/reverse-proxy setup)
+    fho.KnownIPNetworks.Clear(); // trust the proxy in front of us (typical container/reverse-proxy setup)
     fho.KnownProxies.Clear();
     app.UseForwardedHeaders(fho);
 }
