@@ -110,6 +110,7 @@ public sealed class IdentityAutoSignInTests(IdentityFactory site) : IClassFixtur
         Assert.Contains("id=\"login-identity\"", html);
         Assert.Equal(ssoError, html.Contains("id=\"login-sso-error\""));
         Assert.Equal(denied, html.Contains("id=\"login-denied\""));
+        SignIn.IsMatUiPage(site, html);
     }
 
     [Fact]
@@ -252,6 +253,7 @@ public sealed class PendingLinkTests
         Assert.Contains("id=\"login-link\"", html);
         Assert.Contains("id=\"login-link-cancel\"", html);
         Assert.Contains("id=\"login-form\"", html);
+        SignIn.IsMatUiPage(site, html);
     }
 
     [Fact]

@@ -101,6 +101,18 @@ public class LoginModel : PageModel
         var passwordOk = _auth.Verify(Password, user?.PasswordHash ?? AuthService.DummyHash);
         if (user != null && passwordOk)
         {
+            // an older (weaker) hash is upgraded now that the password is known
+            if (_auth.NeedsRehash(user.PasswordHash))
+            {
+                var upgradedHash = _auth.Hash(Password);
+                _config.Mutate(c =>
+                {
+                    var stored = c.Users.FirstOrDefault(u => u.Username == user.Username);
+                    if (stored != null) stored.PasswordHash = upgradedHash;
+                });
+                user.PasswordHash = upgradedHash;
+            }
+
             // A pending link counts only for exactly the account that matched; it is deleted either way.
             string? idToken = null;
             if (MatIdentityPendingLink.TakeFor(HttpContext, user.Username) is { } pending
@@ -109,7 +121,7 @@ public class LoginModel : PageModel
                 idToken = pending.IdToken;
             }
 
-            await MatddnsSession.StartAsync(HttpContext, user.Username, idToken);
+            await MatddnsSession.StartAsync(HttpContext, user, idToken);
             _log.Log(Services.LogLevel.Info, "auth", $"login ok: {Username}");
             return SafeRedirect(returnUrl);
         }

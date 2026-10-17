@@ -4,412 +4,375 @@
     var g = Model.Group;
     var isNew = Model.IsNew;
     var kind = g?.Kind ?? SourceKind.PublicIp;
-    ViewData["Title"] = (isNew ? "New source" : g!.Name) + " – Matddns";
+    ViewData["Title"] = isNew ? "New source" : g!.Name;
+    ViewData["ManagedBy"] = g?.ManagedBy;
+    ViewData["Crumbs"] = Crumbs.Of(("Sources", "/Sources"), (isNew ? "New source" : g!.Name, null));
+    ViewData["ActiveHref"] = "/Sources";
+    var keep = isNew ? "" : "Leave empty to keep the current one";
+
+    // DynDNS Server (push) receiver: the URLs shown to the device or router
+    var baseUrl = Model.BaseUrl;
+    var token = g?.Push?.Token ?? "";
+    var host = baseUrl.Replace("https://", "").Replace("http://", "");
+    var isDyn = Model.DynamicRule != null;
+    var baseFqdn = Model.DynamicRule?.DynamicBaseFqdn ?? "";
+    var pushUrl = isDyn ? $"{baseUrl}/update?token={token}&hostname=<name>.{baseFqdn}&myip=%i" : $"{baseUrl}/api/update?token={token}&ipv4=<your-ipv4>&ipv6=<your-ipv6>";
+    var fritzUrl = isDyn ? $"{baseUrl}/nic/update?token={token}&hostname=<domain>&ipv4=<ipaddr>&ipv6=<ip6addr>" : $"{baseUrl}/nic/update?token={token}&ipv4=<ipaddr>&ipv6=<ip6addr>";
+    var unifiServer = isDyn ? $"{host}/update?token=%p&hostname=%h&ipv4=%i" : $"{host}/update?token=%p&ipv4=%i";
 }
-
-<a class="back-link" href="/Sources">‹ back to Sources</a>
-
-<div class="page-header">
-    <div>
-        <h1>@(isNew ? "New source group" : g!.Name)<partial name="_ManagedBadge" model="g?.ManagedBy" /></h1>
-    </div>
-</div>
-
-@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
-@if (!string.IsNullOrEmpty(Model.Error)) { <div class="alert err">@Model.Error</div> }
 
 @if (!string.IsNullOrEmpty(Model.TestResult))
 {
-    <div class="test-result @(Model.TestOk ? "ok" : "err")">
-        <strong>@(Model.TestOk ? "✓ Test succeeded" : "✗ Test failed")</strong>
-        <span class="mono">@Model.TestResult</span>
+    <div class="mat-alert @(Model.TestOk ? "mat-alert--success" : "mat-alert--danger")" role="@(Model.TestOk ? "status" : "alert")">
+        <icon name="@(Model.TestOk ? "check-circle" : "x-circle")" />
+        <div class="mat-alert__body"><span class="mat-alert__title">@(Model.TestOk ? "Test succeeded" : "Test failed")</span><span class="mat-mono">@Model.TestResult</span></div>
     </div>
 }
 
-<div class="card">
-    <form method="post" asp-page-handler="@(isNew ? "Create" : "Save")">
-        @if (!isNew) { <input type="hidden" name="Id" value="@g!.Id" /> }
+<form method="post" asp-page-handler="@(isNew ? "Create" : "Save")" class="mat-form" novalidate>
+    @if (!isNew) { <input type="hidden" name="Id" value="@g!.Id" /> }
+    <partial name="_ValidationSummary" />
 
-        <div class="form-grid">
-            <div class="field">
-                <label>Name</label>
-                <input type="text" name="Name" value="@(g?.Name ?? "")" required placeholder="e.g. Home Unifi" />
-            </div>
+    <div class="mat-card">
+        <div class="mat-card__body mat-stack">
+            <div class="mat-form__grid">
+                <mat-field label="Name" for-id="Name" required="true">
+                    <input type="text" id="Name" name="Name" value="@(g?.Name ?? "")" class="mat-input" required placeholder="e.g. Home UniFi" data-msg-required="Please enter a name." />
+                </mat-field>
 
-            <div class="field">
-                <label>Type</label>
                 @if (isNew)
                 {
-                    <select name="Kind" id="kindSelect">
-                        <option value="PublicIp">Public IP</option>
-                        <option value="Unifi">Unifi</option>
-                        <option value="UnifiCloud">UniFi Cloud</option>
-                        <option value="Static">Static IP</option>
-                        <option value="Push">DynDNS Server</option>
-                        <option value="Dns">DNS lookup</option>
-                        <option value="Fritzbox">FRITZ!Box</option>
-                        <option value="Matddns">Matddns peer</option>
-                    </select>
+                    <mat-field label="Type" for-id="kindSelect">
+                        <select name="Kind" id="kindSelect" class="mat-select">
+                            @foreach (var k in Enum.GetValues<SourceKind>())
+                            {
+                                <option value="@k">@Labels.Source(k)</option>
+                            }
+                        </select>
+                    </mat-field>
                 }
                 else
                 {
-                    var typeLabel = kind switch { SourceKind.Unifi => "Unifi", SourceKind.UnifiCloud => "UniFi Cloud", SourceKind.Static => "Static IP", SourceKind.Push => "DynDNS Server", SourceKind.Dns => "DNS lookup", SourceKind.Fritzbox => "FRITZ!Box", SourceKind.Matddns => "Matddns peer", _ => "Public IP" };
-                    <input type="text" value="@typeLabel" disabled />
+                    <mat-field label="Type" for-id="kindFixed">
+                        <input type="text" id="kindFixed" value="@Labels.Source(kind)" class="mat-input mat-input--plain" readonly />
+                    </mat-field>
+                }
+
+                @if (isNew || kind != SourceKind.Push)
+                {
+                    <div class="mat-field mat-field--full" data-show-if="#kindSelect" data-show-value="PublicIp,Unifi,UnifiCloud,Static,Dns,Fritzbox,Matddns">
+                        <label class="mat-label" for="IntervalSeconds">Check every (seconds)</label>
+                        <input type="number" id="IntervalSeconds" name="IntervalSeconds" value="@(g?.IntervalSeconds ?? 60)" min="15" class="mat-input mat-mono" inputmode="numeric" data-msg-range="Please enter at least 15 seconds." />
+                        <span class="mat-error" aria-live="polite"></span>
+                    </div>
                 }
             </div>
 
-            @if (isNew || kind != SourceKind.Push)
+            @* The type-specific fields: all are in the form, only the block of the chosen type is shown (data-show-if). *@
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="Unifi" hidden="@(kind != SourceKind.Unifi)">
+                <mat-field label="Base URL" for-id="UniUrl">
+                    <input type="text" id="UniUrl" name="UniUrl" value="@(g?.Unifi?.BaseUrl ?? "")" class="mat-input mat-mono" placeholder="https://10.10.0.1" autocapitalize="none" spellcheck="false" />
+                </mat-field>
+                <mat-field label="Site" for-id="UniSite">
+                    <input type="text" id="UniSite" name="UniSite" value="@(g?.Unifi?.Site ?? "default")" class="mat-input mat-mono" autocapitalize="none" />
+                </mat-field>
+                <mat-field label="Username" for-id="UniUser">
+                    <input type="text" id="UniUser" name="UniUser" value="@(g?.Unifi?.Username ?? "")" class="mat-input" autocomplete="off" autocapitalize="none" />
+                </mat-field>
+                <mat-field label="Password" for-id="UniPass">
+                    <input type="password" id="UniPass" name="UniPass" class="mat-input" placeholder="@keep" autocomplete="new-password" />
+                </mat-field>
+                <div class="mat-field mat-field--full">
+                    <label class="mat-check"><input type="checkbox" id="UniIgnoreCert" name="UniIgnoreCert" value="true" checked="@(g?.Unifi?.IgnoreCertificate != false)" /><span class="mat-check__text">Ignore the self-signed certificate</span></label>
+                </div>
+            </div>
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="Static" hidden="@(kind != SourceKind.Static)">
+                <mat-field label="Static IPv4" for-id="StaticIp">
+                    <input type="text" id="StaticIp" name="StaticIp" value="@(g?.Static?.Ip ?? "")" class="mat-input mat-mono" placeholder="203.0.113.10" inputmode="decimal" autocapitalize="none" spellcheck="false" />
+                </mat-field>
+                <mat-field label="Static IPv6" for-id="StaticIpv6">
+                    <input type="text" id="StaticIpv6" name="StaticIpv6" value="@(g?.Static?.Ipv6 ?? "")" class="mat-input mat-mono" placeholder="2001:db8::1" autocapitalize="none" spellcheck="false" />
+                </mat-field>
+            </div>
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="Dns" hidden="@(kind != SourceKind.Dns)">
+                <mat-field label="Hostname" for-id="DnsHost" full="true">
+                    <input type="text" id="DnsHost" name="DnsHost" value="@(g?.Dns?.Hostname ?? "")" class="mat-input mat-mono" placeholder="xxxxxxxx.myfritz.net" autocapitalize="none" spellcheck="false" />
+                </mat-field>
+            </div>
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="Fritzbox" hidden="@(kind != SourceKind.Fritzbox)">
+                <mat-field label="Address (TR-064)" for-id="FbUrl" full="true">
+                    <input type="text" id="FbUrl" name="FbUrl" value="@(g?.Fritzbox?.BaseUrl ?? "")" class="mat-input mat-mono" placeholder="http://fritz.box:49000 or https://xxxxxxxx.myfritz.net:port" autocapitalize="none" spellcheck="false" />
+                </mat-field>
+                <mat-field label="Username" for-id="FbUser">
+                    <input type="text" id="FbUser" name="FbUser" value="@(g?.Fritzbox?.Username ?? "")" class="mat-input" autocomplete="off" autocapitalize="none" />
+                </mat-field>
+                <mat-field label="Password" for-id="FbPass">
+                    <input type="password" id="FbPass" name="FbPass" class="mat-input" placeholder="@keep" autocomplete="new-password" />
+                </mat-field>
+                <div class="mat-field mat-field--full">
+                    <label class="mat-check"><input type="checkbox" id="FbIgnoreCert" name="FbIgnoreCert" value="true" checked="@(g?.Fritzbox?.IgnoreCertificate == true)" /><span class="mat-check__text">Ignore the self-signed certificate (MyFRITZ! TLS)</span></label>
+                </div>
+            </div>
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="Matddns" hidden="@(kind != SourceKind.Matddns)">
+                <mat-field label="Peer base URL" for-id="MdUrl" full="true">
+                    <input type="url" id="MdUrl" name="MdUrl" value="@(g?.Matddns?.BaseUrl ?? "")" class="mat-input" placeholder="https://dyndns.example.com" autocapitalize="none" spellcheck="false" data-msg-type="Please enter an address like https://dyndns.example.com." />
+                </mat-field>
+                <mat-field label="Token" for-id="MdToken" full="true">
+                    <input type="password" id="MdToken" name="MdToken" class="mat-input" placeholder="@(isNew ? "A DynDNS Server token on the peer" : keep)" autocomplete="new-password" />
+                </mat-field>
+            </div>
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="UnifiCloud" hidden="@(kind != SourceKind.UnifiCloud)">
+                <mat-field label="API key" for-id="UcKey" full="true">
+                    <input type="password" id="UcKey" name="UcKey" class="mat-input" placeholder="@(isNew ? "Site Manager key (unifi.ui.com, API)" : keep)" autocomplete="new-password" />
+                </mat-field>
+            </div>
+
+            @if (!isNew && kind == SourceKind.Push)
             {
-                <div class="field full" id="intervalField">
-                    <label>Interval (seconds)</label>
-                    <input type="number" name="IntervalSeconds" value="@(g?.IntervalSeconds ?? 60)" min="15" />
+                <div class="mat-form__grid">
+                    <div class="mat-field mat-field--full">
+                        <label class="mat-label" for="pushUrl">Update URL</label>
+                        <div class="mat-input-group">
+                            <input class="mat-input mat-mono" id="pushUrl" value="@pushUrl" readonly />
+                            <button type="button" class="mat-btn mat-btn--secondary" data-copy="#pushUrl"><icon name="copy" /><span>Copy</span></button>
+                        </div>
+                    </div>
+                    <div class="mat-field mat-field--full">
+                        <label class="mat-label" for="pushToken">Token</label>
+                        <div class="mat-input-group">
+                            <input class="mat-input mat-mono" id="pushToken" value="@token" readonly />
+                            <button type="button" class="mat-btn mat-btn--secondary" data-copy="#pushToken"><icon name="copy" /><span>Copy</span></button>
+                        </div>
+                    </div>
+                    <div class="mat-field mat-field--full">
+                        <div><button type="button" class="mat-btn mat-btn--secondary" data-dialog-open="pushDocs" aria-haspopup="dialog"><icon name="file-text" /><span>Setup for a router</span></button></div>
+                    </div>
                 </div>
             }
         </div>
+    </div>
 
-        <!-- Unifi fields -->
-        <div class="type-fields @(kind == SourceKind.Unifi ? "active" : "")" data-kind="Unifi">
-            <div class="form-grid" style="margin-top:16px;">
-                <div class="field">
-                    <label>Base URL</label>
-                    <input type="text" name="UniUrl" value="@(g?.Unifi?.BaseUrl ?? "")" placeholder="https://10.10.0.1" />
-                </div>
-                <div class="field">
-                    <label>Site</label>
-                    <input type="text" name="UniSite" value="@(g?.Unifi?.Site ?? "default")" />
-                </div>
-                <div class="field">
-                    <label>Username</label>
-                    <input type="text" name="UniUser" value="@(g?.Unifi?.Username ?? "")" autocomplete="off" />
-                </div>
-                <div class="field">
-                    <label>Password</label>
-                    <input type="password" name="UniPass" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
-                </div>
-                <div class="field full">
-                    <div class="checkbox-field">
-                        <input type="checkbox" id="UniIgnoreCert" name="UniIgnoreCert" value="true" @(g?.Unifi?.IgnoreCertificate != false ? "checked" : "") />
-                        <label for="UniIgnoreCert">Ignore self-signed certificate</label>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Public IP fields -->
-        <div class="type-fields @(kind == SourceKind.PublicIp ? "active" : "")" data-kind="PublicIp"></div>
-
-        <!-- Static fields -->
-        <div class="type-fields @(kind == SourceKind.Static ? "active" : "")" data-kind="Static">
-            <div class="form-grid" style="margin-top:16px;">
-                <div class="field">
-                    <label>Static IPv4</label>
-                    <input type="text" name="StaticIp" value="@(g?.Static?.Ip ?? "")" placeholder="203.0.113.10" />
-                </div>
-                <div class="field">
-                    <label>Static IPv6</label>
-                    <input type="text" name="StaticIpv6" value="@(g?.Static?.Ipv6 ?? "")" placeholder="2001:db8::1" />
-                </div>
-            </div>
-        </div>
-
-        <!-- DNS lookup fields -->
-        <div class="type-fields @(kind == SourceKind.Dns ? "active" : "")" data-kind="Dns">
-            <div class="form-grid" style="margin-top:16px;">
-                <div class="field full">
-                    <label>Hostname</label>
-                    <input type="text" name="DnsHost" value="@(g?.Dns?.Hostname ?? "")" placeholder="xxxxxxxx.myfritz.net" />
-                </div>
-            </div>
-        </div>
-
-        <!-- FRITZ!Box fields -->
-        <div class="type-fields @(kind == SourceKind.Fritzbox ? "active" : "")" data-kind="Fritzbox">
-            <div class="form-grid" style="margin-top:16px;">
-                <div class="field full">
-                    <label>Address (TR-064)</label>
-                    <input type="text" name="FbUrl" value="@(g?.Fritzbox?.BaseUrl ?? "")" placeholder="http://fritz.box:49000  ·  or https://xxxxxxxx.myfritz.net:port" />
-                </div>
-                <div class="field">
-                    <label>Username</label>
-                    <input type="text" name="FbUser" value="@(g?.Fritzbox?.Username ?? "")" autocomplete="off" />
-                </div>
-                <div class="field">
-                    <label>Password</label>
-                    <input type="password" name="FbPass" placeholder="@(isNew ? "" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
-                </div>
-                <div class="field full">
-                    <div class="checkbox-field">
-                        <input type="checkbox" id="FbIgnoreCert" name="FbIgnoreCert" value="true" @(g?.Fritzbox?.IgnoreCertificate == true ? "checked" : "") />
-                        <label for="FbIgnoreCert">Ignore self-signed certificate (MyFRITZ! TLS)</label>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Matddns peer fields -->
-        <div class="type-fields @(kind == SourceKind.Matddns ? "active" : "")" data-kind="Matddns">
-            <div class="form-grid" style="margin-top:16px;">
-                <div class="field full">
-                    <label>Peer base URL</label>
-                    <input type="text" name="MdUrl" value="@(g?.Matddns?.BaseUrl ?? "")" placeholder="https://dyndns.example.com" />
-                </div>
-                <div class="field full">
-                    <label>Token</label>
-                    <input type="password" name="MdToken" placeholder="@(isNew ? "a DynDNS-Server token on the peer" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
-                </div>
-            </div>
-        </div>
-
-        <!-- UniFi Cloud fields -->
-        <div class="type-fields @(kind == SourceKind.UnifiCloud ? "active" : "")" data-kind="UnifiCloud">
-            <div class="form-grid" style="margin-top:16px;">
-                <div class="field full">
-                    <label>API key</label>
-                    <input type="password" name="UcKey" placeholder="@(isNew ? "Site Manager key (unifi.ui.com → API)" : "•••••• (leave empty = unchanged)")" autocomplete="new-password" />
-                </div>
-            </div>
-        </div>
-
-        <!-- Push / DynDNS receiver fields -->
-        <div class="type-fields @(kind == SourceKind.Push ? "active" : "")" data-kind="Push">
-            @if (!isNew)
+    <div class="mat-btn-row">
+        <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>@(isNew ? "Create" : "Save")</span></button>
+        @if (!isNew)
+        {
+            @if (kind == SourceKind.Unifi || kind == SourceKind.PublicIp || kind == SourceKind.Dns || kind == SourceKind.Fritzbox || kind == SourceKind.Matddns)
             {
-                var baseUrl = Model.BaseUrl;
-                var token = g!.Push?.Token ?? "";
-                var host = baseUrl.Replace("https://", "").Replace("http://", "");
-                var isDyn = Model.DynamicRule != null;
-                var baseFqdn = Model.DynamicRule?.DynamicBaseFqdn ?? "";
-                <div class="form-grid" style="margin-top:16px;">
-                    <div class="field full">
-                        <label>Update URL</label>
-                        <input type="text" value="@(isDyn ? $"{baseUrl}/update?token={token}&hostname=<name>.{baseFqdn}&myip=%i" : $"{baseUrl}/api/update?token={token}&ipv4=<your-ipv4>&ipv6=<your-ipv6>")" readonly onclick="this.select()" />
-                        @if (isDyn)
-                        {
-                            <p class="muted-small" style="margin:6px 0 0;">Dynamic receiver: the device sends <span class="mono">&amp;hostname=&lt;name&gt;.@baseFqdn</span> (its own name under the namespace) — that record is created/updated.</p>
-                        }
-                        <button type="button" class="ghost sm" style="margin-top:8px;" onclick="document.getElementById('pushDocs').showModal()">Documentation</button>
-                    </div>
-                    <div class="field full">
-                        <label>Token</label>
-                        <input type="text" value="@token" readonly onclick="this.select()" />
-                    </div>
-                </div>
-
-                @if (isDyn)
-                {
-                    <p class="muted-small" style="margin-top:14px;">Dynamic receiver — a <a href="/Rules/Dynamic?id=@Model.DynamicRule!.Id">dynamic rule</a> writes pushes to <span class="mono">*.@baseFqdn</span>.</p>
-                }
-
-                <dialog id="pushDocs" class="modal">
-                    <div class="modal-head">
-                        <strong>DynDNS Server — setup</strong>
-                        <button type="button" class="modal-x" aria-label="Close" onclick="this.closest('dialog').close()">✕</button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="muted-small" style="margin-top:0;">The token is pre‑filled below. Use a host reachable from the device — not localhost.</p>
-
-                        <details name="pushdocs" class="acc">
-                            <summary>FRITZ!Box</summary>
-                            <div class="acc-body">
-                                <label>Update URL</label>
-                                <input type="text" value="@(isDyn ? $"{baseUrl}/nic/update?token={token}&hostname=<domain>&ipv4=<ipaddr>&ipv6=<ip6addr>" : $"{baseUrl}/nic/update?token={token}&ipv4=<ipaddr>&ipv6=<ip6addr>")" readonly onclick="this.select()" />
-                                @if (isDyn)
-                                {
-                                    <p class="muted-small" style="margin:6px 0 0;">Internet → Permit Access → DynDNS → <em>custom provider</em>. Set <strong>Domainname</strong> = <span class="mono">&lt;name&gt;.@baseFqdn</span> — FRITZ!Box sends it as <span class="mono">&lt;domain&gt;</span>; user / password can be anything.</p>
-                                }
-                                else
-                                {
-                                    <p class="muted-small" style="margin:6px 0 0;">Internet → Permit Access → DynDNS → <em>custom provider</em>. Domain / user / password can be anything; FRITZ!Box fills <span class="mono">&lt;ipaddr&gt;</span> / <span class="mono">&lt;ip6addr&gt;</span>.</p>
-                                }
-                            </div>
-                        </details>
-
-                        <details name="pushdocs" class="acc">
-                            <summary>UniFi (UDM / UGW)</summary>
-                            <div class="acc-body">
-                                <p class="muted-small" style="margin:10px 0 8px;">Settings → Internet → <em>your WAN</em> → Dynamic DNS → <strong>Create New</strong></p>
-                                <table class="api-table">
-                                    <tbody>
-                                        <tr><td>Service</td><td class="mono">custom</td></tr>
-                                        <tr>
-                                            <td>Hostname</td>
-                                            @if (isDyn) { <td><span class="mono">&lt;name&gt;.@baseFqdn</span> — becomes the record</td> }
-                                            else { <td>any FQDN, label only — e.g. <span class="mono">wan.example.com</span></td> }
-                                        </tr>
-                                        <tr><td>Username</td><td class="mono">matddns</td></tr>
-                                        <tr><td>Password</td><td class="mono">@token</td></tr>
-                                        <tr><td>Server</td><td class="mono">@(isDyn ? $"{host}/update?token=%p&hostname=%h&ipv4=%i" : $"{host}/update?token=%p&ipv4=%i")</td></tr>
-                                    </tbody>
-                                </table>
-                                @if (isDyn)
-                                {
-                                    <p class="muted-small" style="margin:8px 0 0;"><strong>Dynamic:</strong> set <strong>Hostname</strong> = <span class="mono">&lt;name&gt;.@baseFqdn</span>; <span class="mono">%h</span> sends it as the record to create/update.</p>
-                                }
-                                <p class="muted-small" style="margin:8px 0 0;"><strong>Server: no <span class="mono">http://</span> / <span class="mono">https://</span></strong> — bare host only, or UniFi's client tries to resolve the scheme as a hostname and never sends. Fill <strong>Password</strong> with the token; <span class="mono">%p</span> mirrors it into the URL and <span class="mono">%i</span> becomes the WAN IPv4 (both are placeholders — UniFi keeps those, drops plain text). Connects over HTTPS.</p>
-                                <p class="muted-small" style="margin:6px 0 0;"><strong>IPv4 only:</strong> UniFi has no IPv6 placeholder, so one entry tracks the WAN IPv4. For dual‑stack use the FRITZ!Box section (separate <span class="mono">&lt;ip6addr&gt;</span>).</p>
-                                <p class="muted-small" style="margin:6px 0 0;"><strong>Same‑network gotcha:</strong> if the UDM's DDNS host resolves to its own public IP, the request loops back to the UDM (NAT hairpin). Add a local DNS record so <span class="mono">@host</span> resolves to this server's internal IP.</p>
-                            </div>
-                        </details>
-                    </div>
-                    <div class="modal-foot">
-                        <button type="button" onclick="this.closest('dialog').close()">Close</button>
-                    </div>
-                </dialog>
+                <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="Test" name="Id" value="@g!.Id"><icon name="plug" /><span>Test connection</span></button>
             }
-        </div>
-
-        <div class="actions">
-            <button type="submit">@(isNew ? "Create" : "Save")</button>
-            <a class="button ghost" href="/Sources">Cancel</a>
-            @if (!isNew)
+            @if (kind != SourceKind.Push)
             {
-                @if (kind == SourceKind.Unifi || kind == SourceKind.PublicIp || kind == SourceKind.Dns || kind == SourceKind.Fritzbox || kind == SourceKind.Matddns)
-                {
-                    <button type="submit" class="ghost" asp-page-handler="Test" name="Id" value="@g!.Id">Test connection</button>
-                }
-                @if (kind != SourceKind.Push)
-                {
-                    <button type="submit" class="ghost" asp-page-handler="Refresh" name="Id" value="@g!.Id">Check now</button>
-                }
-                @if (kind == SourceKind.Push)
-                {
-                    <button type="submit" class="ghost" asp-page-handler="RegenerateToken" name="Id" value="@g!.Id">Regenerate token</button>
-                }
-                <button type="submit" class="danger" asp-page-handler="Delete" name="Id" value="@g!.Id" onclick="return confirm('Remove group and all entries?');">Delete group</button>
+                <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="Refresh" name="Id" value="@g!.Id"><icon name="refresh" /><span>Check now</span></button>
             }
-        </div>
-    </form>
-</div>
+            @if (kind == SourceKind.Push)
+            {
+                <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="RegenerateToken" name="Id" value="@g!.Id" data-confirm="Generate a new token? The old one stops working at once, so update the device afterwards." data-confirm-ok="Generate"><icon name="refresh" /><span>New token</span></button>
+            }
+        }
+        <a class="mat-btn mat-btn--secondary" href="/Sources"><icon name="back" /><span>Back</span></a>
+        @if (!isNew)
+        {
+            <span class="mat-btn-row__spacer"></span>
+            <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Delete" name="Id" value="@g!.Id" data-confirm="Delete the source @g.Name and all its entries? Rules that use it lose it." data-confirm-ok="Delete"><icon name="trash" /><span>Delete</span></button>
+        }
+    </div>
+</form>
 
 @if (!isNew && kind != SourceKind.UnifiCloud)
 {
-    <div class="section-title"><h2>Entries</h2></div>
-    <div class="card">
-        <table>
-            <thead>
-                <tr>
-                    <th>Label</th>
-                    <th>Interface</th>
-                    <th>IPv4</th>
-                    <th>IPv6</th>
-                    <th>Last check</th>
-                    <th>Status</th>
-                    @if (kind == SourceKind.Unifi) { <th></th> }
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var e in g!.Entries)
-            {
-                var noIp = string.IsNullOrEmpty(e.CurrentIp) && string.IsNullOrEmpty(e.CurrentIpv6);
-                var status = e.LastError == null ? (noIp ? "warn" : "ok") : "err";
-                <tr>
-                    <td>@e.Label</td>
-                    <td class="mono">@(e.InterfaceName ?? "—")</td>
-                    <td class="mono">@(e.CurrentIp ?? "—")</td>
-                    <td class="mono">@(e.CurrentIpv6 ?? "—")</td>
-                    <td><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
-                    <td><span class="status-pill" title="@(e.LastError ?? "")"><span class="status-dot @status"></span>@(e.LastError != null ? "error" : (noIp ? "pending" : "ok"))</span></td>
-                    @if (kind == SourceKind.Unifi)
-                    {
-                        <td style="text-align:right">
-                            <form method="post" asp-page-handler="DeleteEntry" style="display:inline">
-                                <input type="hidden" name="Id" value="@g.Id" />
-                                <input type="hidden" name="EntryId" value="@e.Id" />
-                                <button type="submit" class="danger" onclick="return confirm('Remove entry?');">×</button>
-                            </form>
-                        </td>
-                    }
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
+    <section class="mat-section">
+        <div class="mat-section__head"><h2>Entries</h2></div>
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">Entries of @g!.Name</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Label</th>
+                        <th scope="col" class="mat-hide-sm">Interface</th>
+                        <th scope="col">IPv4</th>
+                        <th scope="col" class="mat-hide-sm">IPv6</th>
+                        <th scope="col" class="mat-hide-sm">Last check (@Tz.Label())</th>
+                        <th scope="col">Status</th>
+                        @if (kind == SourceKind.Unifi) { <th scope="col"><span class="mat-sr-only">Actions</span></th> }
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var e in g.Entries)
+                {
+                    var noIp = string.IsNullOrEmpty(e.CurrentIp) && string.IsNullOrEmpty(e.CurrentIpv6);
+                    var status = e.LastError == null ? (noIp ? "warn" : "ok") : "err";
+                    <tr>
+                        <td data-label="Label"><div class="mat-table__name"><span>@e.Label</span></div></td>
+                        <td data-label="Interface" class="mat-hide-sm mat-mono">@(e.InterfaceName ?? "–")</td>
+                        <td data-label="IPv4" class="mat-mono">@(e.CurrentIp ?? "–")</td>
+                        <td data-label="IPv6" class="mat-hide-sm mat-mono">@(e.CurrentIpv6 ?? "–")</td>
+                        <td data-label="Last check" class="mat-hide-sm mat-muted mat-nowrap">@Tz.Format(e.LastChecked)</td>
+                        <td data-label="Status"><span class="@Ui.Pill(status)" title="@(e.LastError ?? "")">@(e.LastError != null ? "Error" : (noIp ? "Pending" : "OK"))</span></td>
+                        @if (kind == SourceKind.Unifi)
+                        {
+                            <td class="mat-table__cell-actions">
+                                <div class="mat-table__actions">
+                                    <form method="post" asp-page-handler="DeleteEntry" data-confirm="Remove the entry @e.Label?" data-confirm-ok="Remove" data-confirm-danger>
+                                        <input type="hidden" name="Id" value="@g.Id" />
+                                        <input type="hidden" name="EntryId" value="@e.Id" />
+                                        <button type="submit" class="mat-btn mat-btn--danger mat-btn--icon mat-btn--sm" aria-label="Remove @e.Label" data-tip="Remove"><icon name="trash" /></button>
+                                    </form>
+                                </div>
+                            </td>
+                        }
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
 }
 
 @if (!isNew && kind == SourceKind.UnifiCloud)
 {
-    <div class="section-title"><h2>Gateways</h2></div>
-    <div class="card">
-        <table>
-            <thead><tr><th>Gateway</th><th>IPv4</th><th>IPv6</th><th>Last check</th><th>Status</th><th></th></tr></thead>
-            <tbody>
-            @foreach (var e in g!.Entries)
-            {
-                var noIp = string.IsNullOrEmpty(e.CurrentIp) && string.IsNullOrEmpty(e.CurrentIpv6);
-                var status = e.LastError == null ? (noIp ? "warn" : "ok") : "err";
-                <tr>
-                    <td>@e.Label</td>
-                    <td class="mono">@(e.CurrentIp ?? "—")</td>
-                    <td class="mono">@(e.CurrentIpv6 ?? "—")</td>
-                    <td><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
-                    <td><span class="status-pill" title="@(e.LastError ?? "")"><span class="status-dot @status"></span>@(e.LastError != null ? "error" : (noIp ? "pending" : "ok"))</span></td>
-                    <td style="text-align:right">
-                        <form method="post" asp-page-handler="DeleteEntry" style="display:inline">
-                            <input type="hidden" name="Id" value="@g.Id" />
-                            <input type="hidden" name="EntryId" value="@e.Id" />
-                            <button type="submit" class="danger" onclick="return confirm('Remove gateway?');">×</button>
-                        </form>
-                    </td>
-                </tr>
-            }
-            @if (g.Entries.Count == 0)
-            {
-                <tr><td colspan="6" class="muted">No gateways added yet — pick from the list below.</td></tr>
-            }
-            </tbody>
-        </table>
-    </div>
+    <section class="mat-section">
+        <div class="mat-section__head"><h2>Gateways</h2></div>
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">Gateways of @g!.Name</caption>
+                <thead><tr><th scope="col">Gateway</th><th scope="col">IPv4</th><th scope="col" class="mat-hide-sm">IPv6</th><th scope="col" class="mat-hide-sm">Last check (@Tz.Label())</th><th scope="col">Status</th><th scope="col"><span class="mat-sr-only">Actions</span></th></tr></thead>
+                <tbody>
+                @foreach (var e in g.Entries)
+                {
+                    var noIp = string.IsNullOrEmpty(e.CurrentIp) && string.IsNullOrEmpty(e.CurrentIpv6);
+                    var status = e.LastError == null ? (noIp ? "warn" : "ok") : "err";
+                    <tr>
+                        <td data-label="Gateway"><div class="mat-table__name"><span>@e.Label</span></div></td>
+                        <td data-label="IPv4" class="mat-mono">@(e.CurrentIp ?? "–")</td>
+                        <td data-label="IPv6" class="mat-hide-sm mat-mono">@(e.CurrentIpv6 ?? "–")</td>
+                        <td data-label="Last check" class="mat-hide-sm mat-muted mat-nowrap">@Tz.Format(e.LastChecked)</td>
+                        <td data-label="Status"><span class="@Ui.Pill(status)" title="@(e.LastError ?? "")">@(e.LastError != null ? "Error" : (noIp ? "Pending" : "OK"))</span></td>
+                        <td class="mat-table__cell-actions">
+                            <div class="mat-table__actions">
+                                <form method="post" asp-page-handler="DeleteEntry" data-confirm="Remove the gateway @e.Label?" data-confirm-ok="Remove" data-confirm-danger>
+                                    <input type="hidden" name="Id" value="@g.Id" />
+                                    <input type="hidden" name="EntryId" value="@e.Id" />
+                                    <button type="submit" class="mat-btn mat-btn--danger mat-btn--icon mat-btn--sm" aria-label="Remove @e.Label" data-tip="Remove"><icon name="trash" /></button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (g.Entries.Count == 0)
+                {
+                    <tr><td colspan="6" class="mat-muted">No gateways added yet. Pick one below.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
 
-    <div class="section-title"><h2>Add gateway</h2></div>
-    <div class="card">
+    <section class="mat-section">
+        <div class="mat-section__head"><h2>Add a gateway</h2></div>
         @if (!string.IsNullOrEmpty(Model.GatewayError))
         {
-            <div class="alert err">@Model.GatewayError</div>
+            <div class="mat-alert mat-alert--danger" role="alert"><icon name="x-circle" /><div class="mat-alert__body">@Model.GatewayError</div></div>
         }
         else if (Model.AvailableGateways.Count == 0)
         {
-            <p class="muted">@(g!.Entries.Count > 0 ? "All visible gateways are already added." : "No gateways visible for this key.")</p>
+            <p class="mat-muted">@(g.Entries.Count > 0 ? "All visible gateways are already added." : "No gateways are visible for this key.")</p>
         }
         else
         {
-            <form method="post" asp-page-handler="AddGateway" class="form-grid">
-                <input type="hidden" name="Id" value="@g!.Id" />
-                <div class="field">
-                    <label>Gateway</label>
-                    <select name="HostId" required>
-                        @foreach (var h in Model.AvailableGateways)
-                        {
-                            <option value="@h.Id">@h.Name — @(h.Ipv4 ?? h.Ipv6 ?? "no IP")</option>
-                        }
-                    </select>
+            <form method="post" asp-page-handler="AddGateway" class="mat-form" novalidate>
+                <input type="hidden" name="Id" value="@g.Id" />
+                <div class="mat-card">
+                    <div class="mat-card__body">
+                        <div class="mat-form__grid">
+                            <mat-field label="Gateway" for-id="HostId">
+                                <select id="HostId" name="HostId" class="mat-select" required>
+                                    @foreach (var h in Model.AvailableGateways)
+                                    {
+                                        <option value="@h.Id">@h.Name (@(h.Ipv4 ?? h.Ipv6 ?? "no IP"))</option>
+                                    }
+                                </select>
+                            </mat-field>
+                            <mat-field label="Alias" for-id="Alias">
+                                <input type="text" id="Alias" name="Alias" class="mat-input" placeholder="Optional, defaults to the gateway name" autocomplete="off" />
+                            </mat-field>
+                        </div>
+                    </div>
                 </div>
-                <div class="field">
-                    <label>Alias name</label>
-                    <input type="text" name="Alias" placeholder="optional — defaults to the gateway name" autocomplete="off" />
-                </div>
-                <div class="field full">
-                    <button type="submit">+ Add gateway</button>
+                <div class="mat-actions">
+                    <button type="submit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>Add gateway</span></button>
                 </div>
             </form>
         }
-    </div>
+    </section>
 }
 
-@if (isNew)
+@if (!isNew && kind == SourceKind.Push)
 {
-    <script>
-        (function () {
-            var sel = document.getElementById('kindSelect');
-            var fields = document.querySelectorAll('.type-fields');
-            var interval = document.getElementById('intervalField');
-            function sync() {
-                fields.forEach(function (f) {
-                    f.classList.toggle('active', f.getAttribute('data-kind') === sel.value);
-                });
-                if (interval) interval.style.display = (sel.value === 'Push') ? 'none' : '';
-            }
-            sel.addEventListener('change', sync);
-            sync();
-        })();
-    </script>
+    <dialog class="mat-dialog mat-dialog--lg" id="pushDocs" aria-labelledby="pushDocs-title">
+        <div class="mat-dialog__form">
+            <div class="mat-dialog__head">
+                <icon name="file-text" />
+                <h2 class="mat-dialog__title" id="pushDocs-title">DynDNS Server: setup</h2>
+                <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon mat-dialog__close" data-dialog-close aria-label="Close"><icon name="x" /></button>
+            </div>
+            <div class="mat-dialog__body mat-stack">
+                <p class="mat-muted">The token is already filled in below. Use an address of this server that the device can reach, not localhost.</p>
+
+                <div class="mat-accordion">
+                    <details class="mat-accordion__item" name="pushdocs" open>
+                        <summary>FRITZ!Box<icon name="chevron-down" /></summary>
+                        <div class="mat-accordion__body mat-stack mat-stack--sm">
+                            <div class="mat-field">
+                                <label class="mat-label" for="fritzUrl">Update URL</label>
+                                <div class="mat-input-group">
+                                    <input class="mat-input mat-mono" id="fritzUrl" value="@fritzUrl" readonly />
+                                    <button type="button" class="mat-btn mat-btn--secondary" data-copy="#fritzUrl"><icon name="copy" /><span>Copy</span></button>
+                                </div>
+                            </div>
+                            @if (isDyn)
+                            {
+                                <p>Internet, Permit Access, DynDNS, <em>custom provider</em>. Set <strong>Domain name</strong> to <code>&lt;name&gt;.@baseFqdn</code>: the FRITZ!Box sends it as <code>&lt;domain&gt;</code>. User name and password can be anything.</p>
+                            }
+                            else
+                            {
+                                <p>Internet, Permit Access, DynDNS, <em>custom provider</em>. Domain name, user name and password can be anything; the FRITZ!Box fills in <code>&lt;ipaddr&gt;</code> and <code>&lt;ip6addr&gt;</code>.</p>
+                            }
+                        </div>
+                    </details>
+
+                    <details class="mat-accordion__item" name="pushdocs">
+                        <summary>UniFi (UDM, UGW)<icon name="chevron-down" /></summary>
+                        <div class="mat-accordion__body mat-stack mat-stack--sm">
+                            <p>Settings, Internet, <em>your WAN</em>, Dynamic DNS, <strong>Create New</strong>:</p>
+                            <dl class="mat-kv">
+                                <dt>Service</dt><dd class="mat-mono">custom</dd>
+                                <dt>Hostname</dt><dd>@if (isDyn) { <span><code>&lt;name&gt;.@baseFqdn</code>, it becomes the record</span> } else { <span>any FQDN, only a label, for example <code>wan.example.com</code></span> }</dd>
+                                <dt>Username</dt><dd class="mat-mono">matddns</dd>
+                                <dt>Password</dt><dd class="mat-mono">@token</dd>
+                                <dt>Server</dt><dd class="mat-mono">@unifiServer</dd>
+                            </dl>
+                            @if (isDyn)
+                            {
+                                <p><strong>Dynamic:</strong> set <strong>Hostname</strong> to <code>&lt;name&gt;.@baseFqdn</code>; <code>%h</code> sends it as the record to create or update.</p>
+                            }
+                            <p><strong>Server: no <code>http://</code> or <code>https://</code></strong>, only the host. Otherwise UniFi's client tries to resolve the scheme as a hostname and never sends. Enter the token as <strong>Password</strong>; <code>%p</code> copies it into the URL and <code>%i</code> becomes the WAN IPv4 (both are placeholders that UniFi keeps). It connects over HTTPS.</p>
+                            <p><strong>IPv4 only:</strong> UniFi has no IPv6 placeholder, so one entry tracks the WAN IPv4. For dual stack use the FRITZ!Box method (separate <code>&lt;ip6addr&gt;</code>).</p>
+                            <p><strong>Same network:</strong> if the DDNS host of the UDM resolves to its own public IP, the request loops back to the UDM (NAT hairpin). Add a local DNS record so that <code>@host</code> resolves to the internal address of this server.</p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+            <div class="mat-dialog__foot">
+                <div class="mat-btn-row mat-btn-row--plain">
+                    <button type="button" class="mat-btn mat-btn--primary" data-dialog-close>Close</button>
+                </div>
+            </div>
+        </div>
+    </dialog>
 }

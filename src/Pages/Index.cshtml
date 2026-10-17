@@ -1,198 +1,226 @@
 @page
 @model IndexModel
 @{
-    ViewData["Title"] = "Dashboard – Matddns";
+    ViewData["Title"] = "Dashboard";
+    ViewData["Reconnect"] = "reload";   // read-only page: show fresh data again once the server is back
+    ViewData["AutoRefresh"] = 30000;
+    ViewData["Refresh"] = true;
     var s = Model.Snapshot;
+    var zone = Tz.Label();
 }
 
-<div class="page-header">
-    <div>
-        <h1>Dashboard</h1>
-        <p class="muted-small">All times in @Tz.Label().</p>
-    </div>
-    <form method="get"><button type="submit" class="ghost">Refresh</button></form>
-</div>
-
-<div class="stat-grid">
-    <div class="stat-card">
-        <span class="stat-dot @(s.Sources.Errors == 0 ? "ok" : "err")" title="@(s.Sources.Errors) source error(s)"></span>
-        <div class="stat-num">@s.Sources.Ok<span class="stat-den">/@s.Sources.Entries</span></div>
-        <div class="stat-label">Source IPs OK</div>
-    </div>
-    <div class="stat-card">
-        <span class="stat-dot @(s.Rules.Issues == 0 ? "ok" : "err")" title="@(s.Rules.Issues) rule issue(s)"></span>
-        <div class="stat-num">@s.Rules.Ok<span class="stat-den">/@s.Rules.Total</span></div>
-        <div class="stat-label">Rules OK</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-num">@s.IpChanges.Last24h</div>
-        <div class="stat-label">IP changes (24h)</div>
-    </div>
-    <div class="stat-card">
-        <span class="stat-dot @(s.ErrorsLast24h == 0 ? "ok" : "err")" title="@s.ErrorsLast24h error(s) in 24h"></span>
-        <div class="stat-num">@s.ErrorsLast24h</div>
-        <div class="stat-label">Errors (24h)</div>
-    </div>
-</div>
-
-<div class="section-title"><h2>Sources</h2><a class="muted-small" href="/Sources">manage →</a></div>
-<div class="card">
-    <table class="dtable">
-        <thead><tr><th>Source</th><th>IPv4</th><th class="hide-sm">IPv6</th><th class="hide-sm">Last check</th><th>Status</th></tr></thead>
-        @foreach (var src in s.SourceList)
+<div class="mat-grid mat-grid--4">
+    <div class="mat-card"><div class="mat-card__body mat-stat">
+        <span class="mat-stat__label">Source IPs OK</span>
+        <span class="mat-stat__value">@s.Sources.Ok / @s.Sources.Entries</span>
+        @if (s.Sources.Errors == 0)
         {
-            var kindLabel = src.Kind == "Push" ? "DynDNS Server" : src.Kind == "Dns" ? "DNS lookup" : src.Kind == "Fritzbox" ? "FRITZ!Box" : src.Kind == "UnifiCloud" ? "UniFi Cloud" : src.Kind == "Matddns" ? "Matddns peer" : src.Kind;
-            var entries = src.Entries;
-            var multi = entries.Count > 1;
-            var first = entries.FirstOrDefault();
-            <tbody class="dt-group">
-                <tr class="dt-parent @(multi ? "has-children" : "")">
-                    <td class="dt-name">@src.Name <span class="muted-small">(@kindLabel)</span></td>
+            <span class="mat-stat__delta">No source has an error</span>
+        }
+        else
+        {
+            <span class="mat-stat__delta mat-stat__delta--down"><icon name="alert" /><span>@s.Sources.Errors with an error</span></span>
+        }
+    </div></div>
+    <div class="mat-card"><div class="mat-card__body mat-stat">
+        <span class="mat-stat__label">Rules OK</span>
+        <span class="mat-stat__value">@s.Rules.Ok / @s.Rules.Total</span>
+        @if (s.Rules.Issues == 0)
+        {
+            <span class="mat-stat__delta">No rule has a problem</span>
+        }
+        else
+        {
+            <span class="mat-stat__delta mat-stat__delta--down"><icon name="alert" /><span>@s.Rules.Issues with a problem</span></span>
+        }
+    </div></div>
+    <div class="mat-card"><div class="mat-card__body mat-stat">
+        <span class="mat-stat__label">IP changes (24 h)</span>
+        <span class="mat-stat__value">@s.IpChanges.Last24h</span>
+        <span class="mat-stat__delta">@s.IpChanges.Last7d in the last 7 days</span>
+    </div></div>
+    <div class="mat-card"><div class="mat-card__body mat-stat">
+        <span class="mat-stat__label">Errors (24 h)</span>
+        <span class="mat-stat__value">@s.ErrorsLast24h</span>
+        @if (s.ErrorsLast24h == 0)
+        {
+            <span class="mat-stat__delta">None in the log</span>
+        }
+        else
+        {
+            <span class="mat-stat__delta mat-stat__delta--down"><icon name="alert" /><a href="/Log?level=Error">See the log</a></span>
+        }
+    </div></div>
+</div>
+
+<section class="mat-section">
+    <div class="mat-section__head"><div class="mat-row mat-row--between"><h2>Sources</h2><a class="mat-btn mat-btn--ghost mat-btn--sm" href="/Sources">Manage</a></div></div>
+    <div class="mat-table-wrap">
+        <table class="mat-table">
+            <caption class="mat-sr-only">Sources and their current addresses</caption>
+            <thead><tr><th scope="col">Source</th><th scope="col">IPv4</th><th scope="col" class="mat-hide-sm">IPv6</th><th scope="col" class="mat-hide-sm">Last check (@zone)</th><th scope="col">Status</th></tr></thead>
+            <tbody>
+            @foreach (var src in s.SourceList)
+            {
+                var kindLabel = src.Kind == "Push" ? "DynDNS Server" : src.Kind == "Dns" ? "DNS lookup" : src.Kind == "Fritzbox" ? "FRITZ!Box" : src.Kind == "UnifiCloud" ? "UniFi Cloud" : src.Kind == "Matddns" ? "Matddns peer" : src.Kind;
+                var entries = src.Entries;
+                var multi = entries.Count > 1;
+                var first = entries.FirstOrDefault();
+                <tr class="md-parent @(multi ? "has-children" : "")">
+                    <td data-label="Source"><div class="mat-table__name"><span>@src.Name <small class="mat-muted">@kindLabel</small></span></div></td>
                     @if (multi || first == null)
                     {
-                        <td></td>
-                        <td class="hide-sm"></td>
-                        <td class="hide-sm"></td>
-                        <td></td>
+                        <td data-label="IPv4"></td>
+                        <td data-label="IPv6" class="mat-hide-sm"></td>
+                        <td data-label="Last check" class="mat-hide-sm"></td>
+                        <td data-label="Status"></td>
                     }
                     else
                     {
                         var noIp = string.IsNullOrEmpty(first.Ip) && string.IsNullOrEmpty(first.Ipv6);
                         var st = first.Error != null ? "err" : (noIp ? "warn" : "ok");
-                        <td class="mono">@(first.Ip ?? "—")</td>
-                        <td class="mono hide-sm">@(first.Ipv6 ?? "—")</td>
-                        <td class="hide-sm"><span class="muted-small">@Tz.Format(first.LastChecked)</span></td>
-                        <td><span class="status-pill" title="@(first.Error ?? "")"><span class="status-dot @st"></span><span class="hide-sm">@(first.Error != null ? "error" : (noIp ? "pending" : "ok"))</span></span></td>
+                        <td data-label="IPv4" class="mat-mono">@(first.Ip ?? "–")</td>
+                        <td data-label="IPv6" class="mat-hide-sm mat-mono">@(first.Ipv6 ?? "–")</td>
+                        <td data-label="Last check" class="mat-hide-sm mat-muted mat-nowrap">@Tz.Format(first.LastChecked)</td>
+                        <td data-label="Status"><span class="@Ui.Pill(st)" title="@(first.Error ?? "")">@(first.Error != null ? "Error" : (noIp ? "Pending" : "OK"))</span></td>
                     }
                 </tr>
                 @if (multi)
                 {
-                    for (int i = 0; i < entries.Count; i++)
+                    for (var i = 0; i < entries.Count; i++)
                     {
                         var e = entries[i];
                         var noIp = string.IsNullOrEmpty(e.Ip) && string.IsNullOrEmpty(e.Ipv6);
                         var st = e.Error != null ? "err" : (noIp ? "warn" : "ok");
-                        <tr class="dt-child @(i == entries.Count - 1 ? "last" : "")">
-                            <td><span class="dt-sub">@e.Label</span></td>
-                            <td class="mono cell-muted">@(e.Ip ?? "—")</td>
-                            <td class="mono cell-muted hide-sm">@(e.Ipv6 ?? "—")</td>
-                            <td class="hide-sm"><span class="muted-small">@Tz.Format(e.LastChecked)</span></td>
-                            <td><span class="status-pill" title="@(e.Error ?? "")"><span class="status-dot @st"></span><span class="hide-sm">@(e.Error != null ? "error" : (noIp ? "pending" : "ok"))</span></span></td>
+                        <tr class="md-child @(i == entries.Count - 1 ? "is-last" : "")">
+                            <td data-label="Entry"><span class="md-child__name">@e.Label</span></td>
+                            <td data-label="IPv4" class="mat-mono">@(e.Ip ?? "–")</td>
+                            <td data-label="IPv6" class="mat-hide-sm mat-mono">@(e.Ipv6 ?? "–")</td>
+                            <td data-label="Last check" class="mat-hide-sm mat-nowrap">@Tz.Format(e.LastChecked)</td>
+                            <td data-label="Status"><span class="@Ui.Pill(st)" title="@(e.Error ?? "")">@(e.Error != null ? "Error" : (noIp ? "Pending" : "OK"))</span></td>
                         </tr>
                     }
                 }
+            }
+            @if (s.SourceList.Count == 0)
+            {
+                <tr><td colspan="5" class="mat-muted">No sources configured. <a href="/Sources/Edit">Add one</a>.</td></tr>
+            }
             </tbody>
-        }
-        @if (s.SourceList.Count == 0)
-        {
-            <tbody><tr><td colspan="5" class="muted">No sources configured. <a href="/Sources/Edit">Add one</a>.</td></tr></tbody>
-        }
-    </table>
-</div>
+        </table>
+    </div>
+</section>
 
-<div class="section-title"><h2>Domains</h2><a class="muted-small" href="/Domains">manage →</a></div>
-<div class="card">
-    <table class="dtable">
-        <thead><tr><th>Zone</th><th class="hide-sm">Provider</th><th>Record</th><th>Type</th></tr></thead>
-        @foreach (var g in Model.Domains)
-        {
-            var dkind = g.Kind switch { DomainKind.Netcup => "Netcup API", DomainKind.Cloudflare => "Cloudflare", DomainKind.Hetzner => "Hetzner DNS", DomainKind.GoDaddy => "GoDaddy", DomainKind.Matddns => "Matddns peer", _ => "DynDNS" };
-            var dentries = g.Entries;
-            var dynForZone = Model.DynamicRules.Where(r => r.DomainGroupId == g.Id).ToList();
-            var dchild = dentries.Count + dynForZone.Count;
-            <tbody class="dt-group">
-                <tr class="dt-parent @(dchild > 0 ? "has-children" : "")">
-                    <td class="dt-name">@g.Name</td>
-                    <td class="hide-sm"><span class="badge @(g.Kind == DomainKind.DynDns ? "info" : "update")">@dkind</span> @if (dynForZone.Count > 0) { <span class="badge info">dynamic</span> }</td>
-                    <td class="cell-muted">@dentries.Count record@(dentries.Count == 1 ? "" : "s")</td>
-                    <td></td>
+<section class="mat-section">
+    <div class="mat-section__head"><div class="mat-row mat-row--between"><h2>Domains</h2><a class="mat-btn mat-btn--ghost mat-btn--sm" href="/Domains">Manage</a></div></div>
+    <div class="mat-table-wrap">
+        <table class="mat-table">
+            <caption class="mat-sr-only">Domain groups and their records</caption>
+            <thead><tr><th scope="col">Group</th><th scope="col" class="mat-hide-sm">Provider</th><th scope="col">Record</th><th scope="col">Type</th></tr></thead>
+            <tbody>
+            @foreach (var g in Model.Domains)
+            {
+                var dkind = g.Kind switch { DomainKind.Netcup => "Netcup API", DomainKind.Cloudflare => "Cloudflare", DomainKind.Hetzner => "Hetzner DNS", DomainKind.GoDaddy => "GoDaddy", DomainKind.Matddns => "Matddns peer", _ => "DynDNS" };
+                var dentries = g.Entries;
+                var dynForZone = Model.DynamicRules.Where(r => r.DomainGroupId == g.Id).ToList();
+                var dchild = dentries.Count + dynForZone.Count;
+                <tr class="md-parent @(dchild > 0 ? "has-children" : "")">
+                    <td data-label="Group"><div class="mat-table__name"><span>@g.Name</span></div></td>
+                    <td data-label="Provider" class="mat-hide-sm"><span class="mat-tag">@dkind</span> @if (dynForZone.Count > 0) { <span class="mat-tag">dynamic</span> }</td>
+                    <td data-label="Record" class="mat-muted">@dentries.Count record@(dentries.Count == 1 ? "" : "s")</td>
+                    <td data-label="Type"></td>
                 </tr>
-                @for (int i = 0; i < dentries.Count; i++)
+                @for (var i = 0; i < dentries.Count; i++)
                 {
                     var e = dentries[i];
-                    <tr class="dt-child @(i == dchild - 1 ? "last" : "")">
-                        <td></td>
-                        <td class="hide-sm"></td>
-                        <td class="mono"><span class="dt-sub">@e.Hostname</span></td>
-                        <td><span class="badge muted">@e.Type</span></td>
+                    <tr class="md-child @(i == dchild - 1 ? "is-last" : "")">
+                        <td data-label="Group"></td>
+                        <td data-label="Provider" class="mat-hide-sm"></td>
+                        <td data-label="Record" class="mat-mono"><span class="md-child__name">@e.Hostname</span></td>
+                        <td data-label="Type"><span class="mat-tag">@e.Type</span></td>
                     </tr>
                 }
-                @for (int j = 0; j < dynForZone.Count; j++)
+                @for (var j = 0; j < dynForZone.Count; j++)
                 {
                     var dr = dynForZone[j];
-                    <tr class="dt-child @(dentries.Count + j == dchild - 1 ? "last" : "")">
-                        <td></td>
-                        <td class="hide-sm"></td>
-                        <td class="mono"><span class="dt-sub">*.@dr.DynamicBaseFqdn</span></td>
-                        <td><span class="badge info">dynamic</span></td>
+                    <tr class="md-child @(dentries.Count + j == dchild - 1 ? "is-last" : "")">
+                        <td data-label="Group"></td>
+                        <td data-label="Provider" class="mat-hide-sm"></td>
+                        <td data-label="Record" class="mat-mono"><span class="md-child__name">*.@dr.DynamicBaseFqdn</span></td>
+                        <td data-label="Type"><span class="mat-tag">dynamic</span></td>
                     </tr>
                 }
+            }
+            @if (Model.Domains.Count == 0)
+            {
+                <tr><td colspan="4" class="mat-muted">No domains configured. <a href="/Domains/Edit">Add one</a>.</td></tr>
+            }
             </tbody>
-        }
-        @if (Model.Domains.Count == 0)
-        {
-            <tbody><tr><td colspan="4" class="muted">No domains configured. <a href="/Domains/Edit">Add one</a>.</td></tr></tbody>
-        }
-    </table>
-</div>
+        </table>
+    </div>
+</section>
 
-<div class="section-title"><h2>Rules</h2><a class="muted-small" href="/Rules">manage →</a></div>
-<div class="card">
-    <table class="dtable">
-        <thead><tr><th>Target</th><th class="hide-sm">Group</th><th>Last set</th><th class="hide-sm">When</th><th>Status</th></tr></thead>
-        @foreach (var r in s.RuleList)
-        {
-            var st = !r.Enabled ? "muted" : (r.Issue ? "err" : (r.Ok ? "ok" : "warn"));
-            var hasSrc = r.Sources.Count > 0;
-            <tbody class="dt-group">
-                <tr class="dt-parent @(hasSrc ? "has-children" : "")">
-                    <td class="dt-name"><span class="badge info">@r.Type</span> <span class="mono">@r.Target</span></td>
-                    <td class="muted-small hide-sm">@(r.Group ?? "—")</td>
-                    <td class="mono">@(r.LastValue ?? "—")</td>
-                    <td class="hide-sm"><span class="muted-small">@Tz.Format(r.LastChange, "yyyy-MM-dd HH:mm")</span></td>
-                    <td><span class="status-pill"><span class="status-dot @st"></span><span class="hide-sm">@(!r.Enabled ? "disabled" : (r.Issue ? "issue" : (r.Ok ? "ok" : "pending")))</span></span></td>
+<section class="mat-section">
+    <div class="mat-section__head"><div class="mat-row mat-row--between"><h2>Rules</h2><a class="mat-btn mat-btn--ghost mat-btn--sm" href="/Rules">Manage</a></div></div>
+    <div class="mat-table-wrap">
+        <table class="mat-table">
+            <caption class="mat-sr-only">Rules, the value they last set and their sources in failover order</caption>
+            <thead><tr><th scope="col">Target</th><th scope="col" class="mat-hide-sm">Group</th><th scope="col">Last set</th><th scope="col" class="mat-hide-sm">When (@zone)</th><th scope="col">Status</th></tr></thead>
+            <tbody>
+            @foreach (var r in s.RuleList)
+            {
+                var st = !r.Enabled ? "none" : (r.Issue ? "err" : (r.Ok ? "ok" : "warn"));
+                var hasSrc = r.Sources.Count > 0;
+                <tr class="md-parent @(hasSrc ? "has-children" : "")">
+                    <td data-label="Target"><div class="mat-table__name"><span class="mat-tag">@r.Type</span><span class="mat-mono">@r.Target</span></div></td>
+                    <td data-label="Group" class="mat-hide-sm mat-muted">@(r.Group ?? "–")</td>
+                    <td data-label="Last set" class="mat-mono">@(r.LastValue ?? "–")</td>
+                    <td data-label="When" class="mat-hide-sm mat-muted mat-nowrap">@Tz.Format(r.LastChange, "yyyy-MM-dd HH:mm")</td>
+                    <td data-label="Status"><span class="@Ui.Pill(st)">@(!r.Enabled ? "Disabled" : (r.Issue ? "Problem" : (r.Ok ? "OK" : "Pending")))</span></td>
                 </tr>
-                @for (int i = 0; i < r.Sources.Count; i++)
+                @for (var i = 0; i < r.Sources.Count; i++)
                 {
                     var src = r.Sources[i];
                     var sip = src.Ip ?? src.Ipv6;
-                    var sdot = src.Missing ? "err" : (src.Active ? "ok" : (string.IsNullOrEmpty(sip) ? "warn" : "muted"));
-                    <tr class="dt-child @(i == r.Sources.Count - 1 ? "last" : "")">
-                        <td><span class="dt-sub">#@(i + 1) @src.Name</span></td>
-                        <td class="hide-sm"></td>
-                        <td class="mono cell-muted">@(sip ?? "—")</td>
-                        <td class="hide-sm"></td>
-                        <td>
-                            <span class="status-pill"><span class="status-dot @sdot"></span><span class="hide-sm">@(src.Missing ? "missing" : (src.Active ? "active" : ""))</span></span>
-                        </td>
+                    var sstate = src.Missing ? "err" : (src.Active ? "ok" : (string.IsNullOrEmpty(sip) ? "warn" : "none"));
+                    <tr class="md-child @(i == r.Sources.Count - 1 ? "is-last" : "")">
+                        <td data-label="Source"><span class="md-child__name">#@(i + 1) @src.Name</span></td>
+                        <td data-label="Group" class="mat-hide-sm"></td>
+                        <td data-label="Address" class="mat-mono">@(sip ?? "–")</td>
+                        <td data-label="When" class="mat-hide-sm"></td>
+                        <td data-label="Status"><span class="@Ui.Pill(sstate)">@(src.Missing ? "Missing" : (src.Active ? "Active" : (string.IsNullOrEmpty(sip) ? "No IP" : "Standby")))</span></td>
                     </tr>
                 }
+            }
+            @if (s.RuleList.Count == 0)
+            {
+                <tr><td colspan="5" class="mat-muted">No rules configured. <a href="/Rules/Edit">Add one</a>.</td></tr>
+            }
             </tbody>
-        }
-        @if (s.RuleList.Count == 0)
-        {
-            <tbody><tr><td colspan="5" class="muted">No rules configured. <a href="/Rules/Edit">Add one</a>.</td></tr></tbody>
-        }
-    </table>
-</div>
+        </table>
+    </div>
+</section>
 
-<div class="section-title"><h2>Recent IP changes</h2><a class="muted-small" href="/Log?Level=Update">full log →</a></div>
-<div class="card">
-    <table>
-        <thead><tr><th>Time</th><th>Target</th><th class="hide-sm">Detail</th></tr></thead>
-        <tbody>
-        @foreach (var c in s.IpChanges.Recent)
-        {
-            <tr>
-                <td class="mono">@Tz.Format(c.Time)</td>
-                <td class="mono">@c.Target</td>
-                <td class="muted-small hide-sm">@c.Detail</td>
-            </tr>
-        }
-        @if (s.IpChanges.Recent.Count == 0)
-        {
-            <tr><td colspan="3" class="muted">No IP changes recorded yet.</td></tr>
-        }
-        </tbody>
-    </table>
-</div>
+<section class="mat-section">
+    <div class="mat-section__head"><div class="mat-row mat-row--between"><h2>Recent IP changes</h2><a class="mat-btn mat-btn--ghost mat-btn--sm" href="/Log?level=Update">Full log</a></div></div>
+    <div class="mat-table-wrap">
+        <table class="mat-table">
+            <caption class="mat-sr-only">The latest changes of an address</caption>
+            <thead><tr><th scope="col">Time (@zone)</th><th scope="col">Target</th><th scope="col" class="mat-hide-sm">Detail</th></tr></thead>
+            <tbody>
+            @foreach (var c in s.IpChanges.Recent)
+            {
+                <tr>
+                    <td data-label="Time" class="mat-mono mat-nowrap">@Tz.Format(c.Time)</td>
+                    <td data-label="Target" class="mat-mono">@c.Target</td>
+                    <td data-label="Detail" class="mat-hide-sm mat-muted">@c.Detail</td>
+                </tr>
+            }
+            @if (s.IpChanges.Recent.Count == 0)
+            {
+                <tr><td colspan="3" class="mat-muted">No IP changes recorded yet.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>

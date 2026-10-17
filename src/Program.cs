@@ -3,12 +3,18 @@ using Matddns.Api;
 using Matddns.Platform;
 using Matddns.Services;
 using MatPlatform;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Request URLs carry secrets in their query strings (?token=, DynDNS update URLs with {password}), so neither the
+// inbound request log nor HttpClientFactory's outbound request log may record them at Information level.
+builder.Logging.AddFilter("Microsoft.AspNetCore", Microsoft.Extensions.Logging.LogLevel.Warning);
+builder.Logging.AddFilter("System.Net.Http.HttpClient", Microsoft.Extensions.Logging.LogLevel.Warning);
 
 var dataDir = Environment.GetEnvironmentVariable("MATDDNS_DATA") ?? "/data";
 Directory.CreateDirectory(dataDir);
@@ -41,6 +47,7 @@ builder.Services.AddSingleton<SourceResolver>();
 builder.Services.AddSingleton<ReachabilityChecker>();
 builder.Services.AddSingleton<StatusService>();
 builder.Services.AddSingleton<TimeZoneService>();
+builder.Services.AddSingleton<Matddns.Support.Toolkit>();
 builder.Services.AddSingleton<PushReceiver>();
 builder.Services.AddSingleton<UpdaterService>(); // also injected by the management API (POST /api/v1/run)
 builder.Services.AddHostedService(sp => sp.GetRequiredService<UpdaterService>());
@@ -56,7 +63,8 @@ if (string.IsNullOrWhiteSpace(builder.Configuration[MatPlatformSettings.ApiKeyVa
     if (string.IsNullOrWhiteSpace(engineKey)) engineKey = builder.Configuration["Matddns:ApiKey"];
     if (!string.IsNullOrWhiteSpace(engineKey)) builder.Configuration[MatPlatformSettings.ApiKeyVariable] = engineKey.Trim();
 }
-var platform = builder.AddMatPlatform<MatddnsPlatform>(MatddnsPlatform.Describe);
+// The anonymous /api and /api/health keep the limit of the other monitoring endpoints (60 requests per minute and address).
+var platform = builder.AddMatPlatform<MatddnsPlatform>(MatddnsPlatform.Describe, o => o.AnonymousPermitPerMinute = 60);
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opt =>
@@ -68,6 +76,22 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         opt.LogoutPath = "/Logout";
         opt.ExpireTimeSpan = TimeSpan.FromDays(30);
         opt.SlidingExpiration = true;
+        // End a session as soon as its account is deleted or its password changed (the cookie itself stays valid for 30 days).
+        opt.Events.OnValidatePrincipal = async ctx =>
+        {
+            var name = ctx.Principal?.Identity?.Name;
+            var stamp = ctx.Principal?.FindFirst(AuthService.SecurityStampClaim)?.Value;
+            var config = ctx.HttpContext.RequestServices.GetRequiredService<ConfigService>();
+            var currentStamp = config.Read(c =>
+                c.Users.FirstOrDefault(u => u.Username.Equals(name, StringComparison.OrdinalIgnoreCase)) is { } user
+                    ? AuthService.SecurityStamp(user)
+                    : null);
+            if (currentStamp == null || stamp != currentStamp)
+            {
+                ctx.RejectPrincipal();
+                await ctx.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+        };
     })
     // Sign-in through MatIdentity, only with MATIDENTITY_AUTHORITY (nothing changes without it); the local form stays at /Login?local=1.
     .AddMatIdentitySignIn<MatddnsIdentityUsers>(platform, o =>
@@ -92,7 +116,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Mvc.RazorPages.RazorPagesOptions
         m => m.EndpointMetadata.Add(new EnableRateLimitingAttribute("login")));
 });
 
-// Rate limiting: protect the anonymous, credential/token-guarded surface from brute force / floods.
+// Rate limiting: protect the anonymous surface (token-guarded DynDNS/peer endpoints, monitoring API) from brute force / floods.
 // Partitioned per client IP. Behind a reverse proxy, configure ForwardedHeaders so this sees the real IP.
 builder.Services.AddRateLimiter(options =>
 {
@@ -101,10 +125,18 @@ builder.Services.AddRateLimiter(options =>
         RateLimitPartition.GetFixedWindowLimiter(
             ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(5) }));
-    options.AddPolicy("dyndns", ctx =>
+    options.AddPolicy("api", ctx =>
         RateLimitPartition.GetFixedWindowLimiter(
             ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
+    // The anonymous monitoring state (GET /api/state without a key or token) is answered by a middleware, not by an endpoint, so an endpoint
+    // policy never sees it: it gets the same limit as the "api" policy here. Everything else passes this limiter untouched.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        MonitoringCompatibility.IsAnonymousState(ctx.Request)
+            ? RateLimitPartition.GetFixedWindowLimiter(
+                "state:" + (ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) })
+            : RateLimitPartition.GetNoLimiter(string.Empty));
 });
 
 var app = builder.Build();
@@ -120,7 +152,27 @@ if (Environment.GetEnvironmentVariable("MATDDNS_FORWARDED_HEADERS")?.Trim().ToLo
     app.UseForwardedHeaders(fho);
 }
 
-app.UseStaticFiles();
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers.XContentTypeOptions = "nosniff";
+    ctx.Response.Headers.XFrameOptions = "DENY";
+    ctx.Response.Headers["Referrer-Policy"] = "no-referrer";
+    await next();
+});
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        // The service worker, manifest and offline page must never be served from a stale HTTP cache; assets that carry
+        // their build tag (?v=) can be cached for good.
+        var file = ctx.File.Name;
+        ctx.Context.Response.Headers.CacheControl =
+            file is "sw.js" or "manifest.webmanifest" or "offline.html" ? "no-cache"
+            : ctx.Context.Request.Query.ContainsKey("v") ? "public, max-age=31536000, immutable"
+            : "public, max-age=3600";
+    }
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
@@ -147,7 +199,7 @@ app.MapGet("/api/source", (HttpContext ctx, ConfigService config, StatusService 
         return Results.Json(new { status = "unauthorized", message = "Invalid or missing token." }, statusCode: 401);
     var s = status.Build(0);
     return Results.Json(new { time = s.Time, sources = s.SourceList });
-}).AllowAnonymous().RequireRateLimiting("dyndns");
+}).AllowAnonymous().RequireRateLimiting("api");
 
 // DynDNS receiver: external devices push their IP into a "Push" source (token-protected).
 // JSON API form: /api/update?token=<token>&ipv4=<v4>&ipv6=<v6>  (send either or both; legacy ?ip= auto-detects family).
@@ -169,7 +221,7 @@ app.MapGet("/api/update", async (HttpContext ctx, PushReceiver push) =>
         "error" => Results.Json(new { status = "error", message = r.Message ?? "Update failed." }, statusCode: 502),
         _ => Results.Json(new { status = "unauthorized", message = "Invalid or missing token." }, statusCode: 401),
     };
-}).AllowAnonymous().RequireRateLimiting("dyndns");
+}).AllowAnonymous().RequireRateLimiting("api");
 
 // dyndns2-compatible (routers / FRITZ!Box / UniFi): /nic/update and the shorter /update alias.
 // Token via HTTP Basic auth password or ?token= (literal, or a client placeholder like %p); ipv4/ipv6 (or myip) set the address(es).
@@ -196,8 +248,8 @@ async Task<IResult> DynDns2Update(HttpContext ctx, PushReceiver push)
     };
     return Results.Text(body, "text/plain", statusCode: 200); // dyndns2 carries status in the body
 }
-app.MapGet("/nic/update", DynDns2Update).AllowAnonymous().RequireRateLimiting("dyndns");
-app.MapGet("/update", DynDns2Update).AllowAnonymous().RequireRateLimiting("dyndns");
+app.MapGet("/nic/update", DynDns2Update).AllowAnonymous().RequireRateLimiting("api");
+app.MapGet("/update", DynDns2Update).AllowAnonymous().RequireRateLimiting("api");
 
 // Management API for Mattiverse (/api/v1): guarded by the X-Api-Key header (MATDDNS_API_KEY), not by the cookie login.
 app.MapManagementApi();
@@ -205,6 +257,8 @@ app.MapManagementApi();
 app.Services.GetRequiredService<ConfigService>().EnsureLoaded();
 
 app.Run();
+
+public partial class Program; // makes the entry point visible to WebApplicationFactory in the integration tests
 
 public record PathOptions(string DataDir)
 {

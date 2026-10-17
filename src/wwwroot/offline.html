@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" data-app="matddns">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#204db6" />
+<title>Offline · Matddns</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<!-- Self-contained on purpose: the service worker serves this page when nothing else can be loaded. It only needs the toolkit files it caches itself (matui.css, matui.boot.js, offline.js). -->
+<script src="/matui/matui.boot.js"></script>
+<link rel="stylesheet" href="/matui/matui.css" />
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" class="mat-sprite" width="0" height="0" aria-hidden="true" focusable="false">
+  <symbol id="mat-i-globe" viewBox="0 0 24 24"><circle cx='12' cy='12' r='10'/><line x1='2' y1='12' x2='22' y2='12'/><path d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z'/></symbol>
+  <symbol id="mat-i-alert" viewBox="0 0 24 24"><path d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/><line x1='12' y1='9' x2='12' y2='13'/><line x1='12' y1='17' x2='12.01' y2='17'/></symbol>
+  <symbol id="mat-i-refresh" viewBox="0 0 24 24"><polyline points='23 4 23 10 17 10'/><polyline points='1 20 1 14 7 14'/><path d='M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15'/></symbol>
+  <symbol id="mat-i-back" viewBox="0 0 24 24"><line x1='19' y1='12' x2='5' y2='12'/><polyline points='12 19 5 12 12 5'/></symbol>
+</svg>
+<main class="mat-auth" id="main">
+  <div class="mat-auth__card">
+    <div class="mat-auth__brand">
+      <span class="mat-logo mat-logo--lg" role="img" aria-label="Matddns"><img src="/img/logo-detail.svg" alt="" /></span>
+      <h1 id="title">You&rsquo;re offline</h1>
+    </div>
+    <div class="mat-alert mat-alert--warning" role="alert">
+      <svg class="mat-icon" aria-hidden="true" focusable="false"><use href="#mat-i-alert"></use></svg>
+      <div class="mat-alert__body" id="text">Matddns can&rsquo;t be reached right now. This page reconnects by itself as soon as the server is back.</div>
+    </div>
+    <p class="mat-muted" id="status" aria-live="polite"></p>
+    <div class="mat-btn-row mat-btn-row--plain">
+      <button type="button" class="mat-btn mat-btn--primary" id="retry"><svg class="mat-icon" aria-hidden="true" focusable="false"><use href="#mat-i-refresh"></use></svg><span>Try again</span></button>
+      <button type="button" class="mat-btn mat-btn--primary" id="back" hidden><svg class="mat-icon" aria-hidden="true" focusable="false"><use href="#mat-i-back"></use></svg><span>Go back</span></button>
+    </div>
+  </div>
+</main>
+<script src="/js/offline.js"></script>
+</body>
+</html>

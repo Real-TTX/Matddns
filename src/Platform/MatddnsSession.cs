@@ -1,11 +1,14 @@
 using System.Security.Claims;
+using Matddns.Models;
+using Matddns.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace Matddns.Platform;
 
 /// <summary>
-/// The session of Matddns: its cookie (<c>matddns.auth</c>) with the user name, and, for a sign-in through MatIdentity (or an account linked at the
+/// The session of Matddns: its cookie (<c>matddns.auth</c>) with the user name and the security stamp of the account (a changed password or a deleted
+/// account ends the session, see <see cref="AuthService.CreatePrincipal"/>), and, for a sign-in through MatIdentity (or an account linked at the
 /// sign-in), the ID token, which the sign-out hands to MatIdentity (<c>id_token_hint</c>). The local sign-in and the one through MatIdentity use this one place.
 /// </summary>
 public static class MatddnsSession
@@ -13,14 +16,13 @@ public static class MatddnsSession
     /// <summary>The claim that carries the ID token of MatIdentity in the session.</summary>
     public const string IdTokenClaim = "matddns:id_token";
 
-    public static Task StartAsync(HttpContext http, string username, string? idToken)
+    public static Task StartAsync(HttpContext http, UserAccount user, string? idToken)
     {
-        var claims = new List<Claim> { new(ClaimTypes.Name, username) };
-        if (!string.IsNullOrEmpty(idToken)) claims.Add(new Claim(IdTokenClaim, idToken));
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var principal = AuthService.CreatePrincipal(user);
+        if (!string.IsNullOrEmpty(idToken)) ((ClaimsIdentity)principal.Identity!).AddClaim(new Claim(IdTokenClaim, idToken));
         return http.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
-            new ClaimsPrincipal(identity),
+            principal,
             new AuthenticationProperties { IsPersistent = true });
     }
 

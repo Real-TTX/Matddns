@@ -10,7 +10,7 @@ namespace Matddns.Platform;
 /// password (<c>/Login?local=1&amp;link=1</c>) and the sign-in page links it (<see cref="UserService.LinkExternal"/>).
 /// Matddns has no roles (every account may do everything), so the claim <c>role</c> is not read.
 /// </summary>
-public sealed class MatddnsIdentityUsers(UserService users) : IMatIdentityUsers
+public sealed class MatddnsIdentityUsers(UserService users, ConfigService config) : IMatIdentityUsers
 {
     public async Task<MatIdentitySignInResult> SignInAsync(MatIdentityPerson person, HttpContext http, CancellationToken ct)
     {
@@ -19,7 +19,10 @@ public sealed class MatddnsIdentityUsers(UserService users) : IMatIdentityUsers
         if (result.LinkUsername is { } link) return MatIdentitySignInResult.LinkRequired(link);
         if (result.Username is not { } username) return MatIdentitySignInResult.Refused(result.Error ?? "refused");
 
-        await MatddnsSession.StartAsync(http, username, person.IdToken);
+        var account = config.Read(c => c.Users.FirstOrDefault(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase)));
+        if (account is null) return MatIdentitySignInResult.Refused("The account does not exist any more.");
+
+        await MatddnsSession.StartAsync(http, account, person.IdToken);
         return MatIdentitySignInResult.Success();
     }
 }

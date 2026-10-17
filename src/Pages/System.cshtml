@@ -1,137 +1,107 @@
 @page
 @model SystemModel
 @{
-    ViewData["Title"] = "System – Matddns";
+    ViewData["Title"] = "System";
+    ViewData["Crumbs"] = Crumbs.Of(("System", null));
     var lvl = Model.CurrentLevel;
 }
 
-<div class="page-header">
-    <div>
-        <h1>System</h1>
+<div data-tabs>
+    <div class="mat-tabs" role="tablist" aria-label="System">
+        <button type="button" class="mat-tab" role="tab" id="tab-general" aria-controls="panel-general" aria-selected="true">General</button>
+        <button type="button" class="mat-tab" role="tab" id="tab-api" aria-controls="panel-api" aria-selected="false" tabindex="-1">API</button>
     </div>
-</div>
 
-@if (!string.IsNullOrEmpty(Model.Notice)) { <div class="alert ok">@Model.Notice</div> }
+    <div class="mat-tabpanel" role="tabpanel" id="panel-general" aria-labelledby="tab-general">
+        <form method="post" class="mat-form" novalidate>
+            <div class="mat-card">
+                <div class="mat-card__head"><icon name="settings" /><h2 class="mat-card__title">Settings</h2></div>
+                <div class="mat-card__body mat-stack">
+                    <div class="mat-form__grid">
+                        <mat-field label="Log level (minimum)" for-id="MinLogLevel">
+                            <select id="MinLogLevel" name="MinLogLevel" class="mat-select">
+                                <option value="Debug" selected="@(lvl == Matddns.Services.LogLevel.Debug)">Debug</option>
+                                <option value="Info" selected="@(lvl == Matddns.Services.LogLevel.Info)">Info</option>
+                                <option value="Update" selected="@(lvl == Matddns.Services.LogLevel.Update)">Update</option>
+                                <option value="Warn" selected="@(lvl == Matddns.Services.LogLevel.Warn)">Warn</option>
+                                <option value="Error" selected="@(lvl == Matddns.Services.LogLevel.Error)">Error</option>
+                            </select>
+                        </mat-field>
 
-<div class="tabs">
-    <button type="button" class="tab" data-tab="general">General</button>
-    <button type="button" class="tab" data-tab="users">Users</button>
-    <button type="button" class="tab" data-tab="api">API</button>
-</div>
+                        <mat-field label="Keep the log for (days)" for-id="LogRetentionDays">
+                            <input type="number" id="LogRetentionDays" name="LogRetentionDays" value="@Model.RetentionDays" min="0" max="3650" class="mat-input mat-mono" inputmode="numeric" data-msg-range="Please enter a number of days from 0 to 3650." />
+                        </mat-field>
 
-<div class="tab-panel" id="tab-general">
-    <div class="card">
-        <form method="post">
-            <div class="form-grid">
-                <div class="field">
-                    <label>Log level (minimum)</label>
-                    <select name="MinLogLevel">
-                        <option value="Debug" selected="@(lvl == Matddns.Services.LogLevel.Debug)">Debug</option>
-                        <option value="Info" selected="@(lvl == Matddns.Services.LogLevel.Info)">Info</option>
-                        <option value="Update" selected="@(lvl == Matddns.Services.LogLevel.Update)">Update</option>
-                        <option value="Warn" selected="@(lvl == Matddns.Services.LogLevel.Warn)">Warn</option>
-                        <option value="Error" selected="@(lvl == Matddns.Services.LogLevel.Error)">Error</option>
-                    </select>
-                </div>
+                        <mat-field label="Time zone" for-id="TimeZone" full="true">
+                            <select id="TimeZone" name="TimeZone" class="mat-select">
+                                <option value="" selected="@(string.IsNullOrEmpty(Model.CurrentTimeZone))">UTC</option>
+                                @foreach (var z in Model.Zones)
+                                {
+                                    <option value="@z.Id" selected="@(z.Id == Model.CurrentTimeZone)">@z.Id</option>
+                                }
+                            </select>
+                        </mat-field>
+                    </div>
 
-                <div class="field">
-                    <label>Retention (days)</label>
-                    <input type="number" name="LogRetentionDays" value="@Model.RetentionDays" min="0" max="3650" />
-                </div>
+                    <label class="mat-check">
+                        <input type="checkbox" id="AnonymousDashboard" name="AnonymousDashboard" value="true" checked="@Model.AnonymousDashboard" />
+                        <span class="mat-check__text">Public dashboard (read-only, no sign-in)</span>
+                    </label>
 
-                <div class="field full">
-                    <label>Time zone</label>
-                    <select name="TimeZone">
-                        <option value="" selected="@(string.IsNullOrEmpty(Model.CurrentTimeZone))">UTC</option>
-                        @foreach (var z in Model.Zones)
-                        {
-                            <option value="@z.Id" selected="@(z.Id == Model.CurrentTimeZone)">@z.Id</option>
-                        }
-                    </select>
-                </div>
-
-                <div class="field full checkbox-field">
-                    <input type="checkbox" name="AnonymousDashboard" value="true" id="anonDash" checked="@Model.AnonymousDashboard" />
-                    <label for="anonDash">Public dashboard — show the dashboard read-only without a login (the menu stays; editing still needs login)</label>
+                    <dl class="mat-kv"><dt>Log file</dt><dd class="mat-mono">/data/log.txt, @(string.Format("{0:N0}", Model.LogFileBytes / 1024)) KB</dd></dl>
                 </div>
             </div>
 
-            <div class="actions">
-                <button type="submit">Save</button>
-                <button type="submit" class="danger" asp-page-handler="Clear" onclick="return confirm('Clear the entire log now?');">Clear log</button>
+            <div class="mat-btn-row">
+                <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
+                <span class="mat-btn-row__spacer"></span>
+                <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Clear" data-confirm="Clear the entire log now? This cannot be undone." data-confirm-ok="Clear log"><icon name="trash" /><span>Clear log</span></button>
             </div>
         </form>
     </div>
 
-    <div class="muted-small" style="margin-top:12px;">
-        Current log file <span class="mono">/data/log.txt</span>: @(string.Format("{0:N0}", Model.LogFileBytes / 1024)) KB
-    </div>
-</div>
+    <div class="mat-tabpanel" role="tabpanel" id="panel-api" aria-labelledby="tab-api" hidden>
+        <div class="mat-stack">
+            <p class="mat-muted">Public JSON endpoints for monitoring software (Uptime Kuma, Zabbix, …). They need no sign-in and never show passwords or API keys.</p>
 
-<div class="tab-panel" id="tab-users" hidden>
-    <div data-dt>
-        <div class="dtable-wrap">
-            <table class="dtable">
-                <thead><tr><th>User</th><th></th></tr></thead>
-                @foreach (var u in Model.Users)
-                {
-                    <tbody class="dt-group" data-href="/Users/Edit?name=@u">
-                        <tr class="dt-parent">
-                            <td class="dt-name mono">
-                                @u
-                                @if (string.Equals(u, User.Identity?.Name, StringComparison.OrdinalIgnoreCase)) { <span class="badge muted">you</span> }
-                            </td>
-                            <td class="dt-go">›</td>
-                        </tr>
+            <div class="mat-table-wrap">
+                <table class="mat-table">
+                    <caption class="mat-sr-only">Public endpoints</caption>
+                    <thead><tr><th scope="col">Endpoint</th><th scope="col">Purpose</th></tr></thead>
+                    <tbody>
+                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /healthz</td><td data-label="Purpose">Liveness: returns <code>ok</code> (200) while the app runs.</td></tr>
+                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /api/health</td><td data-label="Purpose">Health summary: <code>ok</code>, <code>degraded</code> or <code>down</code> with its checks, plus source and rule counts and IP-change stats. HTTP <code>200</code> for ok and degraded, <code>503</code> for down; with <code>?strict=1</code> <code>503</code> unless ok.</td></tr>
+                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /api/state</td><td data-label="Purpose">Full state as JSON: the IPs of every source, the status of every rule and the recent IP changes. With a key or a token it is the state of the Mat platform contract instead.</td></tr>
+                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /api/source?token=</td><td data-label="Purpose">Peer pull: this instance's source entries (IPs only, no secrets) for a valid DynDNS Server token. Used by a <strong>Matddns peer</strong> source on another instance.</td></tr>
+                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /api/update</td><td data-label="Purpose">DynDNS <strong>receiver</strong> (JSON): a device or script pushes its IP into a DynDNS Server source. The URL with the token is shown on that source's page.</td></tr>
+                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /nic/update</td><td data-label="Purpose">The same receiver in the legacy <strong>dyndns2</strong> format (plain <code>good</code> / <code>nochg</code>), only needed for routers and FRITZ!Box. Same token.</td></tr>
                     </tbody>
-                }
-            </table>
-        </div>
-        <div class="actions" style="margin-top:14px;">
-            <a class="button" href="/Users/Edit">+ New user</a>
-        </div>
-    </div>
-</div>
+                </table>
+            </div>
 
-<div class="tab-panel" id="tab-api" hidden>
-    <div class="card">
-        <p class="muted-small" style="margin-top:0;">Public JSON endpoints for monitoring software (Uptime Kuma, Zabbix, …) — <strong>no authentication required</strong>. They never expose passwords or API keys.</p>
-        <table class="api-table">
-            <thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead>
-            <tbody>
-                <tr><td class="mono">GET /healthz</td><td>Liveness — returns <span class="mono">ok</span> (200) while the app runs.</td></tr>
-                <tr><td class="mono">GET /api/health</td><td>Health summary. HTTP <span class="mono">200</span> when everything is OK, <span class="mono">503</span> when degraded — plus JSON with source/rule counts and IP‑change stats.</td></tr>
-                <tr><td class="mono">GET /api/state</td><td>Full state as JSON: per‑source IPs, per‑rule status and recent IP changes.</td></tr>
-                <tr><td class="mono">GET /api/source?token=</td><td>Peer pull — returns this instance's source entries (IPs only, no secrets) for a valid DynDNS‑Server token. Used by a <strong>Matddns peer</strong> source on another instance.</td></tr>
-                <tr><td class="mono">GET /api/update</td><td>DynDNS <strong>receiver</strong> (JSON) — a device or script pushes its IP into a “Push” source. The token‑protected URL is shown on that source's page.</td></tr>
-                <tr><td class="mono">GET /nic/update</td><td>The same receiver in the legacy <strong>dyndns2</strong> format (plain <span class="mono">good</span>/<span class="mono">nochg</span>) — only needed for routers / FRITZ!Box that speak that protocol. Same token.</td></tr>
-            </tbody>
-        </table>
-        <div class="hint" style="margin-top:10px;">Example: <span class="mono">curl http://&lt;host&gt;:4060/api/health</span> — point your monitor at <span class="mono">/api/health</span> and alert on a non‑200 status.</div>
-        <div class="muted-small" style="margin-top:14px; margin-bottom:6px;">Example <span class="mono">/api/health</span> response</div>
-        <pre class="code-block">{
+            <div class="mat-card">
+                <div class="mat-card__head"><icon name="terminal" /><h2 class="mat-card__title">Example: /api/health</h2></div>
+                <div class="mat-card__body mat-stack mat-stack--sm">
+                    <p>Point your monitor at <code>/api/health?strict=1</code> and alert on a status other than 200, for example <code>curl http://&lt;host&gt;:4060/api/health?strict=1</code>.</p>
+                    <pre class="mat-code"><code>{
   "status": "ok",
+  "app": "matddns",
+  "version": "0.4.120",
+  "time": "2026-06-10T08:00:00+00:00",
+  "checks": [ { "name": "config", "status": "ok" }, { "name": "sources", "status": "ok" }, { "name": "rules", "status": "ok" } ],
   "sources": { "total": 2, "entries": 3, "ok": 3, "errors": 0 },
   "rules":   { "total": 2, "ok": 2, "issues": 0, "disabled": 0 },
-  "ipChanges": { "total": 12, "last24h": 1, "last7d": 4, "lastChange": "2026-06-09T23:24:00Z" },
-  "time": "2026-06-10T08:00:00Z"
-}</pre>
-        <p class="muted-small" style="margin-top:14px; margin-bottom:0;"><strong>Management API</strong> (<span class="mono">/api/v1</span>: <span class="mono">status</span>, <span class="mono">sources</span>, <span class="mono">domains</span>, <span class="mono">rules</span>, <span class="mono">run</span>) — used by Mattiverse to provision this instance. It needs the <span class="mono">X-Api-Key</span> header and is <strong>disabled</strong> until the <span class="mono">MATDDNS_API_KEY</span> environment variable is set. See the README.</p>
+  "ipChanges": { "total": 12, "last24h": 1, "last7d": 4, "lastChange": "2026-06-09T23:24:00Z" }
+}</code></pre>
+                </div>
+            </div>
+
+            <div class="mat-card">
+                <div class="mat-card__head"><icon name="key" /><h2 class="mat-card__title">Management API</h2></div>
+                <div class="mat-card__body mat-stack mat-stack--sm">
+                    <p><code>/api/v1</code> (<code>status</code>, <code>sources</code>, <code>domains</code>, <code>rules</code>, <code>run</code>) is used by Mattiverse to provision this instance. It needs the <code>X-Api-Key</code> header and is <strong>disabled</strong> until the <code>MATDDNS_API_KEY</code> environment variable is set. The platform contract (<code>/api</code>, <code>/api/state</code>, <code>/api/configure</code>, <code>/api/actions</code>) takes <code>MAT_API_KEY</code>, or this key when that is not set. See the README.</p>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
-
-<script>
-    (function () {
-        var tabs = document.querySelectorAll('.tabs .tab');
-        var panels = document.querySelectorAll('.tab-panel');
-        function show(name) {
-            tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
-            panels.forEach(function (p) { p.hidden = (p.id !== 'tab-' + name); });
-            try { sessionStorage.setItem('systemTab', name); } catch (e) { }
-        }
-        tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
-        var saved = null;
-        try { saved = sessionStorage.getItem('systemTab'); } catch (e) { }
-        show(saved || 'general');
-    })();
-</script>

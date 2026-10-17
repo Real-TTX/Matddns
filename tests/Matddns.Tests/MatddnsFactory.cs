@@ -186,6 +186,19 @@ internal static partial class SignIn
 
     public static string AntiforgeryToken(string html) => TokenRegex().Match(html).Groups[1].Value;
 
+    /// <summary>The sign-in page is a page of the MatUi toolkit: its card, no inline style or script, and only icons of the sprite the app ships.</summary>
+    public static void IsMatUiPage(MatddnsFactory site, string html)
+    {
+        Assert.Contains("class=\"mat-auth__card\"", html);
+        Assert.DoesNotMatch(@"<[^>]+\sstyle=", html);
+        Assert.DoesNotMatch(@"<script(?![^>]*\ssrc=)[^>]*>", html);
+        var icons = site.Services.GetRequiredService<Matddns.Support.Toolkit>().IconNames;
+        foreach (Match use in IconUseRegex().Matches(html)) Assert.Contains(use.Groups[1].Value, icons);
+    }
+
+    [GeneratedRegex(@"<use href=""#mat-i-([a-z0-9-]+)""")]
+    private static partial Regex IconUseRegex();
+
     public static string Path(HttpResponseMessage response) => response.Headers.Location!.OriginalString.Replace("http://localhost", string.Empty);
 
     public static IEnumerable<string> SetCookies(HttpResponseMessage response)

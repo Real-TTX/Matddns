@@ -1,54 +1,75 @@
 @page
 @model LoginModel
 @{
-    ViewData["Title"] = "Login – Matddns";
+    Layout = "_Bare";
+    ViewData["Title"] = "Sign in";
+    var linking = Model.PendingLink is not null;
 }
-<div class="login-card">
-    <div class="brand">
-        <span class="logo">◈</span>
-        <span class="title">Matddns</span>
+
+<div class="mat-auth__card">
+    <div class="mat-auth__brand">
+        @Ui.Logo("lg")
+        <h1>@Ui.App.Name</h1>
+        <p class="mat-muted">@Ui.App.Tagline</p>
     </div>
-    <h1>Sign in</h1>
-    @if (Model.PendingLink is not null)
+
+    @if (linking)
     {
-        <div class="alert ok" role="status" id="login-link">
-            <p>MatIdentity signed you in, and an account with this name already exists here.</p>
-            <p>Sign in once with the password of that account to connect it with MatIdentity, or cancel.</p>
+        <div class="mat-alert mat-alert--info" role="status" id="login-link">
+            <icon name="link" />
+            <div class="mat-alert__body">
+                <p>MatIdentity signed you in, and an account with this name already exists here.</p>
+                <p>Sign in once with the password of that account to connect it with MatIdentity, or cancel.</p>
+            </div>
         </div>
     }
     else if (Model.LinkExpired)
     {
-        <div class="alert err" role="status" id="login-link-expired">The connection with MatIdentity expired or was cancelled. Sign in again through MatIdentity to start over.</div>
+        <div class="mat-alert mat-alert--warning" role="status" id="login-link-expired"><icon name="alert" /><div class="mat-alert__body">The connection with MatIdentity expired or was cancelled. Sign in again through MatIdentity to start over.</div></div>
     }
     @if (Model.SsoError)
     {
-        <div class="alert err" role="alert" id="login-sso-error">The sign-in through MatIdentity did not work (or MatIdentity cannot be reached). Sign in with your password.</div>
+        <div class="mat-alert mat-alert--danger" role="alert" id="login-sso-error"><icon name="x-circle" /><div class="mat-alert__body">The sign-in through MatIdentity did not work (or MatIdentity cannot be reached). Sign in with your password.</div></div>
     }
     @if (Model.Denied)
     {
-        <div class="alert err" role="alert" id="login-denied">MatIdentity signed you in, but Matddns cannot match you to one account. Ask an administrator.</div>
+        <div class="mat-alert mat-alert--danger" role="alert" id="login-denied"><icon name="x-circle" /><div class="mat-alert__body">MatIdentity signed you in, but Matddns cannot match you to one account. Ask an administrator.</div></div>
     }
     @if (!string.IsNullOrEmpty(Model.Error))
     {
-        <div class="alert err">@Model.Error</div>
+        <div class="mat-alert mat-alert--danger" role="alert"><icon name="x-circle" /><div class="mat-alert__body">@Model.Error</div></div>
     }
-    <form method="post" id="login-form">
-        <div class="field">
-            <label for="Username">Username</label>
-            <input type="text" id="Username" name="Username" value="@Model.Username" autofocus autocomplete="username" />
+
+    <form method="post" class="mat-form" id="login-form" novalidate>
+        <partial name="_ValidationSummary" />
+
+        <mat-field label="Username" for-id="Username">
+            <input type="text" id="Username" name="Username" value="@Model.Username" class="mat-input" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required data-msg-required="Please enter your username." />
+        </mat-field>
+
+        <mat-field label="Password" for-id="Password">
+            <input type="password" id="Password" name="Password" class="mat-input" autocomplete="current-password" required data-msg-required="Please enter your password." />
+        </mat-field>
+
+        <div class="mat-btn-row mat-btn-row--plain">
+            <button type="submit" class="mat-btn mat-btn--primary mat-btn--block"><icon name="login" /><span>@(linking ? "Sign in and connect" : "Sign in")</span></button>
         </div>
-        <div class="field">
-            <label for="Password">Password</label>
-            <input type="password" id="Password" name="Password" autocomplete="current-password" />
-        </div>
-        <button type="submit">@(Model.PendingLink is not null ? "Sign in and connect" : "Sign in")</button>
-        @if (Model.PendingLink is not null)
-        {
-            <button type="submit" class="ghost" asp-page-handler="CancelLink" id="login-link-cancel">Cancel</button>
-        }
     </form>
+
+    @if (linking)
+    {
+        @* A form of its own: the fields of the sign-in are required, and Cancel must not ask for them. *@
+        <form method="post" asp-page-handler="CancelLink">
+            <div class="mat-btn-row mat-btn-row--plain">
+                <button type="submit" class="mat-btn mat-btn--secondary mat-btn--block" id="login-link-cancel"><icon name="x" /><span>Cancel</span></button>
+            </div>
+        </form>
+    }
+
     @if (Model.IdentityEnabled)
     {
-        <p id="login-identity"><a class="button ghost" href="/Login">Sign in with MatIdentity</a></p>
+        <div class="mat-btn-row mat-btn-row--plain" id="login-identity">
+            <a class="mat-btn mat-btn--secondary mat-btn--block" href="/Login"><icon name="user-circle" /><span>Sign in with MatIdentity</span></a>
+        </div>
     }
 </div>

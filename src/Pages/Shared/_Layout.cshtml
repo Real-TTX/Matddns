@@ -1,67 +1,182 @@
+@using Microsoft.AspNetCore.Html
+@inject ConfigService Config
+@inject Toolkit Toolkit
 @{
-    var path = Context.Request.Path.Value ?? "/";
-    bool Starts(string p) => path.StartsWith(p, StringComparison.OrdinalIgnoreCase);
-    bool DomainsActive() => Starts("/Domains");
-    var isLogin = Starts("/Login");
+    // A page fills these in: Title, Crumbs (the breadcrumb below the name), Width ("narrow" or "wide"), Reconnect ("reload": show fresh data once the server is
+    // back), AutoRefresh (milliseconds between reloads of a read-only page) and Refresh (a reload button in the header bar). A page that is
+    // not for visitors without a sign-in is protected by the app's authorization policy, not here.
+    var signedIn = User.Identity?.IsAuthenticated == true;
+    var (sourceProblems, ruleProblems) = signedIn ? Config.Read(Navigation.Problems) : (0, 0);
+    var menu = Navigation.For(signedIn, sourceProblems, ruleProblems);
+    var active = ViewData["ActiveHref"] as string ?? Navigation.ActiveHref(menu, Context.Request.Path.Value ?? "/");
+
+    var name = Ui.App.Name;
+    var title = ViewData["Title"] as string ?? name;
+    var width = ViewData["Width"] as string;
+    var managedBy = ViewData["ManagedBy"] as string; // an edit page of an object another system owns (management API) says so below its name
+    var crumbs = ViewData["Crumbs"] as IReadOnlyList<(string Text, string? Url)> ?? [];
+    var userName = User.Identity?.Name ?? string.Empty;
+    var assetTag = Matddns.Services.BuildInfo.CacheTag;
+
+    IHtmlContent Badge(NavBadge badge)
+        => new HtmlString($"<span class=\"{badge.Classes}\">{Ui.Encode(badge.Text)}<span class=\"mat-sr-only\"> {Ui.Encode(badge.Label)}</span></span>");
+
+    // What a page did and told through a redirect (SHELL-12): "done" is a toast, something to read is an alert at the top of the content.
+    var notice = TempData["Notice"] as string;
+    var error = TempData["Error"] as string;
 }
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@(ViewData["Title"] ?? "Matddns")</title>
-    <link rel="icon" href="~/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="~/css/site.css?v=@Matddns.Services.BuildInfo.CacheTag" />
-</head>
-<body class="@(isLogin ? "login" : "app")">
-    @if (!isLogin)
-    {
-        <header class="topbar">
-            <a class="brand" href="/" title="Dashboard">
-                <span class="logo">◈</span>
-                <span class="title">Matddns</span>
-            </a>
-            <button type="button" class="navtoggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">
-                <span></span><span></span><span></span>
-            </button>
-            <div class="topbar-menu" id="topbarMenu">
-                <nav>
-                    @if (User.Identity?.IsAuthenticated == true)
-                    {
-                        <a class="@(Starts("/Sources") ? "active" : "")" href="/Sources">Sources</a>
-                        <a class="@(DomainsActive() ? "active" : "")" href="/Domains">Domains</a>
-                        <a class="@(Starts("/Rules") ? "active" : "")" href="/Rules">Rules</a>
-                        <a class="@(Starts("/System") ? "active" : "")" href="/System">System</a>
-                        <a class="@(Starts("/Log") ? "active" : "")" href="/Log">Log</a>
-                    }
-                </nav>
-                @if (User.Identity?.IsAuthenticated == true)
-                {
-                    <form method="post" asp-page="/Logout" class="logout">
-                        <button type="submit" class="ghost">Logout</button>
-                    </form>
-                }
-                else
-                {
-                    <div class="logout"><a class="button ghost" href="/Login">Login</a></div>
-                }
+<html lang="en" data-app="@Ui.App.Id">
+<partial name="_Head" model="@(title == name ? name : $"{title} · {name}")" />
+<body>
+    <a class="mat-skip" href="#main">Skip to the content</a>
+    @Html.Raw(Toolkit.Sprite)
+
+    <div class="mat-app">
+        <aside class="mat-nav" id="mat-nav">
+            <div class="mat-nav__brand">
+                <a href="/" aria-label="@name, start page">
+                    @Ui.Logo()
+                    <span>
+                        <span class="mat-nav__name">@name</span>
+                        <span class="mat-nav__tagline">@Ui.App.Tagline</span>
+                    </span>
+                </a>
+                <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon mat-nav__close" data-nav-close aria-label="Close the menu">@Ui.Icon("x")</button>
             </div>
-        </header>
-        <main class="container">
-            @RenderBody()
-        </main>
-        <footer class="appfooter">
-            <span class="build-chip">
-                <span class="logo">◈</span>
-                <span>Matddns</span>
-                <span class="mono">@Matddns.Services.BuildInfo.Display</span>
-            </span>
-        </footer>
-        <script src="~/js/tables.js?v=@Matddns.Services.BuildInfo.CacheTag"></script>
-    }
-    else
+
+            <nav class="mat-nav__scroll" aria-label="Main">
+                <ul class="mat-nav__list">
+                    @foreach (var group in menu)
+                    {
+                        if (group.Title is not null)
+                        {
+                            <li class="mat-nav__group" role="presentation">@group.Title</li>
+                        }
+
+                        foreach (var item in group.Items)
+                        {
+                            var isActive = item.Href == active;
+                            <li>
+                                <a class="mat-nav__item @(isActive ? "is-active" : "")" href="@item.Href" aria-current="@(isActive ? "page" : null)">
+                                    @Ui.Icon(item.Icon)<span>@item.Title</span>
+                                    @if (item.Badge is not null) { @Badge(item.Badge) }
+                                </a>
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+
+            <div class="mat-nav__foot">
+                <div class="mat-nav__account">
+                    @if (signedIn)
+                    {
+                        <button type="button" class="mat-user" data-menu-toggle="user-menu" aria-haspopup="menu" aria-expanded="false">
+                            <span class="mat-avatar" aria-hidden="true">@Ui.Initials(userName)</span>
+                            <span class="mat-user__text">
+                                <span class="mat-user__name">@userName</span>
+                                <span class="mat-user__role">Administrator</span>
+                            </span>
+                            @Ui.Icon("chevron-up", "mat-user__chev")
+                        </button>
+                    }
+                    else
+                    {
+                        <a class="mat-btn mat-btn--primary" href="/Login">@Ui.Icon("login")<span>Sign in</span></a>
+                    }
+                    <button type="button" class="mat-theme" data-theme-toggle data-theme-state="system" aria-label="Theme: System. Click for Light." title="Theme: System. Click for Light.">
+                        <svg class="mat-icon" data-theme-icon="system" aria-hidden="true" focusable="false"><use href="#mat-i-monitor"></use></svg>
+                        <svg class="mat-icon" data-theme-icon="light" aria-hidden="true" focusable="false"><use href="#mat-i-sun"></use></svg>
+                        <svg class="mat-icon" data-theme-icon="dark" aria-hidden="true" focusable="false"><use href="#mat-i-moon"></use></svg>
+                    </button>
+                </div>
+                <div class="mat-nav__version" title="@Matddns.Services.BuildInfo.Display">@name @(Matddns.Services.BuildInfo.IsRelease ? "v" + Matddns.Services.BuildInfo.Version : "local build")</div>
+                <div class="md-install" data-install hidden>
+                    <button type="button" class="mat-btn mat-btn--secondary mat-btn--block" data-install-btn>@Ui.Icon("download")<span>Install app</span></button>
+                </div>
+            </div>
+        </aside>
+
+        <div class="mat-main">
+            <header class="mat-topbar">
+                <button type="button" class="mat-burger" data-nav-toggle aria-label="Open the menu" aria-controls="mat-nav" aria-expanded="false">@Ui.Icon("menu")</button>
+                <nav class="mat-crumbs" aria-label="Breadcrumb">
+                    <ol>
+                        @if (crumbs.Count == 0)
+                        {
+                            <li aria-current="page">@name</li>
+                        }
+                        else
+                        {
+                            <li><a href="/">@name</a></li>
+                            @for (var i = 0; i < crumbs.Count; i++)
+                            {
+                                var c = crumbs[i];
+                                if (i == crumbs.Count - 1 || c.Url is null)
+                                {
+                                    <li aria-current="page">@c.Text</li>
+                                }
+                                else
+                                {
+                                    <li><a href="@c.Url">@c.Text</a></li>
+                                }
+                            }
+                        }
+                    </ol>
+                </nav>
+                @if (ViewData["Refresh"] is true)
+                {
+                    <div class="mat-topbar__actions">
+                        <a class="mat-btn mat-btn--ghost mat-btn--icon" href="@Context.Request.Path" data-tip="Refresh" aria-label="Refresh">@Ui.Icon("refresh")</a>
+                    </div>
+                }
+            </header>
+
+            @* data-autorefresh only exists on pages that asked for it: a page with a form must never reload by itself. *@
+            <main class="mat-page @(width == "narrow" ? "mat-page--narrow" : width == "wide" ? "mat-page--wide" : "")" id="main" data-reconnect="@(ViewData["Reconnect"] ?? "keep")" @(ViewData["AutoRefresh"] is int refreshMs ? Html.Raw($"data-autorefresh=\"{refreshMs}\"") : null)>
+                @if (!string.IsNullOrEmpty(error))
+                {
+                    <div class="mat-alert mat-alert--danger" role="alert">@Ui.Icon("x-circle")<div class="mat-alert__body">@error</div></div>
+                }
+
+                <div class="mat-page__head">
+                    <div class="mat-page__title">
+                        <h1>@title</h1>
+                        @if (!string.IsNullOrWhiteSpace(managedBy))
+                        {
+                            <p class="mat-page__sub"><partial name="_ManagedBadge" model="managedBy" /> Manual changes may be overwritten by @Labels.ManagedBy(managedBy).</p>
+                        }
+                    </div>
+                </div>
+
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+
+    @if (signedIn)
     {
-        @RenderBody()
+        <div class="mat-menu" id="user-menu" role="menu" aria-label="@userName" hidden>
+            <div class="mat-menu__head">
+                <span class="mat-avatar" aria-hidden="true">@Ui.Initials(userName)</span>
+                <div><strong>@userName</strong><small>Administrator</small></div>
+            </div>
+            <a class="mat-menu__item" role="menuitem" href="/Users/Edit?name=@Uri.EscapeDataString(userName)">@Ui.Icon("key")<span>Change password</span></a>
+            <div class="mat-menu__sep" role="separator"></div>
+            <form method="post" asp-page="/Logout">
+                <button type="submit" class="mat-menu__item" role="menuitem">@Ui.Icon("logout")<span>Sign out</span></button>
+            </form>
+        </div>
     }
+
+    @if (!string.IsNullOrEmpty(notice))
+    {
+        <div data-toast="@notice" data-tone="success" hidden></div>
+    }
+
+    <script src="~/matui/matui.js?v=@assetTag"></script>
+    <script src="~/js/matddns.js?v=@assetTag" data-sw="/sw.js?v=@assetTag"></script>
+    @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

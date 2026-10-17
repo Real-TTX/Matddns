@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using Matddns.Models;
 using Matddns.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -45,9 +47,10 @@ public class EditModel : PageModel
         BaseUrl = $"{Request.Scheme}://{Request.Host}";
         if (!string.IsNullOrEmpty(id))
         {
-            Group = _config.Read(c => c.Sources.FirstOrDefault(g => g.Id == id));
+            var cfg = _config.Current;
+            Group = cfg.Sources.FirstOrDefault(g => g.Id == id);
             if (Group == null) { Error = "Group not found"; return RedirectToPage("Index"); }
-            DynamicRule = _config.Read(c => c.Rules.FirstOrDefault(r => r.Dynamic && r.DynamicSourceId == id));
+            DynamicRule = cfg.Rules.FirstOrDefault(r => r.Dynamic && r.DynamicSourceId == id);
 
             if (Group.Kind == SourceKind.UnifiCloud && !string.IsNullOrWhiteSpace(Group.UnifiCloud?.ApiKey))
             {
@@ -94,6 +97,8 @@ public class EditModel : PageModel
         {
             var ip = (StaticIp ?? "").Trim();
             var ipv6 = (StaticIpv6 ?? "").Trim();
+            var invalid = InvalidStaticAddress(ip, ipv6);
+            if (invalid != null) { Error = invalid; return RedirectToPage("Edit"); }
             g.Static = new StaticSettings { Ip = ip, Ipv6 = ipv6 };
             g.Entries.Add(new SourceEntry
             {
@@ -150,6 +155,16 @@ public class EditModel : PageModel
         return RedirectToPage("Edit", new { id = g.Id });
     }
 
+    // Error message if a non-empty static address isn't a valid IPv4 / IPv6 address, otherwise null.
+    private static string? InvalidStaticAddress(string ipv4, string ipv6)
+    {
+        if (ipv4.Length > 0 && !(IPAddress.TryParse(ipv4, out var a4) && a4.AddressFamily == AddressFamily.InterNetwork))
+            return $"'{ipv4}' is not a valid IPv4 address";
+        if (ipv6.Length > 0 && !(IPAddress.TryParse(ipv6, out var a6) && a6.AddressFamily == AddressFamily.InterNetworkV6))
+            return $"'{ipv6}' is not a valid IPv6 address";
+        return null;
+    }
+
     public IActionResult OnPostRegenerateToken(string Id)
     {
         _config.Mutate(c =>
@@ -167,6 +182,12 @@ public class EditModel : PageModel
         string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false,
         string? UcKey = null, string? MdUrl = null, string? MdToken = null)
     {
+        if (_config.Read(c => c.Sources.FirstOrDefault(x => x.Id == Id)?.Kind) == SourceKind.Static)
+        {
+            var invalid = InvalidStaticAddress((StaticIp ?? "").Trim(), (StaticIpv6 ?? "").Trim());
+            if (invalid != null) { Error = invalid; return RedirectToPage("Edit", new { id = Id }); }
+        }
+
         _config.Mutate(c =>
         {
             var g = c.Sources.FirstOrDefault(x => x.Id == Id);
@@ -266,7 +287,7 @@ public class EditModel : PageModel
     public async Task<IActionResult> OnPostAddGatewayAsync(string Id, string HostId, string? Alias, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(HostId)) { Error = "No gateway selected"; return RedirectToPage("Edit", new { id = Id }); }
-        var g = _config.Read(c => c.Sources.FirstOrDefault(x => x.Id == Id));
+        var g = _config.Current.Sources.FirstOrDefault(x => x.Id == Id);
         if (g == null) { Error = "Group not found"; return RedirectToPage("Index"); }
         if (g.Entries.Any(e => e.InterfaceName == HostId)) { Notice = "Gateway already added"; return RedirectToPage("Edit", new { id = Id }); }
 
@@ -329,7 +350,7 @@ public class EditModel : PageModel
         string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false,
         string? MdUrl = null, string? MdToken = null)
     {
-        var g = _config.Read(c => c.Sources.FirstOrDefault(x => x.Id == Id));
+        var g = _config.Current.Sources.FirstOrDefault(x => x.Id == Id);
         if (g == null) { Error = "Group not found"; return RedirectToPage("Index"); }
 
         try

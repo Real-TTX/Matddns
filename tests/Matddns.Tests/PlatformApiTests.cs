@@ -5,6 +5,7 @@ using System.Text.Json;
 using Matddns.Models;
 using Matddns.Platform;
 using Matddns.Services;
+using Matddns.Support;
 using MatPlatform;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -79,22 +80,23 @@ internal static class Sample
     }
 }
 
-/// <summary>The MatApiDefinition: valid in both languages against the MatUi sprite, served with an ETag, the app of the registry.</summary>
+/// <summary>The MatApiDefinition: valid in both languages against the MatUi sprite the app ships (wwwroot/matui), served with an ETag, the app of the registry.</summary>
 public sealed class PlatformDefinitionTests(MatddnsFactory site) : IClassFixture<MatddnsFactory>
 {
-    private static readonly string Sprite = Path.Combine(AppContext.BaseDirectory, "Fixtures", "matui-icons.svg");
+    /// <summary>The icon names of the sprite the app itself ships and inlines into every page (a copy of the MatUi toolkit).</summary>
+    private IReadOnlySet<string> Sprite => site.Services.GetRequiredService<Toolkit>().IconNames;
 
     [Theory]
     [InlineData("de")]
     [InlineData("en")]
     public void The_description_is_valid(string language)
-        => Assert.Empty(MatPlatformValidator.Validate(MatPlatformBuilder.Build(MatddnsPlatform.Describe, language), MatPlatformValidator.ReadSprite(Sprite)));
+        => Assert.Empty(MatPlatformValidator.Validate(MatPlatformBuilder.Build(MatddnsPlatform.Describe, language), Sprite));
 
     [Fact]
     public async Task The_served_definition_is_valid_and_names_the_app()
     {
         var json = await site.Anonymous().GetStringAsync("/api");
-        Assert.Empty(MatPlatformValidator.Validate(json, MatPlatformValidator.ReadSprite(Sprite)));
+        Assert.Empty(MatPlatformValidator.Validate(json, Sprite));
 
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;

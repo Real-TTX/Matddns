@@ -22,7 +22,7 @@ public class EditModel : PageModel
         BaseUrl = $"{Request.Scheme}://{Request.Host}";
         if (!string.IsNullOrEmpty(id))
         {
-            Group = _config.Read(c => c.Domains.FirstOrDefault(g => g.Id == id));
+            Group = _config.Current.Domains.FirstOrDefault(g => g.Id == id);
             if (Group == null) { Error = "Group not found"; return RedirectToPage("Index"); }
         }
         return Page();

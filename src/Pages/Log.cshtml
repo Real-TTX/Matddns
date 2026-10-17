@@ -1,48 +1,59 @@
 @page
 @model LogModel
 @{
-    ViewData["Title"] = "Log – Matddns";
-    var f = Model.MinFilter;
+    ViewData["Title"] = "Log";
+    ViewData["Reconnect"] = "reload";
+    ViewData["Crumbs"] = Crumbs.Of(("Log", null));
+    var list = Model.List;
 }
 
-<div class="page-header">
-    <div>
-        <h1>Log</h1>
-    </div>
-</div>
+<div class="mat-list">
+    <partial name="_Toolbar" model="list.Toolbar" />
 
-<form method="get" class="log-toolbar">
-    <label for="lvl">Filter</label>
-    <select id="lvl" name="Level" onchange="this.form.submit()">
-        <option value="Debug" selected="@(f == Matddns.Services.LogLevel.Debug)">All</option>
-        <option value="Info" selected="@(f == Matddns.Services.LogLevel.Info)">Info+</option>
-        <option value="Update" selected="@(f == Matddns.Services.LogLevel.Update)">Update+</option>
-        <option value="Warn" selected="@(f == Matddns.Services.LogLevel.Warn)">Warn+</option>
-        <option value="Error" selected="@(f == Matddns.Services.LogLevel.Error)">Error only</option>
-    </select>
-    <button type="submit" class="ghost">Refresh</button>
-</form>
-
-<div class="log-view">
-@if (!Model.Entries.Any())
-{
-    <div class="muted">No entries for this filter.</div>
-}
-@foreach (var e in Model.Entries)
-{
-    var cls = e.Level switch
+    @if (list.Items.Count == 0)
     {
-        Matddns.Services.LogLevel.Error => "level-error",
-        Matddns.Services.LogLevel.Warn => "level-warn",
-        Matddns.Services.LogLevel.Update => "level-update",
-        Matddns.Services.LogLevel.Debug => "level-debug",
-        _ => ""
-    };
-    <div class="log-line @cls">
-        <span class="ts">@e.Timestamp.ToString("yyyy-MM-dd HH:mm:ss") UTC</span>
-        <span>@e.Level</span>
-        <span class="src">@e.Source</span>
-        <span>@e.Message</span>
-    </div>
-}
+        <div class="mat-empty">
+            <span class="mat-empty__icon"><icon name="file-text" /></span>
+            @if (list.Toolbar.Total == 0)
+            {
+                <div class="mat-empty__title">The log is empty</div>
+            }
+            else
+            {
+                <div class="mat-empty__title">Nothing matches</div>
+                <p>No entry matches. Change the search or the level.</p>
+                <a class="mat-btn mat-btn--secondary" href="/Log">Reset the tools</a>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">Log entries (times in UTC)</caption>
+                <thead><tr><th scope="col">Time (UTC)</th><th scope="col">Level</th><th scope="col" class="mat-hide-sm">Source</th><th scope="col">Message</th></tr></thead>
+                <tbody>
+                @foreach (var e in list.Items)
+                {
+                    var pill = e.Level switch
+                    {
+                        Matddns.Services.LogLevel.Error => "mat-pill mat-pill--error",
+                        Matddns.Services.LogLevel.Warn => "mat-pill mat-pill--warn",
+                        Matddns.Services.LogLevel.Update => "mat-pill mat-pill--accent",
+                        Matddns.Services.LogLevel.Info => "mat-pill mat-pill--info",
+                        _ => "mat-pill mat-pill--plain"
+                    };
+                    <tr>
+                        <td data-label="Time" class="mat-mono mat-nowrap">@e.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td data-label="Level"><span class="@pill">@e.Level</span></td>
+                        <td data-label="Source" class="mat-hide-sm mat-mono">@e.Source</td>
+                        <td data-label="Message">@e.Message</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <partial name="_Pager" model="list.Pager" />
 </div>

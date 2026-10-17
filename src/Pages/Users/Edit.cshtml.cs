@@ -1,5 +1,7 @@
 using Matddns.Models;
 using Matddns.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -27,7 +29,7 @@ public class EditModel : PageModel
         if (!string.IsNullOrEmpty(name))
         {
             var u = _config.Read(c => c.Users.FirstOrDefault(x => x.Username.Equals(name, StringComparison.OrdinalIgnoreCase)));
-            if (u == null) { Error = "User not found"; return RedirectToPage("/System"); }
+            if (u == null) { Error = "User not found"; return RedirectToPage("Index"); }
             Username = u.Username;
         }
         return Page();
@@ -41,24 +43,42 @@ public class EditModel : PageModel
             Error = "Username and password required";
             return RedirectToPage("Edit");
         }
+        if (NewPassword.Length < AuthService.MinPasswordLength)
+        {
+            Error = $"Password must be at least {AuthService.MinPasswordLength} characters";
+            return RedirectToPage("Edit");
+        }
         var exists = _config.Read(c => c.Users.Any(u => u.Username.Equals(nm, StringComparison.OrdinalIgnoreCase)));
         if (exists) { Error = $"User '{nm}' already exists"; return RedirectToPage("Edit"); }
 
         _config.Mutate(c => c.Users.Add(new UserAccount { Username = nm, PasswordHash = _auth.Hash(NewPassword) }));
         Notice = $"User '{nm}' created";
-        return RedirectToPage("/System");
+        return RedirectToPage("Index");
     }
 
-    public IActionResult OnPostSave(string Name, string? NewPassword)
+    public async Task<IActionResult> OnPostSaveAsync(string Name, string? NewPassword)
     {
         if (!string.IsNullOrEmpty(NewPassword))
         {
+            if (NewPassword.Length < AuthService.MinPasswordLength)
+            {
+                Error = $"Password must be at least {AuthService.MinPasswordLength} characters";
+                return RedirectToPage("Edit", new { name = Name });
+            }
             _config.Mutate(c =>
             {
                 var u = c.Users.FirstOrDefault(x => x.Username.Equals(Name, StringComparison.OrdinalIgnoreCase));
                 if (u != null) u.PasswordHash = _auth.Hash(NewPassword);
             });
             Notice = $"Password for '{Name}' updated";
+
+            // The password change invalidates this account's sessions; re-issue our own so the editor stays signed in.
+            if (string.Equals(Name, User.Identity?.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                var self = _config.Current.Users.First(u => u.Username.Equals(Name, StringComparison.OrdinalIgnoreCase));
+                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
+                    AuthService.CreatePrincipal(self), new AuthenticationProperties { IsPersistent = true });
+            }
         }
         else
         {
@@ -81,6 +101,6 @@ public class EditModel : PageModel
                 c.Users.RemoveAll(u => u.Username.Equals(Name, StringComparison.OrdinalIgnoreCase));
         });
         Notice = $"User '{Name}' deleted";
-        return RedirectToPage("/System");
+        return RedirectToPage("Index");
     }
 }
