@@ -9,12 +9,18 @@ services:
       - ./data:/data
     environment:
       - TZ=Europe/Berlin
+      # The platform contract of the Mat apps and the sign-in through MatIdentity (all optional; Mattiverse sets them):
+      # - MAT_API_KEY=                 # key of the platform API /api/* (unset: MATDDNS_API_KEY opens it)
+      # - MATIDENTITY_AUTHORITY=       # https://id.example.com: sign-in through MatIdentity
+      # - MATIDENTITY_CLIENT_ID=matddns
+      # - MATIDENTITY_CLIENT_SECRET=
+      # - MATIDENTITY_INTERNAL_URL=    # http://matidentity:2300 inside Docker
     # let the non-root user send ICMP for the "Ping" failover check
     sysctls:
       - net.ipv4.ping_group_range=0 2147483647
-    # healthy while /healthz returns HTTP 200 (liveness; 8080 is the in-container port)
+    # healthy while /api/health returns HTTP 200: ok or degraded, 503 only when Matddns cannot do its job (8080 is the in-container port)
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/healthz"]
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3

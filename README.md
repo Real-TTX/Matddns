@@ -12,7 +12,7 @@ to the first reachable source. One container, no cloud, no third-party services.
 
 [![Build & Publish](https://github.com/Real-TTX/Matddns/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/Real-TTX/Matddns/actions/workflows/docker-publish.yml)
 [![GHCR image](https://img.shields.io/badge/ghcr.io-real--ttx%2Fmatddns-2496ED?logo=docker&logoColor=white)](https://github.com/Real-TTX/Matddns/pkgs/container/matddns)
-![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)
+![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)
 
 </div>
 
@@ -55,7 +55,7 @@ its IP into Matddns just like it would to any DynDNS provider.
   **log level** with retention, and an optional **read-only public dashboard**
 - **Monitoring API** (`/api/health`, `/api/state`), an optional key-protected
   [management API](#management-api-for-mattiverse) to provision sources, domains and rules,
-  and one **.NET 8 container** with a single `/data` volume; CI publishes the image to GHCR on every push
+  and one **.NET 10 container** with a single `/data` volume; CI publishes the image to GHCR on every push
 
 ## Screenshots
 
@@ -107,11 +107,16 @@ services:
       - ./data:/data
     environment:
       - TZ=Europe/Berlin
+      # - MAT_API_KEY=                 # key of the platform API /api/* (Mattiverse sets it)
+      # - MATIDENTITY_AUTHORITY=       # https://id.example.com: sign-in through MatIdentity
+      # - MATIDENTITY_CLIENT_ID=matddns
+      # - MATIDENTITY_CLIENT_SECRET=
+      # - MATIDENTITY_INTERNAL_URL=    # http://matidentity:2300 inside Docker
     # lets the non-root user send ICMP for the "Ping" failover check
     sysctls:
       - net.ipv4.ping_group_range=0 2147483647
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/healthz"]
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -153,7 +158,7 @@ docker build -t matddns:local .
 docker run -d --name matddns -p 4060:8080 -v "$PWD/data:/data" matddns:local
 ```
 
-or run it directly with the .NET 8 SDK:
+or run it directly with the .NET 10 SDK (`dotnet test Matddns.slnx` runs the tests):
 
 ```bash
 dotnet run --project src
@@ -168,6 +173,11 @@ dotnet run --project src
 | `MATDDNS_DATA` | `/data` | Data directory (config, log, keys) |
 | `MATDDNS_FORWARDED_HEADERS` | – | Set to `true` behind a TLS reverse proxy to honor `X-Forwarded-Proto`/`-For` (secure cookie + real client IP) |
 | `TZ` | – | Time zone for UI timestamps (the log and `/api/*` stay UTC) |
+| `MAT_API_KEY` | `MATDDNS_API_KEY` | Key for the [platform API](#platform-api-mat-platform-contract) (`X-Api-Key` header). Unset = the engine key `MATDDNS_API_KEY` opens it too; neither = only a MatIdentity token opens it |
+| `MATIDENTITY_AUTHORITY` | – | Address of MatIdentity (`https://id.example.com`). Set = [sign-in through MatIdentity](#sign-in-through-matidentity); unset = nothing changes |
+| `MATIDENTITY_CLIENT_ID` | `matddns` | The client of Matddns in MatIdentity (also the audience of the tokens `/api` accepts) |
+| `MATIDENTITY_CLIENT_SECRET` | – | Its secret |
+| `MATIDENTITY_INTERNAL_URL` | – | Where Matddns reaches MatIdentity from inside Docker (`http://matidentity:2300`); the browser keeps using `MATIDENTITY_AUTHORITY` |
 
 The in-container port is `8080` (mapped to `4060` above). The UI is English throughout.
 
@@ -282,13 +292,26 @@ Unauthenticated JSON endpoints for monitoring software. They never expose passwo
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /healthz` | liveness; returns `ok` while the app runs |
-| `GET /api/health` | health summary: HTTP 200 when OK, 503 when degraded, plus source/rule counts |
+| `GET /api/health` | health summary: `status` (`ok` / `degraded` / `down`) plus source/rule counts; HTTP 200 for ok and degraded, 503 for down. `?strict=1`: 503 unless ok |
 | `GET /api/state` | full state: per-source IPs, per-rule status, recent IP changes |
 | `GET /api/source?token=` | peer pull: this instance's source entries (IPs only) for a valid token |
 
 ```bash
-curl http://localhost:4060/api/health   # point a monitor here and alert on a non-200 status
+curl -f http://localhost:4060/api/health?strict=1   # point a monitor here and alert on a non-200 status
 ```
+
+Both `/api/health` and `/api/state` are also endpoints of the [platform contract](#platform-api-mat-platform-contract). They stay
+compatible with what monitors read before:
+
+- **`/api/health`** is one answer for everybody: the contract's fields (`status`, `app`, `version`, `time`, `checks`) **plus every
+  old field** (`sources`, `rules`, `ipChanges`, with the same names and values). `status` is `ok` or `degraded` exactly as before
+  (degraded = a source entry or a record fails) and `down` when `config.json` cannot be read. **One change:** a degraded Matddns now
+  answers **HTTP 200** (it used to be 503), because the contract's Docker `HEALTHCHECK` uses this address and a degraded app must not
+  count as unhealthy. A monitor that alerts on degraded either reads `status` or calls **`/api/health?strict=1`** (503 unless ok,
+  the old behaviour).
+- **`/api/state` without credentials** (no `X-Api-Key`, no `Authorization: Bearer`) answers the old monitoring state, unchanged and
+  anonymous as before. **With credentials** it is the contract's state (`{"time", "values"}` with the tiles below; a wrong key or
+  token is `401`).
 
 Keep Matddns on a trusted network or behind a reverse proxy; the optional public dashboard
 exposes the same data as `/api/state`, nothing more.
@@ -427,14 +450,57 @@ docker run -d --name matddns-test -p 18702:8080 -e MATDDNS_API_KEY=testkey matdd
 scripts/api-test.sh http://localhost:18702 testkey
 ```
 
+## Platform API (Mat platform contract)
+
+Matddns speaks the platform contract of the Mat apps (MatDesign `docs/PLATFORM.md`, shared code MatPlatform in `src/MatPlatform`,
+a copy that is never edited here), so Mattiverse or any other app can show it, watch it, set it up and act on it without
+knowing it beforehand. It lives next to the engine API (`/api/v1`) and the peer endpoints, which are unchanged.
+
+| Endpoint | Purpose | Access |
+|---|---|---|
+| `GET /api` | the definition: who the app is (`matddns`, accent `#204db6`), its pages, tiles, settings and actions | anonymous |
+| `GET /api/health` | `ok` / `degraded` / `down` with the checks `config`, `sources`, `rules` (plus the old monitoring fields, see above) | anonymous |
+| `GET /api/state`, `GET /api/state/{key}` | the values of the tiles | key or token |
+| `GET /api/configure`, `PUT /api/configure` | the few settings | key or token |
+| `POST /api/actions/{id}` | run an action | key or token |
+
+The key is `X-Api-Key: <MAT_API_KEY>` (without `MAT_API_KEY` the engine key `MATDDNS_API_KEY`); with MatIdentity also
+`Authorization: Bearer <token>` for the audience `matddns`. Texts follow `Accept-Language` (`de`, `en`).
+
+- **Tiles:** current IPv4 and IPv6 (of the source most records are written from), the active source, records in failover (written
+  from a source other than their first choice), DNS records and how many are in sync (enabled rules whose last write succeeded),
+  the last update (the last successful write) and the last error (an error in the log within 24 hours).
+- **Settings:** time zone, the dashboard without sign-in, the minimum log level and how long the log is kept: the general settings
+  of *System*, the same values in `config.json`. A change is written to the log with who made it.
+- **Actions:** *Update now* (`runNow`: one pass over all sources and rules, like `POST /api/v1/run`; started and answered right away),
+  and links to Matddns, the sources, the log and the system settings.
+- Matddns has no roles (every account may do everything), so the definition names none.
+
+## Sign-in through MatIdentity
+
+Optional, on only when `MATIDENTITY_AUTHORITY` is set; without it Matddns signs in exactly as before.
+
+- A visit to the sign-in page goes straight to MatIdentity (OpenID Connect, authorization code with PKCE) and comes back signed in.
+  The local form stays at **`/Login?local=1`** (the way in when MatIdentity is down). In MatIdentity, the client of Matddns needs
+  the redirect address **`/signin-oidc`** and the signed-out address **`/signout-callback-oidc`**.
+- The first sign-in of a person creates an account (named after `preferred_username`, else the e-mail address) without a password,
+  linked by the claim `sub`. An **existing account is never linked by its name alone**: when its name equals the person's user name or
+  e-mail address, Matddns asks for that account's password once (`/Login?local=1&link=1`, ten minutes) and links it only when exactly
+  that account signs in; another account links nothing, *Cancel* drops it. Several matches, or a match linked to another person, are refused.
+- The sign-out ends the session at MatIdentity too.
+- The peer endpoints (`/api/update`, `/api/source`, `/nic/update`, `/update`) keep their tokens and the engine API its key;
+  MatIdentity changes none of them.
+
 ## How it is built
 
-- **.NET 8 / ASP.NET Core Razor Pages**, cookie auth (the management API uses a key instead), a hosted background updater service
+- **.NET 10 / ASP.NET Core Razor Pages**, cookie auth (the management API uses a key instead), a hosted background updater service
 - `System.Text.Json` config in `/data/config.json` (atomic + fsync'd, schema-migrated on load);
   DataProtection keys in `/data/keys`
 - Passwords hashed with **PBKDF2-SHA256**; per-IP **rate limiting** on the login and push endpoints
-- Docker (`mcr.microsoft.com/dotnet/aspnet:8.0`, non-root, `tzdata` for time zones)
-- GitHub Actions publishing to GHCR on every push to `main`
+- Docker (`mcr.microsoft.com/dotnet/aspnet:10.0`, non-root, `tzdata` for time zones, `HEALTHCHECK` on `/api/health`)
+- Tests: `dotnet test Matddns.slnx` (xunit, the whole app in memory: the platform API, the old monitoring answers, the sign-in
+  with and without MatIdentity, the engine API and the peer endpoints)
+- GitHub Actions running the tests and publishing to GHCR on every push to `main`
 
 ## Versioning and schema
 
