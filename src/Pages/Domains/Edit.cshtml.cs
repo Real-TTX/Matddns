@@ -72,6 +72,7 @@ public class EditModel : PageModel
             var g = c.Domains.FirstOrDefault(x => x.Id == Id);
             if (g == null) return;
             if (!string.IsNullOrWhiteSpace(Name)) g.Name = Name.Trim();
+            foreach (var r in c.Rules.Where(r => r.DomainGroupId == g.Id)) r.FailCount = 0; // new credentials: start again at the shortest wait
             if (g.Kind == DomainKind.DynDns)
             {
                 g.DynDns ??= new DynDnsSettings();

@@ -53,6 +53,36 @@ public class UpdaterRuleTests
         Assert.True(UpdaterService.RuleDue(RuleRunSecondsAgo(31, true, 0, lastResult: "err: boom"), Now, "other"));
     }
 
+    [Theory]
+    [InlineData(0, 30)]
+    [InlineData(1, 30)]
+    [InlineData(2, 60)]
+    [InlineData(3, 120)]
+    [InlineData(6, 960)]
+    [InlineData(7, 1800)]
+    [InlineData(100, 1800)]
+    public void The_wait_after_a_failure_doubles_up_to_30_minutes(int failures, int seconds)
+        => Assert.Equal(TimeSpan.FromSeconds(seconds), UpdaterService.RetryDelay(failures));
+
+    [Fact]
+    public void A_rule_that_failed_several_times_in_a_row_waits_longer()
+    {
+        var rule = RuleRunSecondsAgo(100, true, 0, lastResult: "err: boom");
+        rule.FailCount = 3; // 120 s
+
+        Assert.False(UpdaterService.RuleDue(rule, Now, "other"));
+        rule.LastRun = Now.AddSeconds(-121);
+        Assert.True(UpdaterService.RuleDue(rule, Now, "other"));
+    }
+
+    [Fact]
+    public void Fail_count_is_not_written_while_zero()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(new Rule());
+        Assert.DoesNotContain("FailCount", json);
+        Assert.Contains("\"FailCount\":2", System.Text.Json.JsonSerializer.Serialize(new Rule { FailCount = 2 }));
+    }
+
     [Fact]
     public void Signature_lists_both_address_families_of_every_source_in_rule_order()
     {

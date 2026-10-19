@@ -263,7 +263,7 @@ A source counts as reachable only when its current IP passes the rule's validati
 | Ping | ICMP echo to the source IP (needs the `ping_group_range` sysctl shown above) |
 | TCP port | a TCP connect to `IP:port` succeeds (no special privileges) |
 
-A failed update is retried on the next cycle – the record is not left stranded on a stale value.
+A failed update is retried with a growing wait: 30 s after the first failure, then doubled each time up to 30 minutes (the rule page shows the next try). Saving the rule or its domain group, *Run now* and `POST /api/v1/run` start again at once or at the shortest wait.
 
 ## DynDNS server (incoming)
 

@@ -71,4 +71,8 @@ public class Rule
     public string? LastValue { get; set; }
     public DateTime? LastChange { get; set; }            // when the value was last actually set
     public string? LastSourceSignature { get; set; }     // snapshot of source IPs, to detect changes for OnChange
+
+    /// <summary>Failed writes in a row (0 after a success); sets the wait before the next try, see <c>UpdaterService.RetryDelay</c>. Not written while 0.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int FailCount { get; set; }
 }

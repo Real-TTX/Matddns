@@ -352,7 +352,7 @@ public class UpdaterService : BackgroundService
             {
                 // leave LastSourceSignature untouched so the failed evaluation is retried next cycle
                 _log.Log(LogLevel.Error, $"rule:{RuleDesc(rule, cfg)}", ex.Message);
-                MutateRule(rule.Id, r => { r.LastRun = DateTime.UtcNow; r.LastResult = "error: " + ex.Message; });
+                MutateRule(rule.Id, r => { r.LastRun = DateTime.UtcNow; r.LastResult = "error: " + ex.Message; r.FailCount++; });
             }
         }
     }
@@ -413,8 +413,10 @@ public class UpdaterService : BackgroundService
             if (ok)
             {
                 r.LastChange = DateTime.UtcNow; // a successful write = the moment it was set (happens only on change due to the skip logic)
+                r.FailCount = 0;
                 r.LastSourceSignature = signature;
             }
+            else r.FailCount++;
             r.LastValue = chosenValue;
             r.LastUsedSourceId = chosenSourceId;
         });
@@ -515,9 +517,9 @@ public class UpdaterService : BackgroundService
         if (rule.LastRun == null) return true; // first evaluation after (re)start
         var age = (now - rule.LastRun.Value).TotalSeconds;
 
-        // back off briefly after an error so a misconfiguration doesn't flood the DNS API
+        // back off after an error, longer with every failure in a row, so a misconfiguration or an outage doesn't flood the DNS API
         var lastErr = rule.LastResult != null && rule.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase);
-        if (lastErr && age < 30) return false;
+        if (lastErr && age < RetryDelay(rule.FailCount).TotalSeconds) return false;
 
         // time-driven: periodic re-check — re-validates reachability, so a source going DOWN
         // (without its IP changing) still triggers failover.
@@ -528,6 +530,15 @@ public class UpdaterService : BackgroundService
 
         return false;
     }
+
+    /// <summary>The wait after the <paramref name="failures"/>-th failed write in a row: 30 s, then doubled each time, at most 30 minutes.</summary>
+    internal static TimeSpan RetryDelay(int failures)
+    {
+        var seconds = 30.0 * Math.Pow(2, Math.Clamp(failures, 1, 16) - 1);
+        return TimeSpan.FromSeconds(Math.Min(seconds, MaxRetryDelaySeconds));
+    }
+
+    internal const int MaxRetryDelaySeconds = 1800;
 
     // Zone + relative record name for zone-based APIs. Prefers the explicit Domain/RecordName, else derives from the FQDN.
     private static (string zone, string host) ZoneAndHost(DomainEntry de)

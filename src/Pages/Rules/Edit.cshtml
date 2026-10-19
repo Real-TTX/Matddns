@@ -35,7 +35,12 @@ else
     {
         var state = r.LastResult.StartsWith("ok", StringComparison.OrdinalIgnoreCase) ? "ok"
             : r.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase) ? "err" : "warn";
-        <p class="mat-muted">Last run @Tz.Format(r.LastRun) (@Tz.Label()) · <span class="@Ui.Pill(state)">@r.LastResult</span></p>
+        <p class="mat-muted">Last run @Tz.Format(r.LastRun) (@Tz.Label()) · <span class="@Ui.Pill(state)">@r.LastResult</span>
+            @if (state == "err" && r.FailCount > 0 && r.LastRun is { } lastRun)
+            {
+                <span> · failed @r.FailCount× in a row, next try after @Tz.Format(lastRun + UpdaterService.RetryDelay(r.FailCount), "HH:mm:ss")</span>
+            }
+        </p>
     }
 
     <form method="post" asp-page-handler="@(isNew ? "Create" : "Save")" class="mat-form" novalidate>

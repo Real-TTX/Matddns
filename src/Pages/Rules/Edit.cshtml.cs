@@ -103,6 +103,7 @@ public class EditModel : PageModel
             // ping/TCP failover needs a periodic re-check (a recovered source keeps its IP), so force a minimum interval
             r.NormalizeTriggers();
             r.Enabled = Enabled;
+            r.FailCount = 0; // a changed rule starts again at the shortest wait
             if (ValidationPort is >= 1 and <= 65535) r.ValidationPort = ValidationPort;
             if (parts.Length == 2) { r.DomainGroupId = parts[0]; r.DomainEntryId = parts[1]; }
         });
@@ -190,6 +191,7 @@ public class EditModel : PageModel
                 r.LastValue = null;
                 r.LastUsedSourceId = null;
                 r.LastResult = null;
+                r.FailCount = 0;
             }
         });
         Notice = "The rule runs within 15 seconds.";
