@@ -9,12 +9,14 @@ namespace Matddns.Tests;
 internal sealed class FakeMail : IMailSender
 {
     public List<(string To, string Subject, string Body)> Sent { get; } = new();
+    public List<MailSettings> Servers { get; } = new();
     public Exception? Fail { get; set; }
 
     public Task SendAsync(MailSettings mail, string subject, string body, CancellationToken ct)
     {
         if (Fail != null) throw Fail;
         Sent.Add((mail.To, subject, body));
+        Servers.Add(mail);
         return Task.CompletedTask;
     }
 }

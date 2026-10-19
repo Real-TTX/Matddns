@@ -32,6 +32,16 @@ public class SystemModel : PageModel
     public long LogFileBytes { get; private set; }
     public NotificationSettings Notifications { get; private set; } = new();
 
+    /// <summary>The mail settings in force (with MatSMTP its values), the password emptied: what the form shows.</summary>
+    public MailSettings Mail { get; private set; } = new();
+    public bool HasMailPassword { get; private set; }
+
+    /// <summary>True when the mail goes through MatSMTP: the server fields are shown disabled and nothing is saved for them.</summary>
+    public bool MailFixed => _notify.MailThroughMatSmtp;
+
+    /// <summary>The sentence that says where the mail goes when <see cref="MailFixed"/>.</summary>
+    public string? MailFixedText => _notify.MatSmtpText("en");
+
     [TempData] public string? Notice { get; set; }
     [TempData] public string? Error { get; set; }
 
@@ -45,7 +55,11 @@ public class SystemModel : PageModel
         AnonymousDashboard = s.AnonymousDashboard;
         Zones = TimeZoneInfo.GetSystemTimeZones().OrderBy(z => z.Id, StringComparer.Ordinal).ToList();
         LogFileBytes = _log.LogFileBytes();
-        Notifications = _config.Read(c => c.Settings.Notifications);
+        Notifications = _settings.GetNotifications();
+        // With MatSMTP the form shows its server, port, security, user and sender (never the password); the stored ones stay stored.
+        Mail = _notify.EffectiveMail();
+        HasMailPassword = !string.IsNullOrEmpty(Mail.Password);
+        Mail.Password = "";
     }
 
     /// <summary>Only the scheme and the host of a URL that may carry a token (<c>https://ntfy.sh/…</c>).</summary>
@@ -116,35 +130,29 @@ public class SystemModel : PageModel
         return RedirectToPage(new { tab = "notifications" });
     }
 
-    /// <summary>Checks and saves the form; answers the problem (nothing saved) or null. An empty password or URL keeps the stored one.</summary>
+    /// <summary>
+    /// Checks and saves the form (<see cref="SettingsService.ChangeNotifications"/>, the same as <c>/api/configure</c>); answers the problem (nothing saved) or null.
+    /// An empty password or URL keeps the stored one. With MatSMTP the server fields are disabled in the form and not taken from it at all.
+    /// </summary>
     private string? SaveNotifications(NotificationForm f)
     {
-        var current = _config.Read(c => c.Settings.Notifications);
-        var mail = new MailSettings
-        {
-            Enabled = f.MailEnabled,
-            Host = (f.MailHost ?? "").Trim(),
-            Port = f.MailPort,
-            Tls = f.MailTls,
-            Username = (f.MailUsername ?? "").Trim(),
-            Password = string.IsNullOrEmpty(f.MailPassword) ? current.Mail.Password : f.MailPassword,
-            From = (f.MailFrom ?? "").Trim(),
-            To = (f.MailTo ?? "").Trim(),
-        };
-        var url = string.IsNullOrWhiteSpace(f.WebhookUrl) ? current.Webhook.Url : f.WebhookUrl.Trim();
-
-        if (mail.Enabled && NotificationService.MailProblem(mail) is { } mailProblem) return $"E-mail: {mailProblem}.";
-        if (f.WebhookEnabled && !InputCheck.IsHttpUrl(url)) return "Webhook: enter an http(s) URL.";
-
-        _config.Mutate(c => c.Settings.Notifications = new NotificationSettings
-        {
-            OnChange = f.OnChange,
-            OnFailure = f.OnFailure,
-            Mail = mail,
-            Webhook = new WebhookSettings { Enabled = f.WebhookEnabled, Url = url, Format = f.WebhookFormat },
-        });
-        _log.Log(Services.LogLevel.Info, "settings", $"notifications changed by {User.Identity?.Name ?? "?"}: e-mail {(mail.Enabled ? "on" : "off")}, webhook {(f.WebhookEnabled ? f.WebhookFormat.ToString() : "off")}");
-        return null;
+        var server = !_settings.MailFixed;
+        var change = new NotificationSettingsChange(
+            OnChange: f.OnChange,
+            OnFailure: f.OnFailure,
+            MailEnabled: f.MailEnabled,
+            MailHost: server ? f.MailHost ?? "" : null,
+            MailPort: server ? f.MailPort : null,
+            MailTls: server ? f.MailTls : null,
+            MailUsername: server ? f.MailUsername ?? "" : null,
+            MailPassword: server && !string.IsNullOrEmpty(f.MailPassword) ? f.MailPassword : null,
+            MailFrom: server ? f.MailFrom ?? "" : null,
+            MailTo: f.MailTo ?? "",
+            WebhookEnabled: f.WebhookEnabled,
+            WebhookUrl: string.IsNullOrWhiteSpace(f.WebhookUrl) ? null : f.WebhookUrl,
+            WebhookFormat: f.WebhookFormat);
+        var problems = _settings.ChangeNotifications(change, User.Identity?.Name ?? "?");
+        return problems.Count == 0 ? null : string.Join(" ", problems.Values.Distinct());
     }
 
     public sealed class NotificationForm

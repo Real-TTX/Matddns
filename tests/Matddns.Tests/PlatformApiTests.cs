@@ -83,6 +83,14 @@ internal static class Sample
 /// <summary>The MatApiDefinition: valid in both languages against the MatUi sprite the app ships (wwwroot/matui), served with an ETag, the app of the registry.</summary>
 public sealed class PlatformDefinitionTests(MatddnsFactory site) : IClassFixture<MatddnsFactory>
 {
+    /// <summary>The keys of /api/configure: the general settings and the notifications.</summary>
+    internal static readonly string[] ConfigureKeys =
+    [
+        "timeZone", "anonymousDashboard", "minLogLevel", "logRetentionDays",
+        "notifyOnChange", "notifyOnFailure", "mailEnabled", "mailHost", "mailPort", "mailTls", "mailUsername", "mailPassword", "mailFrom", "mailTo",
+        "webhookEnabled", "webhookFormat", "webhookUrl",
+    ];
+
     /// <summary>The icon names of the sprite the app itself ships and inlines into every page (a copy of the MatUi toolkit).</summary>
     private IReadOnlySet<string> Sprite => site.Services.GetRequiredService<Toolkit>().IconNames;
 
@@ -109,7 +117,7 @@ public sealed class PlatformDefinitionTests(MatddnsFactory site) : IClassFixture
         var tiles = root.GetProperty("state").EnumerateArray().Select(t => t.GetProperty("key").GetString()).ToList();
         Assert.Equal(["ipv4", "ipv6", "activeSource", "failovers", "records", "recordsInSync", "lastUpdate", "lastError"], tiles);
         var fields = root.GetProperty("configure").EnumerateArray().Select(f => f.GetProperty("key").GetString()).ToList();
-        Assert.InRange(fields.Count, 1, 10);
+        Assert.Equal(ConfigureKeys, fields);
         Assert.Contains(root.GetProperty("actions").EnumerateArray(), a => a.GetProperty("id").GetString() == "runNow" && a.GetProperty("kind").GetString() == "post");
         // Matddns has no roles: every account may do everything.
         Assert.False(root.TryGetProperty("roles", out var roles) && roles.GetArrayLength() > 0);
@@ -230,7 +238,7 @@ public sealed class PlatformApiTests(MatddnsFactory site) : IClassFixture<Matddn
         using (var doc = JsonDocument.Parse(await site.Api().GetStringAsync("/api/configure")))
         {
             var values = doc.RootElement.GetProperty("values");
-            Assert.Equal(["timeZone", "anonymousDashboard", "minLogLevel", "logRetentionDays"], values.EnumerateObject().Select(p => p.Name));
+            Assert.Equal(PlatformDefinitionTests.ConfigureKeys, values.EnumerateObject().Select(p => p.Name));
             Assert.Equal("Info", values.GetProperty("minLogLevel").GetString());
         }
 

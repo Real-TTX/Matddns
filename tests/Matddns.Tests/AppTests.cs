@@ -38,6 +38,7 @@ public sealed class AppFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable(MatPlatformSettings.ClientIdVariable, null);
         Environment.SetEnvironmentVariable(MatPlatformSettings.ClientSecretVariable, null);
         Environment.SetEnvironmentVariable(MatPlatformSettings.InternalUrlVariable, null);
+        foreach (var variable in MatddnsFactory.SmtpVariables) Environment.SetEnvironmentVariable(variable, null);
     }
 
     public HttpClient NewClient() => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });

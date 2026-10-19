@@ -5,6 +5,8 @@
     ViewData["Crumbs"] = Crumbs.Of(("System", null));
     var lvl = Model.CurrentLevel;
     var n = Model.Notifications;
+    var m = Model.Mail;
+    var fixedMail = Model.MailFixed;
     var keep = "Leave empty to keep the current one";
     string Selected(string tab) => Model.Tab == tab ? "true" : "false";
     string? TabIndex(string tab) => Model.Tab == tab ? null : "-1";
@@ -79,29 +81,33 @@
             <div class="mat-card">
                 <div class="mat-card__head"><icon name="mail" /><h2 class="mat-card__title">E-mail</h2></div>
                 <div class="mat-card__body mat-stack">
+                    @if (fixedMail)
+                    {
+                        <div class="mat-alert mat-alert--info" role="status" id="mail-matsmtp"><icon name="info" /><div class="mat-alert__body"><p>@Model.MailFixedText</p></div></div>
+                    }
                     <label class="mat-check"><input type="checkbox" id="MailEnabled" name="MailEnabled" value="true" checked="@n.Mail.Enabled" /><span class="mat-check__text">Send e-mails</span></label>
                     <div class="mat-form__grid" data-show-if="#MailEnabled" data-show-value="true" hidden="@(!n.Mail.Enabled)">
                         <mat-field label="SMTP server" for-id="MailHost">
-                            <input type="text" id="MailHost" name="MailHost" value="@n.Mail.Host" class="mat-input mat-mono" placeholder="smtp.example.com" autocapitalize="none" spellcheck="false" />
+                            <input type="text" id="MailHost" name="MailHost" value="@m.Host" disabled="@fixedMail" class="mat-input mat-mono" placeholder="smtp.example.com" autocapitalize="none" spellcheck="false" />
                         </mat-field>
                         <mat-field label="Port" for-id="MailPort">
-                            <input type="number" id="MailPort" name="MailPort" value="@n.Mail.Port" min="1" max="65535" class="mat-input mat-mono" inputmode="numeric" data-msg-range="Please enter a port from 1 to 65535." />
+                            <input type="number" id="MailPort" name="MailPort" value="@m.Port" min="1" max="65535" disabled="@fixedMail" class="mat-input mat-mono" inputmode="numeric" data-msg-range="Please enter a port from 1 to 65535." />
                         </mat-field>
                         <mat-field label="Security" for-id="MailTls">
-                            <select id="MailTls" name="MailTls" class="mat-select">
-                                <option value="StartTls" selected="@(n.Mail.Tls == MailTls.StartTls)">STARTTLS (port 587)</option>
-                                <option value="Tls" selected="@(n.Mail.Tls == MailTls.Tls)">TLS (port 465)</option>
-                                <option value="None" selected="@(n.Mail.Tls == MailTls.None)">None</option>
+                            <select id="MailTls" name="MailTls" class="mat-select" disabled="@fixedMail">
+                                <option value="StartTls" selected="@(m.Tls == MailTls.StartTls)">STARTTLS (port 587)</option>
+                                <option value="Tls" selected="@(m.Tls == MailTls.Tls)">TLS (port 465)</option>
+                                <option value="None" selected="@(m.Tls == MailTls.None)">None</option>
                             </select>
                         </mat-field>
                         <mat-field label="Username" for-id="MailUsername">
-                            <input type="text" id="MailUsername" name="MailUsername" value="@n.Mail.Username" class="mat-input" autocomplete="off" autocapitalize="none" />
+                            <input type="text" id="MailUsername" name="MailUsername" value="@m.Username" disabled="@fixedMail" class="mat-input" autocomplete="off" autocapitalize="none" />
                         </mat-field>
                         <mat-field label="Password" for-id="MailPassword">
-                            <input type="password" id="MailPassword" name="MailPassword" class="mat-input" placeholder="@(string.IsNullOrEmpty(n.Mail.Password) ? "" : keep)" autocomplete="new-password" />
+                            <input type="password" id="MailPassword" name="MailPassword" disabled="@fixedMail" class="mat-input" placeholder="@(fixedMail ? (Model.HasMailPassword ? "Set by Mattiverse" : "") : Model.HasMailPassword ? keep : "")" autocomplete="new-password" />
                         </mat-field>
                         <mat-field label="From" for-id="MailFrom">
-                            <input type="email" id="MailFrom" name="MailFrom" value="@n.Mail.From" class="mat-input" placeholder="matddns@example.com" autocomplete="off" autocapitalize="none" data-msg-type="Please enter an e-mail address." />
+                            <input type="email" id="MailFrom" name="MailFrom" value="@m.From" disabled="@fixedMail" class="mat-input" placeholder="matddns@example.com" autocomplete="off" autocapitalize="none" data-msg-type="Please enter an e-mail address." />
                         </mat-field>
                         <mat-field label="To" for-id="MailTo" full="true">
                             <input type="text" id="MailTo" name="MailTo" value="@n.Mail.To" class="mat-input" placeholder="admin@example.com, ops@example.com" autocomplete="off" autocapitalize="none" spellcheck="false" />

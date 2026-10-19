@@ -59,6 +59,9 @@ builder.Services.AddSingleton<Matddns.Support.Toolkit>();
 builder.Services.AddSingleton<PushReceiver>();
 builder.Services.AddSingleton<UpdaterService>(); // also injected by the management API (POST /api/v1/run)
 builder.Services.AddHostedService(sp => sp.GetRequiredService<UpdaterService>());
+// Mail through MatSMTP when Mattiverse provides it (MATSMTP_*, MatDesign docs/PLATFORM.md): all mail goes there and the SMTP server settings are fixed.
+var smtp = MatSmtpSettings.From(builder.Configuration);
+builder.Services.AddSingleton(smtp);
 builder.Services.AddSingleton<IMailSender, MailKitSender>();
 builder.Services.AddSingleton<NotificationService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<NotificationService>());
@@ -75,7 +78,7 @@ if (string.IsNullOrWhiteSpace(builder.Configuration[MatPlatformSettings.ApiKeyVa
     if (!string.IsNullOrWhiteSpace(engineKey)) builder.Configuration[MatPlatformSettings.ApiKeyVariable] = engineKey.Trim();
 }
 // The anonymous /api and /api/health keep the limit of the other monitoring endpoints (60 requests per minute and address).
-var platform = builder.AddMatPlatform<MatddnsPlatform>(MatddnsPlatform.Describe, o => o.AnonymousPermitPerMinute = 60);
+var platform = builder.AddMatPlatform<MatddnsPlatform>(o => MatddnsPlatform.Describe(o, smtp), o => o.AnonymousPermitPerMinute = 60);
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opt =>

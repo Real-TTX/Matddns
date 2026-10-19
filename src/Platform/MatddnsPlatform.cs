@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Matddns.Models;
 using Matddns.Services;
 using MatPlatform;
 using LogLevel = Matddns.Services.LogLevel;
@@ -18,6 +19,7 @@ public sealed class MatddnsPlatform(
     ConfigService config,
     UpdaterService updater,
     LogService log,
+    NotificationService notifications,
     IHostApplicationLifetime lifetime)
     : IMatPlatformState, IMatPlatformConfiguration, IMatPlatformActions, IMatPlatformHealth
 {
@@ -29,10 +31,17 @@ public sealed class MatddnsPlatform(
 
     private static readonly string[] LogLevels = Enum.GetNames<LogLevel>();
 
-    /// <summary>The MatApiDefinition of Matddns (<c>GET /api</c>); MatPlatform fills in <c>auth</c> and <c>endpoints</c>.</summary>
-    public static void Describe(MatPlatformBuilder o)
+    /// <summary>The MatApiDefinition of Matddns (<c>GET /api</c>) without MatSMTP; MatPlatform fills in <c>auth</c> and <c>endpoints</c>.</summary>
+    public static void Describe(MatPlatformBuilder o) => Describe(o, new MatSmtpSettings());
+
+    /// <summary>
+    /// The definition with the mail through MatSMTP in <paramref name="smtp"/>: when it is configured, the mail server fields are fixed
+    /// (<see cref="MatSmtpSettings.Fix"/>: shown, not changeable, <c>PUT /api/configure</c> refuses them); whether mail is on and the recipients stay editable.
+    /// </summary>
+    public static void Describe(MatPlatformBuilder o, MatSmtpSettings smtp)
     {
         var T = o.T;
+        void Field(MatField field) => o.Field(NotificationSettingsChange.MailServerKeys.Contains(field.Key) ? smtp.Fix(field, o.Language) : field);
 
         o.App(
             AppId,
@@ -49,6 +58,11 @@ public sealed class MatddnsPlatform(
             MatSection.Form(T("Allgemein", "General"), "timeZone", "anonymousDashboard"),
             MatSection.Form(T("Protokoll", "Log"), "minLogLevel", "logRetentionDays"),
             MatSection.Actions("openSystem"));
+        o.Page("notifications", T("Benachrichtigungen", "Notifications"), "bell",
+            MatSection.Form(T("Wann", "When"), "notifyOnChange", "notifyOnFailure"),
+            MatSection.Form(T("E-Mail", "E-mail"), "mailEnabled", "mailHost", "mailPort", "mailTls", "mailUsername", "mailPassword", "mailFrom", "mailTo"),
+            MatSection.Form("Webhook", "webhookEnabled", "webhookFormat", "webhookUrl"),
+            MatSection.Actions("openNotifications"));
 
         o.Tile("ipv4", T("Aktuelle IPv4", "Current IPv4"), "text", icon: "globe");
         o.Tile("ipv6", T("Aktuelle IPv6", "Current IPv6"), "text", icon: "globe");
@@ -94,11 +108,49 @@ public sealed class MatddnsPlatform(
             Hint = T("0 = unbegrenzt.", "0 = unlimited."),
         });
 
-        o.PostAction("runNow", T("Jetzt aktualisieren", "Update now"), "refresh");
+        var mailOn = MatField.When(("mailEnabled", true));
+        var hookOn = MatField.When(("webhookEnabled", true));
+        o.Field(new MatField("notifyOnChange", T("Neue IP eines Eintrags", "A record gets a new IP"), "bool"));
+        o.Field(new MatField("notifyOnFailure", T("Fehler und Erholung", "Failures and recoveries"), "bool")
+        {
+            Hint = T("Ein Eintrag lässt sich nicht aktualisieren oder klappt wieder.", "A record cannot be updated, or works again."),
+        });
+        o.Field(new MatField("mailEnabled", T("E-Mails senden", "Send e-mails"), "bool"));
+        Field(new MatField("mailHost", T("SMTP-Server", "SMTP server"), "text") { Max = 255, Placeholder = "smtp.example.com", ShowIf = mailOn });
+        Field(new MatField("mailPort", T("SMTP-Port", "SMTP port"), "number") { Min = 1, Max = 65535, ShowIf = mailOn });
+        Field(new MatField("mailTls", T("Verschlüsselung", "Security"), "select")
+        {
+            Options = [new("starttls", "STARTTLS (587)"), new("tls", "TLS (465)"), new("none", T("Keine", "None"))],
+            ShowIf = mailOn,
+        });
+        Field(new MatField("mailUsername", T("SMTP-Benutzer", "SMTP user"), "text") { Max = 255, ShowIf = mailOn });
+        Field(new MatField("mailPassword", T("SMTP-Passwort", "SMTP password"), "secret") { ShowIf = mailOn });
+        Field(new MatField("mailFrom", T("Absender", "From"), "email") { Max = 255, Placeholder = "matddns@example.com", ShowIf = mailOn });
+        o.Field(new MatField("mailTo", T("Empfänger", "To"), "text")
+        {
+            Max = 1000,
+            Placeholder = "admin@example.com, ops@example.com",
+            Hint = T("Eine oder mehrere Adressen, mit Komma getrennt.", "One or more addresses, separated by commas."),
+            ShowIf = mailOn,
+        });
+        o.Field(new MatField("webhookEnabled", T("Webhook aufrufen", "Call a webhook"), "bool"));
+        o.Field(new MatField("webhookFormat", T("Format", "Format"), "select")
+        {
+            Options = [new("json", "JSON"), new("ntfy", "ntfy"), new("gotify", "Gotify")],
+            ShowIf = hookOn,
+        });
+        o.Field(new MatField("webhookUrl", "URL", "secret")
+        {
+            Hint = T("Kann ein Token tragen und wird deshalb nie zurückgegeben.", "May carry a token, so it is never sent back."),
+            ShowIf = hookOn,
+        });
+
+        o.PostAction("runNow",T("Jetzt aktualisieren", "Update now"), "refresh");
         o.LinkAction("open", T("Matddns öffnen", "Open Matddns"), "external", "/");
         o.LinkAction("sources", T("Quellen", "Sources"), "network", "/Sources");
         o.LinkAction("log", T("Protokoll", "Log"), "file-text", "/Log");
         o.LinkAction("openSystem", T("Alle Einstellungen", "All settings"), "settings", "/System");
+        o.LinkAction("openNotifications", T("Benachrichtigungen öffnen", "Open notifications"), "bell", "/System?tab=notifications");
     }
 
     public Task<IReadOnlyList<MatHealthCheck>> CheckHealthAsync(MatPlatformCall call, CancellationToken ct)
@@ -151,14 +203,109 @@ public sealed class MatddnsPlatform(
     public Task<IReadOnlyDictionary<string, object?>> GetConfigurationAsync(MatPlatformCall call, CancellationToken ct)
     {
         var s = settings.Get();
+        var n = settings.GetNotifications();
+        // The values in force: MatSMTP's server, user, password and sender when Mattiverse provides it.
+        var mail = notifications.EffectiveMail();
         IReadOnlyDictionary<string, object?> values = new Dictionary<string, object?>
         {
             ["timeZone"] = s.TimeZone,
             ["anonymousDashboard"] = s.AnonymousDashboard,
             ["minLogLevel"] = s.MinLogLevel.ToString(),
             ["logRetentionDays"] = s.LogRetentionDays,
+            ["notifyOnChange"] = n.OnChange,
+            ["notifyOnFailure"] = n.OnFailure,
+            ["mailEnabled"] = mail.Enabled,
+            ["mailHost"] = mail.Host,
+            ["mailPort"] = mail.Port,
+            ["mailTls"] = TlsName(mail.Tls),
+            ["mailUsername"] = mail.Username,
+            ["mailPassword"] = MatSecret.Of(mail.Password),
+            ["mailFrom"] = mail.From,
+            ["mailTo"] = mail.To,
+            ["webhookEnabled"] = n.Webhook.Enabled,
+            ["webhookFormat"] = n.Webhook.Format.ToString().ToLowerInvariant(),
+            ["webhookUrl"] = MatSecret.Of(n.Webhook.Url),
         };
         return Task.FromResult(values);
+    }
+
+    private static string TlsName(MailTls tls) => tls switch
+    {
+        MailTls.Tls => "tls",
+        MailTls.None => "none",
+        _ => "starttls",
+    };
+
+    /// <summary>The change of the notification settings in <paramref name="values"/>, or null when there is none; a value of the wrong kind goes to <paramref name="errors"/>.</summary>
+    private static NotificationSettingsChange? NotificationChange(IReadOnlyDictionary<string, JsonElement> values, Dictionary<string, string> errors, MatPlatformCall call)
+    {
+        var any = false;
+
+        bool? Bool(string key)
+        {
+            if (!values.TryGetValue(key, out var v)) return null;
+            any = true;
+            if (v.ValueKind is JsonValueKind.True or JsonValueKind.False) return v.ValueKind == JsonValueKind.True;
+            errors[key] = call.T("Bitte true oder false angeben.", "Send true or false.");
+            return null;
+        }
+
+        string? Text(string key)
+        {
+            if (!values.TryGetValue(key, out var v)) return null;
+            any = true;
+            if (v.ValueKind == JsonValueKind.Null) return "";
+            if (v.ValueKind == JsonValueKind.String) return v.GetString() ?? "";
+            errors[key] = call.T("Bitte einen Text angeben.", "Send a text.");
+            return null;
+        }
+
+        int? port = null;
+        if (values.TryGetValue("mailPort", out var p))
+        {
+            any = true;
+            if (p.ValueKind == JsonValueKind.Number && p.TryGetInt32(out var number)) port = number;
+            else errors["mailPort"] = call.T("Bitte eine ganze Zahl angeben.", "Send a whole number.");
+        }
+
+        MailTls? tls = Text("mailTls") switch
+        {
+            null => null,
+            "starttls" => MailTls.StartTls,
+            "tls" => MailTls.Tls,
+            "none" => MailTls.None,
+            _ => Refuse<MailTls>("mailTls"),
+        };
+        WebhookFormat? format = Text("webhookFormat") switch
+        {
+            null => null,
+            "json" => WebhookFormat.Json,
+            "ntfy" => WebhookFormat.Ntfy,
+            "gotify" => WebhookFormat.Gotify,
+            _ => Refuse<WebhookFormat>("webhookFormat"),
+        };
+
+        T? Refuse<T>(string key) where T : struct
+        {
+            errors[key] = call.T("Bitte einen der angebotenen Werte wählen.", "Choose one of the offered values.");
+            return null;
+        }
+
+        var change = new NotificationSettingsChange(
+            OnChange: Bool("notifyOnChange"),
+            OnFailure: Bool("notifyOnFailure"),
+            MailEnabled: Bool("mailEnabled"),
+            MailHost: Text("mailHost"),
+            MailPort: port,
+            MailTls: tls,
+            MailUsername: Text("mailUsername"),
+            MailPassword: Text("mailPassword"),
+            MailFrom: Text("mailFrom"),
+            MailTo: Text("mailTo"),
+            WebhookEnabled: Bool("webhookEnabled"),
+            WebhookUrl: Text("webhookUrl"),
+            WebhookFormat: format);
+        return any ? change : null;
     }
 
     /// <summary>
@@ -200,7 +347,22 @@ public sealed class MatddnsPlatform(
             ? a.ValueKind == JsonValueKind.True
             : null;
 
+        var change = NotificationChange(values, errors, call);
         if (errors.Count > 0) return Task.FromResult<IReadOnlyDictionary<string, string>>(errors);
+
+        // The notifications first: they are checked as a whole (the general values were checked above), so nothing is saved when one is wrong.
+        if (change is not null)
+        {
+            var refused = settings.ChangeNotifications(change, $"the platform API ({call.Caller})");
+            if (refused.Count > 0)
+            {
+                // A fixed field (MatSMTP): MatPlatform refuses it already; this keeps it so and says where the mail goes.
+                var texts = refused.ToDictionary(e => e.Key, e => NotificationSettingsChange.MailServerKeys.Contains(e.Key) && notifications.MailThroughMatSmtp
+                    ? notifications.MatSmtpText(call.Language)!
+                    : e.Value);
+                return Task.FromResult<IReadOnlyDictionary<string, string>>(texts);
+            }
+        }
 
         var problems = settings.Change(new GeneralSettingsChange(level, days, zone, anonymous), $"the platform API ({call.Caller})");
         return Task.FromResult(problems);

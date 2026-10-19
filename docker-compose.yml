@@ -15,6 +15,14 @@ services:
       # - MATIDENTITY_CLIENT_ID=matddns
       # - MATIDENTITY_CLIENT_SECRET=
       # - MATIDENTITY_INTERNAL_URL=    # http://matidentity:2300 inside Docker
+      # Mail through MatSMTP (optional; Mattiverse sets them when MatSMTP is installed): all notification mail goes there and
+      # the SMTP server fields of System -> Notifications are fixed
+      # - MATSMTP_HOST=                # mattiverse-matsmtp-matsmtp
+      # - MATSMTP_PORT=2025
+      # - MATSMTP_USERNAME=matddns
+      # - MATSMTP_PASSWORD=
+      # - MATSMTP_FROM=                # matddns@example.com
+      # - MATSMTP_TLS=none             # none, starttls or tls
     # let the non-root user send ICMP for the "Ping" failover check
     sysctls:
       - net.ipv4.ping_group_range=0 2147483647

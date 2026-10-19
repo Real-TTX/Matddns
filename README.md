@@ -125,6 +125,14 @@ services:
       # - MATIDENTITY_CLIENT_ID=matddns
       # - MATIDENTITY_CLIENT_SECRET=
       # - MATIDENTITY_INTERNAL_URL=    # http://matidentity:2300 inside Docker
+      # Mail through MatSMTP (optional; Mattiverse sets them when MatSMTP is installed): all notification mail goes there and
+      # the SMTP server fields of System -> Notifications are fixed
+      # - MATSMTP_HOST=                # mattiverse-matsmtp-matsmtp
+      # - MATSMTP_PORT=2025
+      # - MATSMTP_USERNAME=matddns
+      # - MATSMTP_PASSWORD=
+      # - MATSMTP_FROM=                # matddns@example.com
+      # - MATSMTP_TLS=none             # none, starttls or tls
     # lets the non-root user send ICMP for the "Ping" failover check
     sysctls:
       - net.ipv4.ping_group_range=0 2147483647
@@ -191,6 +199,12 @@ dotnet run --project src
 | `MATIDENTITY_CLIENT_ID` | `matddns` | The client of Matddns in MatIdentity (also the audience of the tokens `/api` accepts) |
 | `MATIDENTITY_CLIENT_SECRET` | – | Its secret |
 | `MATIDENTITY_INTERNAL_URL` | – | Where Matddns reaches MatIdentity from inside Docker (`http://matidentity:2300`); the browser keeps using `MATIDENTITY_AUTHORITY` |
+| `MATSMTP_HOST` | – | Address of [MatSMTP](#notifications) (inside Docker its container name). Set = all mail goes through MatSMTP and the SMTP server fields of *System → Notifications* are fixed |
+| `MATSMTP_PORT` | `2025` | Its SMTP port |
+| `MATSMTP_USERNAME` | – | The relay user of Matddns in MatSMTP (unset = no authentication) |
+| `MATSMTP_PASSWORD` | – | Its password |
+| `MATSMTP_FROM` | – | The sender of all mail (unset = the sender stored in Matddns) |
+| `MATSMTP_TLS` | `none` | `none`, `starttls` or `tls` |
 
 The in-container port is `8080` (mapped to `4060` above). The UI is English throughout.
 
@@ -281,8 +295,10 @@ A failed update is retried with a growing wait: 30 s after the first failure, th
 *System → Notifications* tells you when a record gets a new IP, when it cannot be updated (once, at the first failure; Matddns keeps
 trying with its back-off) and when it works again. Each kind can be switched off.
 
-- **E-mail** over SMTP: server, port, STARTTLS / TLS / none, user, password, sender and one or more recipients. The fields are those of
-  the `MATSMTP_*` variables of the Mat platform (host, port, username, password, from, tls), so mail through MatSMTP can take their place.
+- **E-mail** over SMTP: server, port, STARTTLS / TLS / none, user, password, sender and one or more recipients.
+- **Mail through MatSMTP:** when the `MATSMTP_*` variables are set (Mattiverse does that when MatSMTP is installed), all mail goes through
+  MatSMTP. The page then says where the mail goes and shows server, port, security, user and sender as fixed (the password never);
+  nothing is saved for them, and what was stored before counts again when the variables are gone. On/off and the recipients stay editable.
 - **Webhook**: `JSON` (`{"app":"matddns","event":"change|failure|recovery|test","title","message","record","type","value","previous","source","time"}`),
   `ntfy` (plain text with a `Title` header to a topic URL) or `Gotify` (`{"title","message","priority"}` to `/message?token=…`).
 
@@ -499,7 +515,7 @@ knowing it beforehand. It lives next to the engine API (`/api/v1`) and the peer 
 | `GET /api` | the definition: who the app is (`matddns`, accent `#204db6`), its pages, tiles, settings and actions | anonymous |
 | `GET /api/health` | `ok` / `degraded` / `down` with the checks `config`, `sources`, `rules` (plus the old monitoring fields, see above) | anonymous |
 | `GET /api/state`, `GET /api/state/{key}` | the values of the tiles | key or token |
-| `GET /api/configure`, `PUT /api/configure` | the few settings | key or token |
+| `GET /api/configure`, `PUT /api/configure` | the general and the notification settings | key or token |
 | `POST /api/actions/{id}` | run an action | key or token |
 
 The key is `X-Api-Key: <MAT_API_KEY>` (without `MAT_API_KEY` the engine key `MATDDNS_API_KEY`); with MatIdentity also
@@ -508,10 +524,12 @@ The key is `X-Api-Key: <MAT_API_KEY>` (without `MAT_API_KEY` the engine key `MAT
 - **Tiles:** current IPv4 and IPv6 (of the source most records are written from), the active source, records in failover (written
   from a source other than their first choice), DNS records and how many are in sync (enabled rules whose last write succeeded),
   the last update (the last successful write) and the last error (an error in the log within 24 hours).
-- **Settings:** time zone, the dashboard without sign-in, the minimum log level and how long the log is kept: the general settings
-  of *System*, the same values in `config.json`. A change is written to the log with who made it.
+- **Settings:** time zone, the dashboard without sign-in, the minimum log level and how long the log is kept (the general settings
+  of *System*), and the notifications (when, e-mail, webhook; the SMTP password and the webhook URL as secrets, never sent back): the
+  same values in `config.json`. A change is written to the log with who made it. With MatSMTP the mail server fields are `fixed`
+  (a change is `400`).
 - **Actions:** *Update now* (`runNow`: one pass over all sources and rules, like `POST /api/v1/run`; started and answered right away),
-  and links to Matddns, the sources, the log and the system settings.
+  and links to Matddns, the sources, the log, the system settings and the notifications.
 - Matddns has no roles (every account may do everything), so the definition names none.
 
 ## Sign-in through MatIdentity

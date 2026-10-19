@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Threading.Channels;
 using Matddns.Models;
+using MatPlatform;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
@@ -59,15 +60,23 @@ public class NotificationService : BackgroundService
     private readonly LogService _log;
     private readonly IHttpClientFactory _http;
     private readonly IMailSender _mail;
+    private readonly MatSmtpSettings _smtp;
     private readonly Channel<Notification> _queue = Channel.CreateBounded<Notification>(new BoundedChannelOptions(200) { FullMode = BoundedChannelFullMode.DropOldest });
 
-    public NotificationService(ConfigService config, LogService log, IHttpClientFactory http, IMailSender? mail = null)
+    public NotificationService(ConfigService config, LogService log, IHttpClientFactory http, IMailSender? mail = null, MatSmtpSettings? smtp = null)
     {
         _config = config;
         _log = log;
         _http = http;
         _mail = mail ?? new MailKitSender();
+        _smtp = smtp ?? new MatSmtpSettings();
     }
+
+    /// <summary>True when the mail goes through MatSMTP (<c>MATSMTP_HOST</c> is set): server, port, security, user, password and sender are fixed.</summary>
+    public bool MailThroughMatSmtp => _smtp.IsConfigured;
+
+    /// <summary>The sentence that says where the mail goes when <see cref="MailThroughMatSmtp"/> (never the password), else null.</summary>
+    public string? MatSmtpText(string language = "en") => _smtp.Describe(language);
 
     /// <summary>Queues <paramref name="n"/> when its kind is switched on and a receiver is set up.</summary>
     public void Notify(Notification n)
@@ -93,10 +102,41 @@ public class NotificationService : BackgroundService
     }
 
     /// <summary>
-    /// The mail settings that are used. Today the own ones of System, Notifications; mail through MatSMTP (the <c>MATSMTP_*</c> variables of the Mat
-    /// platform, MatPlatform <c>MatSmtpSettings</c>) will take their place here, field by field, when they are set.
+    /// The mail settings that are used: the own ones of System, Notifications, or, when the <c>MATSMTP_*</c> variables of the Mat platform are set
+    /// (MatPlatform <see cref="MatSmtpSettings"/>), those with the server, port, security, user, password and sender of MatSMTP. Whether mail is on
+    /// and the recipients stay Matddns' own; the stored server settings stay stored and count again when the variables are gone.
     /// </summary>
-    public MailSettings EffectiveMail() => _config.Read(c => c.Settings.Notifications.Mail);
+    public MailSettings EffectiveMail() => Effective(_config.Read(c => c.Settings.Notifications.Mail), _smtp);
+
+    /// <summary><paramref name="own"/> with the values of MatSMTP when <paramref name="smtp"/> is configured (a copy; <paramref name="own"/> stays as it is).</summary>
+    public static MailSettings Effective(MailSettings own, MatSmtpSettings smtp)
+    {
+        var mail = new MailSettings
+        {
+            Enabled = own.Enabled,
+            Host = own.Host,
+            Port = own.Port,
+            Username = own.Username,
+            Password = own.Password,
+            From = own.From,
+            Tls = own.Tls,
+            To = own.To,
+        };
+        if (!smtp.IsConfigured) return mail;
+
+        mail.Host = smtp.Host!;
+        mail.Port = smtp.Port;
+        mail.Tls = smtp.Tls switch
+        {
+            MatSmtpTls.Tls => MailTls.Tls,
+            MatSmtpTls.StartTls => MailTls.StartTls,
+            _ => MailTls.None,
+        };
+        mail.Username = smtp.HasCredentials ? smtp.Username! : "";
+        mail.Password = smtp.HasCredentials ? smtp.Password ?? "" : "";
+        mail.From = smtp.FromAddress ?? own.From;
+        return mail;
+    }
 
     /// <summary>Sends <paramref name="n"/> to every enabled receiver now. Answers one line per receiver that failed (empty = all went out).</summary>
     public async Task<IReadOnlyList<string>> SendAsync(Notification n, CancellationToken ct)

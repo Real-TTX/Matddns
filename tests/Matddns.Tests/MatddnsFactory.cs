@@ -37,14 +37,16 @@ public class MatddnsFactory : WebApplicationFactory<Program>
     private readonly bool _engineKey;
     private readonly string? _authority;
     private readonly bool _reachable;
+    private readonly IReadOnlyDictionary<string, string>? _smtp;
 
     public MatddnsFactory()
         : this(platformKey: true, engineKey: true, authority: null)
     {
     }
 
-    protected MatddnsFactory(bool platformKey, bool engineKey, string? authority, bool reachable = true)
+    protected MatddnsFactory(bool platformKey, bool engineKey, string? authority, bool reachable = true, IReadOnlyDictionary<string, string>? smtp = null)
     {
+        _smtp = smtp;
         _platformKey = platformKey;
         _engineKey = engineKey;
         _authority = authority;
@@ -65,7 +67,15 @@ public class MatddnsFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable(MatPlatformSettings.ClientIdVariable, null);
         Environment.SetEnvironmentVariable(MatPlatformSettings.ClientSecretVariable, _authority is null ? null : "test-secret");
         Environment.SetEnvironmentVariable(MatPlatformSettings.InternalUrlVariable, null);
+        foreach (var variable in SmtpVariables) Environment.SetEnvironmentVariable(variable, _smtp?.GetValueOrDefault(variable));
     }
+
+    /// <summary>The six <c>MATSMTP_*</c> variables (mail through MatSMTP); set only by <see cref="MatSmtpFactory"/>.</summary>
+    public static readonly string[] SmtpVariables =
+    [
+        MatSmtpSettings.HostVariable, MatSmtpSettings.PortVariable, MatSmtpSettings.UsernameVariable,
+        MatSmtpSettings.PasswordVariable, MatSmtpSettings.FromVariable, MatSmtpSettings.TlsVariable,
+    ];
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -149,7 +159,7 @@ public class MatddnsFactory : WebApplicationFactory<Program>
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        foreach (var variable in new[] { "MATDDNS_DATA", "MATDDNS_API_KEY", MatPlatformSettings.ApiKeyVariable, MatPlatformSettings.AuthorityVariable, MatPlatformSettings.ClientSecretVariable })
+        foreach (var variable in new[] { "MATDDNS_DATA", "MATDDNS_API_KEY", MatPlatformSettings.ApiKeyVariable, MatPlatformSettings.AuthorityVariable, MatPlatformSettings.ClientSecretVariable }.Concat(SmtpVariables))
             Environment.SetEnvironmentVariable(variable, null);
         try { Directory.Delete(_data, recursive: true); }
         catch (IOException) { }
