@@ -44,7 +44,7 @@ its IP into Matddns just like it would to any DynDNS provider.
 - The **Cloudflare**, **Netcup**, **Hetzner DNS** and **GoDaddy** APIs (record + zone,
   A/AAAA/CNAME, optional create-on-demand)
 - Another **Matddns peer** (push over its JSON API)
-- Generic **DynDNS update URLs** with presets for ~20 providers (DuckDNS, No-IP, Dynu,
+- Generic **DynDNS update URLs** with presets for 29 providers (DuckDNS, No-IP, Dynu, Namecheap, OVH,
   DynDNS.org, Strato, deSEC, DynV6, …)
 
 **Failover, dual-stack, operations**
@@ -236,7 +236,7 @@ is never pushed to DNS.
 
 | Kind | Target |
 |------|--------|
-| DynDNS | any provider via an update URL with `{ipv4}`, `{ipv6}`, `{hostname}`, `{user}`, `{password}` placeholders (empty ones are dropped, so one URL covers A and AAAA); presets prefill the URL |
+| DynDNS | any provider via an update URL with `{ipv4}`, `{ipv6}`, `{hostname}` (or `{host}` and `{domain}` apart), `{user}`, `{password}` placeholders (empty ones are dropped, so one URL covers A and AAAA); presets prefill the URL |
 | Netcup | the Netcup DNS API (record + zone) |
 | Cloudflare | the Cloudflare API (API token with Zone.DNS edit) |
 | Hetzner DNS | the DNS API of the Hetzner Cloud: a Cloud API token (read & write) of the project that holds the zone; tokens of the retired DNS Console do not work. A record set must hold exactly one record, the TTL is set to 60 s |

@@ -92,6 +92,29 @@ public class DynDnsClientTests
 
         Assert.False(ok);
     }
+
+    [Fact]
+    public async Task Host_and_domain_give_the_name_and_the_zone_apart()
+    {
+        var settings = new DynDnsSettings { UpdateUrl = "https://dyn.example/update?host={host}&domain={domain}&ip={ipv4}" };
+
+        var (_, call) = await UpdateAsync(settings, "203.0.113.5", "<ErrCount>0</ErrCount>");
+
+        Assert.Equal("https://dyn.example/update?host=home&domain=example.com&ip=203.0.113.5", call.Uri.OriginalString);
+    }
+
+    [Theory]
+    [InlineData("<?xml version=\"1.0\"?><interface-response><ErrCount>0</ErrCount></interface-response>", true)]
+    [InlineData("<?xml version=\"1.0\"?><interface-response><ErrCount>1</ErrCount><errors><Err1>Passwords do not match</Err1></errors></interface-response>", false)]
+    public async Task A_namecheap_error_count_is_a_failure(string body, bool ok)
+        => Assert.Equal(ok, (await UpdateAsync(new DynDnsSettings { UpdateUrl = "https://dyn.example/u?ip={ipv4}" }, "203.0.113.5", body)).Ok);
+
+    [Fact]
+    public void Every_preset_is_an_http_url_with_a_unique_key()
+    {
+        Assert.All(Matddns.Support.DynDnsPresets.All, p => Assert.True(InputCheck.IsHttpUrl(p.Url), p.Key));
+        Assert.Equal(Matddns.Support.DynDnsPresets.All.Count, Matddns.Support.DynDnsPresets.All.Select(p => p.Key).Distinct().Count());
+    }
 }
 
 public class NetcupClientTests

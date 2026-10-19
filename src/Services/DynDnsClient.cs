@@ -20,8 +20,11 @@ public class DynDnsClient
         var ipv4 = isV6 ? "" : ip;
         var ipv6 = isV6 ? ip : "";
 
+        var (zone, host) = NetcupClient.SplitHostname(hostname); // {host} and {domain}: for providers that want the name and the zone apart (Namecheap)
         var url = settings.UpdateUrl
             .Replace("{hostname}", Uri.EscapeDataString(hostname), StringComparison.OrdinalIgnoreCase)
+            .Replace("{host}", Uri.EscapeDataString(host), StringComparison.OrdinalIgnoreCase)
+            .Replace("{domain}", Uri.EscapeDataString(zone), StringComparison.OrdinalIgnoreCase)
             .Replace("{ipv4}", Uri.EscapeDataString(ipv4), StringComparison.OrdinalIgnoreCase)
             .Replace("{ipv6}", Uri.EscapeDataString(ipv6), StringComparison.OrdinalIgnoreCase)
             .Replace("{ip}", Uri.EscapeDataString(ip), StringComparison.OrdinalIgnoreCase)
@@ -65,7 +68,9 @@ public class DynDnsClient
     private static bool IsDynDnsFailure(string body)
     {
         var first = body.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-        return first != null && DynDnsFailureCodes.Contains(first);
+        if (first != null && DynDnsFailureCodes.Contains(first)) return true;
+        // Namecheap answers HTTP 200 with XML and reports a failure as <ErrCount>1</ErrCount>
+        return System.Text.RegularExpressions.Regex.IsMatch(body, @"<ErrCount>\s*[1-9]\d*\s*</ErrCount>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
     // The response ends up in the rule status, the log and /api/state: an HTML error page must not be stored in full.
