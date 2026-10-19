@@ -35,10 +35,18 @@ else
     {
         var state = r.LastResult.StartsWith("ok", StringComparison.OrdinalIgnoreCase) ? "ok"
             : r.LastResult.StartsWith("err", StringComparison.OrdinalIgnoreCase) ? "err" : "warn";
-        <p class="mat-muted">Last run @Tz.Format(r.LastRun) (@Tz.Label()) · <span class="@Ui.Pill(state)">@r.LastResult</span>
-            @if (state == "err" && r.FailCount > 0 && r.LastRun is { } lastRun)
+        var detail = r.LastResult.StartsWith("ok: ", StringComparison.OrdinalIgnoreCase) ? r.LastResult[4..]
+            : r.LastResult.StartsWith("err: ", StringComparison.OrdinalIgnoreCase) ? r.LastResult[5..]
+            : r.LastResult.StartsWith("error: ", StringComparison.OrdinalIgnoreCase) ? r.LastResult[7..] : null;
+        var stateText = state == "ok" ? "OK" : state == "err" ? "Error" : r.LastResult;
+        <p class="mat-muted">
+            <span class="@Ui.Pill(state)">@stateText</span> Last run @Tz.Format(r.LastRun) (@Tz.Label())@if (state == "err" && r.FailCount > 0 && r.LastRun is { } lastRun)
             {
-                <span> · failed @r.FailCount× in a row, next try after @Tz.Format(lastRun + UpdaterService.RetryDelay(r.FailCount), "HH:mm:ss")</span>
+                <span>, failed @r.FailCount× in a row, next try after @Tz.Format(lastRun + UpdaterService.RetryDelay(r.FailCount), "HH:mm:ss")</span>
+            }
+            @if (detail != null)
+            {
+                <br /><span class="mat-mono mat-text-break">@detail</span>
             }
         </p>
     }
