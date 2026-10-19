@@ -21,7 +21,7 @@ public class DynamicModel : PageModel
     public Rule? RuleItem { get; private set; }
     public bool IsNew => RuleItem == null;
     public List<SourceGroup> PushSources { get; private set; } = new();
-    public List<DomainGroup> NetcupGroups { get; private set; } = new();
+    public List<DomainGroup> ZoneGroups { get; private set; } = new();
 
     [TempData] public string? Notice { get; set; }
     [TempData] public string? Error { get; set; }
@@ -30,7 +30,7 @@ public class DynamicModel : PageModel
     {
         var cfg = _config.Current;
         PushSources = cfg.Sources.Where(s => s.Kind == SourceKind.Push).ToList();
-        NetcupGroups = cfg.Domains.Where(d => d.Kind == DomainKind.Netcup).ToList();
+        ZoneGroups = cfg.Domains.Where(d => RecordWriter.CanCreate(d.Kind)).ToList();
     }
 
     public IActionResult OnGet(string? id)
@@ -48,7 +48,7 @@ public class DynamicModel : PageModel
     public IActionResult OnPostCreate(string DynamicSourceId, string DomainGroupId, string DynamicZone, string? DynamicPrefix)
     {
         if (string.IsNullOrWhiteSpace(DynamicSourceId) || string.IsNullOrWhiteSpace(DomainGroupId) || string.IsNullOrWhiteSpace(DynamicZone))
-        { Error = "Select the receiver and the Netcup account, and enter the zone."; return RedirectToPage("Dynamic"); }
+        { Error = "Select the receiver and the domain group, and enter the zone."; return RedirectToPage("Dynamic"); }
         if (InvalidNames(DynamicZone, DynamicPrefix) is { } bad) { Error = bad; return RedirectToPage("Dynamic"); }
 
         var rule = new Rule

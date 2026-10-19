@@ -16,7 +16,7 @@ public class PushReceiverTests : IDisposable
     public PushReceiverTests()
     {
         _env.Config.Mutate(c => c.Sources.Add(_source));
-        _receiver = new PushReceiver(_env.Config, _env.Log, new NetcupClient(new StubHttpClientFactory(_netcupApi)), _env.History);
+        _receiver = new PushReceiver(_env.Config, _env.Log, TestUpdater.Writer(new StubHttpClientFactory(_netcupApi)), _env.History);
     }
 
     public void Dispose() => _env.Dispose();
@@ -169,5 +169,32 @@ public class PushReceiverTests : IDisposable
         Assert.Contains("\"domainname\":\"example.com\"", update.Body);
         Assert.Contains("\"hostname\":\"home.dyn\"", update.Body);
         Assert.Contains("\"destination\":\"203.0.113.5\"", update.Body);
+    }
+
+    [Fact]
+    public async Task Dynamic_receiver_also_creates_records_at_cloudflare_and_a_repeat_is_no_change()
+    {
+        var cloudflare = new StubHandler(call => new HttpResponseMessage
+        {
+            Content = new StringContent(call.Method == "GET" && call.Uri.AbsolutePath.EndsWith("/zones")
+                ? """{"success":true,"result":[{"id":"z1"}]}"""
+                : call.Method == "GET" ? """{"success":true,"result":[]}""" : """{"success":true,"result":{}}""")
+        });
+        var receiver = new PushReceiver(_env.Config, _env.Log, TestUpdater.Writer(new StubHttpClientFactory(cloudflare)), _env.History);
+        var zone = new DomainGroup { Name = "CF", Kind = DomainKind.Cloudflare, Cloudflare = new CloudflareSettings { ApiToken = "cf", AllowDynamic = true } };
+        _env.Config.Mutate(c =>
+        {
+            c.Domains.Add(zone);
+            c.Rules.Add(new Rule { Dynamic = true, DynamicSourceId = _source.Id, DomainGroupId = zone.Id, DynamicZone = "example.com", DynamicPrefix = "dyn" });
+        });
+
+        var first = await receiver.UpdateAsync(Token, "nas.dyn.example.com", "203.0.113.5", null, null, null, default);
+        var again = await receiver.UpdateAsync(Token, "nas.dyn.example.com", "203.0.113.5", null, null, null, default);
+
+        Assert.Equal(("ok", true), (first.Status, first.Changed));
+        Assert.Equal(("ok", false), (again.Status, again.Changed));
+        var create = cloudflare.Calls.First(c => c.Method == "POST");
+        Assert.Contains("\"name\":\"nas.dyn.example.com\"", create.Body);
+        Assert.Equal("203.0.113.5", _env.History.Of("nas.dyn.example.com", "A").Single().Value);
     }
 }

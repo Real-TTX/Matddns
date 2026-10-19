@@ -11,18 +11,18 @@ namespace Matddns.Services;
 public record PushOutcome(int HttpStatus, string Status, bool Changed, string? Ipv4, string? Ipv6, string? Message = null);
 
 /// <summary>Receives DynDNS-style pushes. A normal receiver stores the reported IP in its source; a <b>dynamic</b>
-/// receiver takes the hostname from the request and writes it straight to the named record in the target Netcup zone.</summary>
+/// receiver takes the hostname from the request and writes it straight to the named record in the target zone (Netcup, Cloudflare, Hetzner, GoDaddy).</summary>
 public class PushReceiver
 {
     private readonly ConfigService _config;
     private readonly LogService _log;
-    private readonly NetcupClient _netcup;
+    private readonly RecordWriter _writer;
     private readonly HistoryService _history;
-    public PushReceiver(ConfigService config, LogService log, NetcupClient netcup, HistoryService history)
+    public PushReceiver(ConfigService config, LogService log, RecordWriter writer, HistoryService history)
     {
         _config = config;
         _log = log;
-        _netcup = netcup;
+        _writer = writer;
         _history = history;
     }
 
@@ -106,7 +106,7 @@ public class PushReceiver
         return new PushOutcome(200, "ok", changed, newV4, newV6);
     }
 
-    /// <summary>Dynamic receiver: validate the hostname against the configured namespace, then write the record to Netcup.</summary>
+    /// <summary>Dynamic receiver: validate the hostname against the configured namespace, then write the record to the zone of its domain group.</summary>
     private async Task<PushOutcome> DynamicAsync(SourceGroup grp, Rule rule, string? hostname, string? newV4, string? newV6, string joined, string? callerIp, CancellationToken ct)
     {
         var host = (hostname ?? "").Trim().TrimEnd('.').ToLowerInvariant();
@@ -129,22 +129,20 @@ public class PushReceiver
             : host.EndsWith("." + zone, StringComparison.Ordinal) ? host[..^(zone.Length + 1)]
             : host;
 
-        var dgrp = _config.Read(c => c.Domains.FirstOrDefault(d =>
-            d.Id == rule.DomainGroupId && d.Kind == DomainKind.Netcup && d.Netcup != null));
+        var dgrp = _config.Read(c => c.Domains.FirstOrDefault(d => d.Id == rule.DomainGroupId && RecordWriter.CanCreate(d.Kind)));
         if (dgrp == null)
-            return Reject(grp, "target Netcup zone not found", callerIp);
+            return Reject(grp, "target zone not found", callerIp);
 
         bool any = false, changed = false;
         string? err = null;
-        if (newV4 != null)
+        foreach (var (type, value) in new[] { (DnsRecordType.A, newV4), (DnsRecordType.AAAA, newV6) })
         {
-            var (ok, msg) = await _netcup.UpdateRecordAsync(dgrp.Netcup!, zone, recordName, "A", newV4, dgrp.Netcup!.AllowDynamic, ct);
-            if (ok) { any = true; if (!msg.StartsWith("unchanged", StringComparison.Ordinal)) changed = true; _history.Record(rule.Id, host, "A", newV4, grp.Name); } else err = msg;
-        }
-        if (newV6 != null)
-        {
-            var (ok, msg) = await _netcup.UpdateRecordAsync(dgrp.Netcup!, zone, recordName, "AAAA", newV6, dgrp.Netcup!.AllowDynamic, ct);
-            if (ok) { any = true; if (!msg.StartsWith("unchanged", StringComparison.Ordinal)) changed = true; _history.Record(rule.Id, host, "AAAA", newV6, grp.Name); } else err = msg;
+            if (value == null) continue;
+            var entry = new DomainEntry { Hostname = host, Type = type, RecordName = recordName, Domain = zone };
+            var (ok, msg) = await _writer.WriteAsync(dgrp, entry, value, ct);
+            if (!ok) { err = msg; continue; }
+            any = true;
+            if (_history.Record(rule.Id, host, type.ToString(), value, grp.Name) != null) changed = true;
         }
 
         // record the pushed host as a per-hostname entry (for display / state)

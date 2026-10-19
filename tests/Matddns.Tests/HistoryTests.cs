@@ -11,9 +11,11 @@ internal static class TestUpdater
     {
         var f = new StubHttpClientFactory(http);
         return new UpdaterService(env.Config, env.Log, new PublicIpClient(f), new DnsLookupClient(), new FritzboxClient(), new UnifiClient(),
-            new UnifiCloudClient(f), new DynDnsClient(f), new NetcupClient(f), new CloudflareClient(f), new HetznerClient(f), new GoDaddyClient(f),
-            new MatddnsClient(f), new SourceResolver(), new ReachabilityChecker(), env.History, notifications ?? new NotificationService(env.Config, env.Log, f));
+            new UnifiCloudClient(f), new MatddnsClient(f), Writer(f), new SourceResolver(), new ReachabilityChecker(), env.History, notifications ?? new NotificationService(env.Config, env.Log, f));
     }
+
+    public static RecordWriter Writer(IHttpClientFactory f)
+        => new(new DynDnsClient(f), new NetcupClient(f), new CloudflareClient(f), new HetznerClient(f), new GoDaddyClient(f), new MatddnsClient(f));
 
     /// <summary>A static source and a DynDNS group with one A record bound by a rule; returns the ids.</summary>
     public static (string SourceId, string RuleId) StaticToDynDns(TestEnvironment env, string ip)

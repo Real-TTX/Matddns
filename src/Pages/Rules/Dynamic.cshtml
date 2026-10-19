@@ -10,11 +10,11 @@
     var src = isNew ? null : Model.PushSources.FirstOrDefault(s => s.Id == r!.DynamicSourceId);
 }
 
-@if (isNew && (Model.PushSources.Count == 0 || Model.NetcupGroups.Count == 0))
+@if (isNew && (Model.PushSources.Count == 0 || Model.ZoneGroups.Count == 0))
 {
     <div class="mat-alert mat-alert--danger" role="alert">
         <icon name="x-circle" />
-        <div class="mat-alert__body">A dynamic rule needs a <a href="/Sources/Edit">DynDNS Server source</a> and a <a href="/Domains/Edit">Netcup domain group</a>.</div>
+        <div class="mat-alert__body">A dynamic rule needs a <a href="/Sources/Edit">DynDNS Server source</a> and a <a href="/Domains/Edit">domain group</a> of Netcup, Cloudflare, Hetzner or GoDaddy.</div>
     </div>
     <div class="mat-actions"><a class="mat-btn mat-btn--secondary" href="/Rules"><icon name="back" /><span>Back</span></a></div>
 }
@@ -36,11 +36,11 @@ else
                         }
                     </select>
                 </mat-field>
-                <mat-field label="Netcup account" for-id="DomainGroupId">
+                <mat-field label="Domain group" for-id="DomainGroupId">
                     <select id="DomainGroupId" name="DomainGroupId" class="mat-select">
-                        @foreach (var d in Model.NetcupGroups)
+                        @foreach (var d in Model.ZoneGroups)
                         {
-                            <option value="@d.Id" selected="@(r?.DomainGroupId == d.Id)">@d.Name</option>
+                            <option value="@d.Id" selected="@(r?.DomainGroupId == d.Id)">@d.Name (@Labels.Domain(d.Kind))</option>
                         }
                     </select>
                 </mat-field>
@@ -80,6 +80,10 @@ else
                 <dl class="mat-kv">
                     <dt>Allowed</dt><dd class="mat-mono">*.@r!.DynamicBaseFqdn</dd>
                     <dt>The device sends</dt><dd class="mat-mono">&amp;hostname=&lt;name&gt;.@r.DynamicBaseFqdn</dd>
+                    @if (Model.ZoneGroups.FirstOrDefault(d => d.Id == r.DomainGroupId) is { } zg)
+                    {
+                        <dt>New records</dt><dd>@(RecordWriter.AllowsCreate(zg) ? "are created" : "are not created: switch on \"Allow dynamic records\" in the domain group") <a href="/Domains/Edit?id=@zg.Id">@zg.Name</a></dd>
+                    }
                     @if (src != null)
                     {
                         <dt>Token and update URL</dt><dd><a href="/Sources/Edit?id=@src.Id">@src.Name</a></dd>

@@ -293,9 +293,9 @@ source's page, with copy-ready FRITZ!Box and UniFi examples). Both URLs take sep
 `ipv4`/`ipv6` parameters; send either or both, and the other family is left untouched. Tokens
 are compared in constant time, and the endpoints are rate-limited.
 
-A **dynamic receiver** (a dynamic rule binding a DynDNS-server source to a Netcup zone) lets one
+A **dynamic receiver** (a dynamic rule binding a DynDNS-server source to a Netcup, Cloudflare, Hetzner or GoDaddy zone) lets one
 token manage many records under a namespace: the device sends `&hostname=<name>.<zone>` and that
-record is created/updated on the fly (auto-create is opt-in per zone).
+record is created/updated on the fly (creating is opt-in per domain group: *Allow dynamic records*).
 
 JSON API, for scripts and devices:
 

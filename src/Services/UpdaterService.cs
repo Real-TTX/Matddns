@@ -11,12 +11,8 @@ public class UpdaterService : BackgroundService
     private readonly FritzboxClient _fritz;
     private readonly UnifiClient _unifi;
     private readonly UnifiCloudClient _unifiCloud;
-    private readonly DynDnsClient _dyndns;
-    private readonly NetcupClient _netcup;
-    private readonly CloudflareClient _cloudflare;
-    private readonly HetznerClient _hetzner;
-    private readonly GoDaddyClient _godaddy;
     private readonly MatddnsClient _matddns;
+    private readonly RecordWriter _writer;
     private readonly SourceResolver _resolver;
     private readonly ReachabilityChecker _reach;
     private readonly HistoryService _history;
@@ -33,12 +29,8 @@ public class UpdaterService : BackgroundService
         FritzboxClient fritz,
         UnifiClient unifi,
         UnifiCloudClient unifiCloud,
-        DynDnsClient dyndns,
-        NetcupClient netcup,
-        CloudflareClient cloudflare,
-        HetznerClient hetzner,
-        GoDaddyClient godaddy,
         MatddnsClient matddns,
+        RecordWriter writer,
         SourceResolver resolver,
         ReachabilityChecker reach,
         HistoryService history,
@@ -51,12 +43,8 @@ public class UpdaterService : BackgroundService
         _fritz = fritz;
         _unifi = unifi;
         _unifiCloud = unifiCloud;
-        _dyndns = dyndns;
-        _netcup = netcup;
-        _cloudflare = cloudflare;
-        _hetzner = hetzner;
-        _godaddy = godaddy;
         _matddns = matddns;
+        _writer = writer;
         _resolver = resolver;
         _reach = reach;
         _history = history;
@@ -415,7 +403,7 @@ public class UpdaterService : BackgroundService
             return;
         }
 
-        var (ok, msg) = await WriteRecordAsync(dgroup, dentry, chosenValue, ct);
+        var (ok, msg) = await _writer.WriteAsync(dgroup, dentry, chosenValue, ct);
         _log.Log(ok ? LogLevel.Update : LogLevel.Error, $"rule:{RuleDesc(rule, cfg)}",
             $"{dentry.Type} {dentry.Hostname} -> {chosenValue} (src#{chosenIndex}) : {msg}");
 
@@ -498,52 +486,6 @@ public class UpdaterService : BackgroundService
         return reachable;
     }
 
-    // Writes the value to the target provider and returns its result message.
-    private async Task<(bool ok, string message)> WriteRecordAsync(DomainGroup group, DomainEntry entry, string value, CancellationToken ct)
-    {
-        var recordType = entry.Type.ToString();
-        switch (group.Kind)
-        {
-            case DomainKind.DynDns when group.DynDns is { } dynDns:
-                return entry.Type == DnsRecordType.CNAME
-                    ? (false, "CNAME not supported via DynDNS update URL")
-                    : await _dyndns.UpdateAsync(dynDns, entry.Hostname, value, ct);
-
-            case DomainKind.Netcup when group.Netcup is { } netcup:
-            {
-                var (zone, host) = ZoneAndHost(entry);
-                return await _netcup.UpdateRecordAsync(netcup, zone, host, recordType, value, netcup.AllowDynamic, ct);
-            }
-
-            case DomainKind.Cloudflare when group.Cloudflare is { } cloudflare:
-            {
-                var zone = !string.IsNullOrWhiteSpace(entry.Domain) ? entry.Domain! : NetcupClient.SplitHostname(entry.Hostname).Domain;
-                return await _cloudflare.UpdateRecordAsync(cloudflare, zone, entry.Hostname, recordType, value, cloudflare.AllowDynamic, ct);
-            }
-
-            case DomainKind.Hetzner when group.Hetzner is { } hetzner:
-            {
-                var (zone, host) = ZoneAndHost(entry);
-                return await _hetzner.UpdateRecordAsync(hetzner, zone, host, recordType, value, hetzner.AllowDynamic, ct);
-            }
-
-            case DomainKind.GoDaddy when group.GoDaddy is { } godaddy:
-            {
-                var (zone, host) = ZoneAndHost(entry);
-                return await _godaddy.UpdateRecordAsync(godaddy, zone, host, recordType, value, godaddy.AllowDynamic, ct);
-            }
-
-            case DomainKind.Matddns when group.Matddns is { } peer:
-                if (entry.Type == DnsRecordType.CNAME) return (false, "CNAME not supported via Matddns push");
-                return await _matddns.PushAsync(peer, entry.Hostname,
-                    entry.Type == DnsRecordType.A ? value : null,
-                    entry.Type == DnsRecordType.AAAA ? value : null, ct);
-
-            default:
-                return (false, "no credentials configured");
-        }
-    }
-
     // Due when: never run yet, the periodic interval elapsed, or (OnChange) a source IP changed since the last evaluation.
     internal static bool RuleDue(Rule rule, DateTime now, string signature)
     {
@@ -573,15 +515,6 @@ public class UpdaterService : BackgroundService
 
     internal const int MaxRetryDelaySeconds = 1800;
 
-    // Zone + relative record name for zone-based APIs. Prefers the explicit Domain/RecordName, else derives from the FQDN.
-    private static (string zone, string host) ZoneAndHost(DomainEntry de)
-    {
-        if (!string.IsNullOrWhiteSpace(de.Domain))
-            return (de.Domain!, string.IsNullOrWhiteSpace(de.RecordName) ? "@" : de.RecordName!);
-        var (domain, host) = NetcupClient.SplitHostname(de.Hostname);
-        if (!string.IsNullOrWhiteSpace(de.RecordName)) host = de.RecordName!;
-        return (domain, host);
-    }
 
     private static string RuleDesc(Rule rule, AppConfig cfg)
     {

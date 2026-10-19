@@ -50,6 +50,7 @@ builder.Services.AddSingleton<HetznerClient>();
 builder.Services.AddSingleton<GoDaddyClient>();
 builder.Services.AddSingleton<MatddnsClient>();
 builder.Services.AddSingleton<DynDnsClient>();
+builder.Services.AddSingleton<RecordWriter>();
 builder.Services.AddSingleton<SourceResolver>();
 builder.Services.AddSingleton<ReachabilityChecker>();
 builder.Services.AddSingleton<StatusService>();
