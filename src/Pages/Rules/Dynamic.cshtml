@@ -88,5 +88,30 @@ else
             </div>
         </div>
     </section>
+
+    <section class="mat-section">
+        <div class="mat-section__head"><h2>Recent changes</h2></div>
+        <div class="mat-table-wrap">
+            <table class="mat-table">
+                <caption class="mat-sr-only">The latest records this receiver wrote</caption>
+                <thead><tr><th scope="col">Time (@Tz.Label())</th><th scope="col">Record</th><th scope="col">Value</th><th scope="col" class="mat-hide-sm">Before</th></tr></thead>
+                <tbody>
+                @foreach (var h in Model.History)
+                {
+                    <tr>
+                        <td data-label="Time" class="mat-mono mat-nowrap">@Tz.Format(h.Time)</td>
+                        <td data-label="Record" class="mat-mono">@h.Record <span class="mat-tag">@h.Type</span></td>
+                        <td data-label="Value" class="mat-mono">@h.Value</td>
+                        <td data-label="Before" class="mat-hide-sm mat-mono mat-muted">@(h.Previous ?? "–")</td>
+                    </tr>
+                }
+                @if (Model.History.Count == 0)
+                {
+                    <tr><td colspan="4" class="mat-muted">No record written yet.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
 }
 }

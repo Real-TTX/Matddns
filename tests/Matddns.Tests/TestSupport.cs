@@ -11,6 +11,7 @@ internal sealed class TestEnvironment : IDisposable
     public AuthService Auth { get; } = new();
     public ConfigService Config { get; }
     public LogService Log { get; }
+    public HistoryService History { get; }
 
     /// <param name="configJson">Optional content for config.json, written before the config is loaded.</param>
     public TestEnvironment(string? configJson = null)
@@ -20,6 +21,7 @@ internal sealed class TestEnvironment : IDisposable
         Config = new ConfigService(Paths, Auth);
         Config.EnsureLoaded();
         Log = new LogService(Paths, Config);
+        History = new HistoryService(Paths);
     }
 
     public void Dispose()

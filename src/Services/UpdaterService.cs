@@ -19,6 +19,7 @@ public class UpdaterService : BackgroundService
     private readonly MatddnsClient _matddns;
     private readonly SourceResolver _resolver;
     private readonly ReachabilityChecker _reach;
+    private readonly HistoryService _history;
 
     // one evaluation pass at a time: the periodic loop and an on-demand run (management API) never overlap
     private readonly SemaphoreSlim _pass = new(1, 1);
@@ -38,7 +39,8 @@ public class UpdaterService : BackgroundService
         GoDaddyClient godaddy,
         MatddnsClient matddns,
         SourceResolver resolver,
-        ReachabilityChecker reach)
+        ReachabilityChecker reach,
+        HistoryService history)
     {
         _config = config;
         _log = log;
@@ -55,6 +57,7 @@ public class UpdaterService : BackgroundService
         _matddns = matddns;
         _resolver = resolver;
         _reach = reach;
+        _history = history;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -420,6 +423,12 @@ public class UpdaterService : BackgroundService
             r.LastValue = chosenValue;
             r.LastUsedSourceId = chosenSourceId;
         });
+
+        if (ok)
+        {
+            var source = _resolver.Find(cfg, chosenSourceId) is { } s ? $"{s.Group.Name} · {s.Entry.Label}" : null;
+            _history.Record(rule.Id, dentry.Hostname, dentry.Type.ToString(), chosenValue, source);
+        }
     }
 
     // First source in failover order that has an address for the record type and passes all enabled reachability checks.

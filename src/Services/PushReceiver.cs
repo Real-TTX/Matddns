@@ -17,11 +17,13 @@ public class PushReceiver
     private readonly ConfigService _config;
     private readonly LogService _log;
     private readonly NetcupClient _netcup;
-    public PushReceiver(ConfigService config, LogService log, NetcupClient netcup)
+    private readonly HistoryService _history;
+    public PushReceiver(ConfigService config, LogService log, NetcupClient netcup, HistoryService history)
     {
         _config = config;
         _log = log;
         _netcup = netcup;
+        _history = history;
     }
 
     public static string NewToken() =>
@@ -137,12 +139,12 @@ public class PushReceiver
         if (newV4 != null)
         {
             var (ok, msg) = await _netcup.UpdateRecordAsync(dgrp.Netcup!, zone, recordName, "A", newV4, dgrp.Netcup!.AllowDynamic, ct);
-            if (ok) { any = true; if (!msg.StartsWith("unchanged", StringComparison.Ordinal)) changed = true; } else err = msg;
+            if (ok) { any = true; if (!msg.StartsWith("unchanged", StringComparison.Ordinal)) changed = true; _history.Record(rule.Id, host, "A", newV4, grp.Name); } else err = msg;
         }
         if (newV6 != null)
         {
             var (ok, msg) = await _netcup.UpdateRecordAsync(dgrp.Netcup!, zone, recordName, "AAAA", newV6, dgrp.Netcup!.AllowDynamic, ct);
-            if (ok) { any = true; if (!msg.StartsWith("unchanged", StringComparison.Ordinal)) changed = true; } else err = msg;
+            if (ok) { any = true; if (!msg.StartsWith("unchanged", StringComparison.Ordinal)) changed = true; _history.Record(rule.Id, host, "AAAA", newV6, grp.Name); } else err = msg;
         }
 
         // record the pushed host as a per-hostname entry (for display / state)

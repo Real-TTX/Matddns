@@ -201,6 +201,7 @@ the `users` list in `data/config.json`, and start it again: `admin` is re-create
 /data
 ├─ config.json   sources, domains, rules, users, settings
 ├─ log.txt       application log (rotates to log.txt.1)
+├─ history.jsonl the IP changes of every record (the newest 2,000)
 └─ keys/         DataProtection keys (sessions survive restarts)
 ```
 
@@ -249,6 +250,9 @@ type comes from the entry.
   re-check every N seconds. A periodic re-check drives ping/TCP failover, because a source going
   down does not change its IP – so enabling a check also enforces a minimum interval.
 - Validation: none, ping, or TCP port.
+- History: every change of a record (value, the value before, the source) is kept in `history.jsonl`, apart from the log, so the
+  log level, its retention or clearing it lose nothing. The rule page lists the changes of its record, the dashboard and the IP-change
+  counts of `/api/health` and `/api/state` read them (an older install takes the updates of its log over once).
 
 ## Failover and validation
 

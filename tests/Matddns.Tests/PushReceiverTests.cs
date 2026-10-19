@@ -16,7 +16,7 @@ public class PushReceiverTests : IDisposable
     public PushReceiverTests()
     {
         _env.Config.Mutate(c => c.Sources.Add(_source));
-        _receiver = new PushReceiver(_env.Config, _env.Log, new NetcupClient(new StubHttpClientFactory(_netcupApi)));
+        _receiver = new PushReceiver(_env.Config, _env.Log, new NetcupClient(new StubHttpClientFactory(_netcupApi)), _env.History);
     }
 
     public void Dispose() => _env.Dispose();

@@ -37,6 +37,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton(new PathOptions(dataDir));
 builder.Services.AddSingleton<ConfigService>();
 builder.Services.AddSingleton<LogService>();
+builder.Services.AddSingleton<HistoryService>();
 builder.Services.AddSingleton<AuthService>();
 builder.Services.AddSingleton<PublicIpClient>();
 builder.Services.AddSingleton<DnsLookupClient>();
@@ -261,6 +262,9 @@ app.MapGet("/update", DynDns2Update).AllowAnonymous().RequireRateLimiting("api")
 app.MapManagementApi();
 
 app.Services.GetRequiredService<ConfigService>().EnsureLoaded();
+// An install from before the history of IP changes: take the updates of the log over once.
+app.Services.GetRequiredService<HistoryService>().SeedFrom(
+    app.Services.GetRequiredService<LogService>().EntriesOfLevel(Matddns.Services.LogLevel.Update, HistoryService.MaxEntries).Reverse());
 
 app.Run();
 

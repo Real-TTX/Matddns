@@ -235,5 +235,30 @@ else
                 </div>
             </form>
         </section>
+
+        <section class="mat-section">
+            <div class="mat-section__head"><h2>History</h2></div>
+            <div class="mat-table-wrap">
+                <table class="mat-table">
+                    <caption class="mat-sr-only">The latest changes of @de?.Display</caption>
+                    <thead><tr><th scope="col">Time (@Tz.Label())</th><th scope="col">Value</th><th scope="col" class="mat-hide-sm">Before</th><th scope="col" class="mat-hide-sm">Source</th></tr></thead>
+                    <tbody>
+                    @foreach (var h in Model.History)
+                    {
+                        <tr>
+                            <td data-label="Time" class="mat-mono mat-nowrap">@Tz.Format(h.Time)</td>
+                            <td data-label="Value" class="mat-mono">@h.Value</td>
+                            <td data-label="Before" class="mat-hide-sm mat-mono mat-muted">@(h.Previous ?? "–")</td>
+                            <td data-label="Source" class="mat-hide-sm mat-muted">@(h.Source ?? "–")</td>
+                        </tr>
+                    }
+                    @if (Model.History.Count == 0)
+                    {
+                        <tr><td colspan="4" class="mat-muted">Not written yet.</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </section>
     }
 }

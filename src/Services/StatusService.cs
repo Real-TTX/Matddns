@@ -7,10 +7,12 @@ public class StatusService
 {
     private readonly ConfigService _config;
     private readonly LogService _log;
-    public StatusService(ConfigService config, LogService log)
+    private readonly HistoryService _history;
+    public StatusService(ConfigService config, LogService log, HistoryService history)
     {
         _config = config;
         _log = log;
+        _history = history;
     }
 
     // "on change", "every 300s", "on change + every 300s", or "manual"
@@ -89,7 +91,7 @@ public class StatusService
         var sourceErrors = allEntries.Count(e => e.Error != null);
         var ruleIssues = rules.Count(r => r.Issue);
 
-        var updates = _log.EntriesOfLevel(LogLevel.Update, 1000);
+        var updates = _history.All();
         var errors24h = _log.EntriesOfLevel(LogLevel.Error, 1000).Count(e => e.Timestamp >= now.AddHours(-24));
 
         return new StatusSnapshot
@@ -114,20 +116,24 @@ public class StatusService
             IpChanges = new IpChangeStats
             {
                 Total = updates.Count,
-                Last24h = updates.Count(e => e.Timestamp >= now.AddHours(-24)),
-                Last7d = updates.Count(e => e.Timestamp >= now.AddDays(-7)),
-                LastChange = updates.Count > 0 ? updates[0].Timestamp : null,
+                Last24h = updates.Count(e => e.Time >= now.AddHours(-24)),
+                Last7d = updates.Count(e => e.Time >= now.AddDays(-7)),
+                LastChange = updates.Count > 0 ? updates[0].Time : null,
                 Recent = updates.Take(recentChanges).Select(e => new IpChangeItem
                 {
-                    Time = e.Timestamp,
-                    Target = e.Source.StartsWith("rule:", StringComparison.Ordinal) ? e.Source[5..] : e.Source,
-                    Detail = e.Message
+                    Time = e.Time,
+                    Target = $"{e.Type} {e.Record}",
+                    Detail = Describe(e)
                 }).ToList()
             },
             SourceList = sources,
             RuleList = rules
         };
     }
+
+    /// <summary>"203.0.113.7, was 203.0.113.6, from Office · WAN1": one change in words.</summary>
+    public static string Describe(IpChange c)
+        => c.Value + (c.Previous != null ? $", was {c.Previous}" : "") + (c.Source != null ? $", from {c.Source}" : "");
 
     /// <summary>The values of the platform overview (see <see cref="OverviewStatus"/>).</summary>
     public OverviewStatus Overview()

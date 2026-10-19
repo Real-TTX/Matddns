@@ -8,7 +8,15 @@ namespace Matddns.Pages.Rules;
 public class DynamicModel : PageModel
 {
     private readonly ConfigService _config;
-    public DynamicModel(ConfigService config) => _config = config;
+    private readonly HistoryService _history;
+    public DynamicModel(ConfigService config, HistoryService history)
+    {
+        _config = config;
+        _history = history;
+    }
+
+    /// <summary>The latest records this receiver wrote, newest first.</summary>
+    public IReadOnlyList<IpChange> History { get; private set; } = [];
 
     public Rule? RuleItem { get; private set; }
     public bool IsNew => RuleItem == null;
@@ -31,7 +39,8 @@ public class DynamicModel : PageModel
         if (!string.IsNullOrEmpty(id))
         {
             RuleItem = _config.Current.Rules.FirstOrDefault(r => r.Id == id && r.Dynamic);
-            if (RuleItem == null) { Error = "Dynamic rule not found"; return RedirectToPage("Index"); }
+            if (RuleItem == null) { Error = "Dynamic rule not found."; return RedirectToPage("Index"); }
+            History = _history.OfRule(RuleItem.Id);
         }
         return Page();
     }

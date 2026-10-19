@@ -9,10 +9,12 @@ public class EditModel : PageModel
 {
     private readonly ConfigService _config;
     private readonly SourceResolver _resolver;
-    public EditModel(ConfigService config, SourceResolver resolver)
+    private readonly HistoryService _history;
+    public EditModel(ConfigService config, SourceResolver resolver, HistoryService history)
     {
         _config = config;
         _resolver = resolver;
+        _history = history;
     }
 
     public Rule? RuleItem { get; private set; }
@@ -32,6 +34,9 @@ public class EditModel : PageModel
         AllSources = cfg.Sources.ToList();
         SourceLookup = _resolver.AllEntries(cfg).ToDictionary(r => r.Entry.Id);
     }
+
+    /// <summary>The latest changes of the record of this rule, newest first.</summary>
+    public IReadOnlyList<IpChange> History { get; private set; } = [];
 
     public bool HasAnyRecord => AllDomains.SelectMany(d => d.Entries).Any();
 
@@ -54,7 +59,8 @@ public class EditModel : PageModel
         if (!string.IsNullOrEmpty(id))
         {
             RuleItem = _config.Current.Rules.FirstOrDefault(r => r.Id == id);
-            if (RuleItem == null) { Error = "Rule not found"; return RedirectToPage("Index"); }
+            if (RuleItem == null) { Error = "Rule not found."; return RedirectToPage("Index"); }
+            if (TargetEntry is { } entry) History = _history.Of(entry.Hostname, entry.Type.ToString());
         }
         return Page();
     }
