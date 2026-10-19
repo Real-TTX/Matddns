@@ -26,8 +26,7 @@ Kept as decided: `/api/health` answers 200 when degraded (`?strict=1` = 503); an
 `/api/v1` and the peer endpoints are unchanged (the pinning tests pass); the IP-change counts of `/api/health` and `/api/state` now come
 from the history, same JSON shape.
 
-Not changed, worth knowing: the management API has no rate limit on wrong keys (key compared in constant time; Mattiverse calls it often).
-The screenshots in `docs/images` still show the dashboard with the Domains table.
+Done after the review: mail through MatSMTP, notifications for sources, a limit for wrong keys and new screenshots (see "Done" below).
 
 ## Gaps against ddns-updater / ddclient
 
@@ -40,26 +39,31 @@ The screenshots in `docs/images` still show the dashboard with the Domains table
 | History of IP changes | **done** | `history.jsonl` (value, before, source), rule and dynamic-rule pages, dashboard |
 | Update only on change | has | Same value and source = no write; no drift check against the live DNS (see plan) |
 | Retry / backoff | **done** | 30 s doubling to 30 min per rule, next try shown, reset on save |
-| Notifications | **done** | E-mail (SMTP, MATSMTP-shaped), webhook JSON / ntfy / Gotify; change, failure, recovery |
+| Notifications | **done** | E-mail (own SMTP or MatSMTP), webhook JSON / ntfy / Gotify; change, failure, recovery of records and of sources |
 | Web UI with the state of every record | has | |
 | Health endpoint | has | `/healthz`, `/api/health` (+ `?strict=1`), platform contract |
 | Config import / export | **done** | System → Backup |
 | Dynamic hostnames (one token, many records) | **done (extended)** | Was Netcup only; now every zone-based provider |
 | Drift check (compare with what DNS answers) | missing | |
-| Notifications for sources (a WAN down) | missing | Only records are reported |
+| Notifications for sources (a WAN down) | **done** | Once at the first failure of a source entry, once on its recovery |
 | Shoutrrr-style targets (Telegram, Discord, Pushover …) | partly | Reachable through the JSON webhook or ntfy/Gotify relays |
+
+## Done (after the review)
+
+| Item | What |
+|---|---|
+| Mail through MatSMTP | MatPlatform 1.3.0; with `MATSMTP_*` set, `NotificationService.EffectiveMail()` takes server, port, security, user, password and sender from `MatSmtpSettings`. System → Notifications shows the `Describe` sentence and the server fields disabled (nothing saved, password never shown); `/api/configure` now carries the notification settings and marks the server fields `fixed` (`Fix()`, a change is `400`). On/off and the recipients stay editable. README and compose name the six variables |
+| Notifications for sources | A polled source entry that starts failing sends one `source-failure`, its recovery one `source-recovery` (same channels; switch *A source fails*, `notifyOnSource`) |
+| Wrong keys | `/api/v1` and `/api/state`, `/api/configure`, `/api/actions`: after 10 `401` per address and minute the address gets `429` (`Retry-After`) for the rest of the minute; a valid key or token is never limited; the pinned answers are unchanged |
+| Screenshots | All of `docs/images` taken again (dashboard without the Domains table, rule page, phone), plus `history.png` and `notifications.png` |
 
 ## Plan (what is left)
 
 | Priority | Item | Effort |
 |---|---|---|
-| 1 | Mail through MatSMTP: read `MATSMTP_*` (MatPlatform `MatSmtpSettings`, needs the newer MatPlatform copy) in `NotificationService.EffectiveMail()` and show the fields as fixed | S |
-| 2 | Drift check: resolve the record (or ask the provider) every N hours and rewrite when it differs | M |
-| 3 | More native APIs where a DynDNS URL is not enough: DigitalOcean, Porkbun, deSEC token API, IONOS, Gandi | M each |
-| 4 | Notify when a source entry fails or comes back (WAN down), with a quiet time | S |
-| 5 | Rate limit for wrong keys on `/api/v1` (a separate, generous partition so Mattiverse is never throttled) | S |
-| 6 | New screenshots in `docs/images` | S |
-| 7 | History as a chart per record (changes per day) | M |
+| 1 | Drift check: resolve the record (or ask the provider) every N hours and rewrite when it differs | M |
+| 2 | More native APIs where a DynDNS URL is not enough: DigitalOcean, Porkbun, deSEC token API, IONOS, Gandi | M each |
+| 3 | History as a chart per record (changes per day) | M |
 
 Dropped:
 
