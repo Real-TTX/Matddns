@@ -16,7 +16,7 @@ to the first reachable source. One container, no cloud, no third-party services.
 
 </div>
 
-![The dashboard with health, sources, rules and recent changes](docs/images/dashboard.png)
+![The dashboard: health tiles, the sources, the rules with their failover order and the recent IP changes](docs/images/dashboard.png)
 
 ---
 
@@ -51,7 +51,7 @@ its IP into Matddns just like it would to any DynDNS provider.
 - **Failover rules**: a record is bound to an ordered list of sources; the first reachable wins
 - **Reachability validation**: a source counts only if its IP answers a **ping** or a **TCP-port** check
 - **History and notifications**: every change of a record is kept (value, before, source); e-mail or a webhook (JSON, ntfy, Gotify)
-  on a new IP, a failed update and the recovery; failed updates are retried with a growing wait
+  on a new IP, a failed update, a failing source and each recovery; failed updates are retried with a growing wait
 - **Backup**: export and import of the whole configuration
 - **Dual-stack**: every source carries an optional IPv4 and IPv6 (IPv6-only works too)
 - **Multi-user login** with **rate-limited sign-in**, a per-install **time zone**, an adjustable
@@ -67,7 +67,7 @@ its IP into Matddns just like it would to any DynDNS provider.
 
 ### Sources – every WAN and its current IP
 
-![The sources list, grouped by source with one row per WAN](docs/images/sources.png)
+![The sources list with the current IPv4 and IPv6 of each source and its state](docs/images/sources.png)
 
 Each source keeps its current IPv4 and IPv6. UniFi WANs (and cloud gateways) appear
 automatically, one row per WAN including LTE failover.
@@ -79,11 +79,25 @@ automatically, one row per WAN including LTE failover.
 A rule links one DNS record to an ordered list of sources. The first reachable one wins;
 ping/TCP validation and the check interval are set per rule.
 
-### Domains and the dashboard
+### History – every IP a record had
+
+![The history of a record: time, new value, the value before and the source it came from](docs/images/history.png)
+
+Every change of a record is kept with the value before and the source it came from, on the rule page and as
+*Recent IP changes* on the dashboard.
+
+### Notifications – mail and webhooks
+
+![System, Notifications: when to tell, e-mail over SMTP and a webhook in ntfy format](docs/images/notifications.png)
+
+*System → Notifications* sends a message when a record gets a new IP, fails or works again, and when a source fails or
+works again, by e-mail and/or a webhook (JSON, ntfy, Gotify). With MatSMTP the server fields are fixed (see [Notifications](#notifications)).
+
+### Domains and the system settings
 
 | Domains | System |
 |---|---|
-| ![The domains list grouped by zone](docs/images/domains.png) | ![The system settings tabs](docs/images/system.png) |
+| ![The domain groups with their provider and records](docs/images/domains.png) | ![The system settings: general, notifications, backup and API tabs](docs/images/system.png) |
 
 Domains group your records per provider zone; System holds the general settings and the API
 docs, Users and Log sit next to it under Administration.
