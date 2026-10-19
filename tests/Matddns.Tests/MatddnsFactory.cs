@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Matddns.Models;
 using Matddns.Services;
+using Matddns.Api;
 using MatPlatform;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -38,14 +39,16 @@ public class MatddnsFactory : WebApplicationFactory<Program>
     private readonly string? _authority;
     private readonly bool _reachable;
     private readonly IReadOnlyDictionary<string, string>? _smtp;
+    private readonly bool _keyLimit;
 
     public MatddnsFactory()
         : this(platformKey: true, engineKey: true, authority: null)
     {
     }
 
-    protected MatddnsFactory(bool platformKey, bool engineKey, string? authority, bool reachable = true, IReadOnlyDictionary<string, string>? smtp = null)
+    protected MatddnsFactory(bool platformKey, bool engineKey, string? authority, bool reachable = true, IReadOnlyDictionary<string, string>? smtp = null, bool keyLimit = false)
     {
+        _keyLimit = keyLimit;
         _smtp = smtp;
         _platformKey = platformKey;
         _engineKey = engineKey;
@@ -86,6 +89,8 @@ public class MatddnsFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IHostedService>();
+            // The test classes share one address and send wrong keys on purpose: only KeyLimitFactory has the real limit of wrong keys.
+            if (!_keyLimit) services.Replace(ServiceDescriptor.Singleton(new KeyFailureLimiter(100_000)));
 
             if (_authority is not null && _reachable)
             {

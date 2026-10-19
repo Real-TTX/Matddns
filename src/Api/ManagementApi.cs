@@ -35,9 +35,7 @@ public static class ManagementApi
 
     public static void MapManagementApi(this WebApplication app)
     {
-        var configured = Environment.GetEnvironmentVariable("MATDDNS_API_KEY");
-        if (string.IsNullOrWhiteSpace(configured)) configured = app.Configuration["Matddns:ApiKey"];
-        var apiKey = string.IsNullOrWhiteSpace(configured) ? null : configured.Trim();
+        var apiKey = EngineKey(app.Configuration);
         app.Logger.LogInformation("Management API (/api/v1): {State}",
             apiKey == null ? "disabled - set MATDDNS_API_KEY to enable it" : "enabled");
 
@@ -131,7 +129,15 @@ public static class ManagementApi
     }
 
     /// <summary>Constant-time comparison (hashes first, so the key length does not leak either).</summary>
-    private static bool KeyEquals(string expected, string? provided)
+    /// <summary>The key of the management API: <c>MATDDNS_API_KEY</c>, else the config key <c>Matddns:ApiKey</c>; null = the API is disabled.</summary>
+    internal static string? EngineKey(IConfiguration configuration)
+    {
+        var configured = Environment.GetEnvironmentVariable("MATDDNS_API_KEY");
+        if (string.IsNullOrWhiteSpace(configured)) configured = configuration["Matddns:ApiKey"];
+        return string.IsNullOrWhiteSpace(configured) ? null : configured.Trim();
+    }
+
+    internal static bool KeyEquals(string expected, string? provided)
     {
         if (string.IsNullOrEmpty(provided)) return false;
         return CryptographicOperations.FixedTimeEquals(

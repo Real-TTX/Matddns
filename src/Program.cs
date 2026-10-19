@@ -67,6 +67,8 @@ builder.Services.AddSingleton<NotificationService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<NotificationService>());
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<UserService>();
+// Wrong keys on /api/v1 and the key part of /api: 429 after 10 per minute and address (a valid key is never limited).
+builder.Services.AddSingleton(new KeyFailureLimiter());
 
 // The Mat platform contract (MatDesign docs/PLATFORM.md): /api, /api/health, /api/state, /api/configure, /api/actions/{id}.
 // Its key is MAT_API_KEY; without it the engine key (MATDDNS_API_KEY, config Matddns:ApiKey) opens /api too, so a caller that has
@@ -190,6 +192,7 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
+app.UseKeyFailureLimit();
 // An anonymous GET /api/state is a monitor: it gets the old monitoring state (see MonitoringCompatibility).
 app.UseMonitoringState();
 app.MapRazorPages();

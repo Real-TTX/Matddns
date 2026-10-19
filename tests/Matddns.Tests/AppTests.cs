@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text.RegularExpressions;
+using Matddns.Api;
 using MatPlatform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -73,7 +74,11 @@ public sealed class AppFactory : WebApplicationFactory<Program>
     {
         SetEnvironment(); // again: another factory may have changed them since this one was created
         builder.ConfigureLogging(logging => logging.AddProvider(Logs));
-        builder.ConfigureTestServices(services => services.RemoveAll<IHostedService>()); // no polling of external services
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IHostedService>(); // no polling of external services
+            services.Replace(ServiceDescriptor.Singleton(new KeyFailureLimiter(100_000))); // wrong keys on purpose (KeyLimitTests has the real limit)
+        });
     }
 
     protected override void Dispose(bool disposing)

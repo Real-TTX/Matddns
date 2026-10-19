@@ -384,7 +384,9 @@ records) and **rules**. Whatever the API writes is visible and editable in the U
       - MATDDNS_API_KEY=<a long random string>      # or the config key Matddns:ApiKey
 ```
 
-Every request carries the key in the **`X-Api-Key`** header (compared in constant time). A missing or wrong key is `401`.
+Every request carries the key in the **`X-Api-Key`** header (compared in constant time). A missing or wrong key is `401`; after
+10 of them within a minute the address gets `429` (with `Retry-After`, the same `{"error": …}` shape) for the rest of that minute,
+here and on the key part of the platform API (`/api/state`, `/api/configure`, `/api/actions`). A valid key is never limited.
 The login cookie is ignored, and the API paths are never redirected to the login page. Bodies and answers are JSON in the same
 camelCase as `config.json`; errors are `{"error": "..."}` with `400` (invalid input), `404`, `409` (conflict) or `500`.
 
@@ -589,7 +591,7 @@ accent (`theme-color`); on iOS the installed app keeps the standard status bar, 
   DataProtection keys in `/data/keys`
 - Passwords hashed with **PBKDF2-SHA256** (600,000 iterations; older hashes are upgraded on the next
   login, minimum length 8). Changing a password or deleting a user ends that account's sessions.
-- Per-IP **rate limiting** on the login page, the push endpoints and the monitoring API; request URLs
+- Per-IP **rate limiting** on the login page, the push endpoints, the monitoring API and wrong keys on `/api/v1` and `/api/*`; request URLs
   (which carry tokens) are kept out of the application log
 - Docker (`mcr.microsoft.com/dotnet/aspnet:10.0`, non-root, `tzdata` for time zones, `HEALTHCHECK` on `/api/health`)
 - Tests: `dotnet test Matddns.slnx` (xunit: unit tests plus the whole app in memory: the pages, the platform API, the old monitoring
