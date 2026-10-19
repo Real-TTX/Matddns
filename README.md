@@ -50,6 +50,9 @@ its IP into Matddns just like it would to any DynDNS provider.
 **Failover, dual-stack, operations**
 - **Failover rules**: a record is bound to an ordered list of sources; the first reachable wins
 - **Reachability validation**: a source counts only if its IP answers a **ping** or a **TCP-port** check
+- **History and notifications**: every change of a record is kept (value, before, source); e-mail or a webhook (JSON, ntfy, Gotify)
+  on a new IP, a failed update and the recovery; failed updates are retried with a growing wait
+- **Backup**: export and import of the whole configuration
 - **Dual-stack**: every source carries an optional IPv4 and IPv6 (IPv6-only works too)
 - **Multi-user login** with **rate-limited sign-in**, a per-install **time zone**, an adjustable
   **log level** with retention, and an optional **read-only public dashboard**
