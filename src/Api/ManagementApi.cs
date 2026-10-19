@@ -523,6 +523,7 @@ public static class ManagementApi
                 if (Secret(s, "updateUrl") is { } url) d.UpdateUrl = url;
                 if (Secret(s, "username") is { } user) d.Username = user;
                 if (Secret(s, "password") is { } pass) d.Password = pass;
+                if (d.UpdateUrl.Length > 0) RequireUrl(d.UpdateUrl, "dynDns.updateUrl");
                 break;
             }
             case DomainKind.Cloudflare:

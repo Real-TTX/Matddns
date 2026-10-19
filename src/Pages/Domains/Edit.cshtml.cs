@@ -12,18 +12,16 @@ public class EditModel : PageModel
 
     public DomainGroup? Group { get; private set; }
     public bool IsNew => Group == null;
-    public string BaseUrl { get; private set; } = "";
 
     [TempData] public string? Notice { get; set; }
     [TempData] public string? Error { get; set; }
 
     public IActionResult OnGet(string? id)
     {
-        BaseUrl = $"{Request.Scheme}://{Request.Host}";
         if (!string.IsNullOrEmpty(id))
         {
             Group = _config.Current.Domains.FirstOrDefault(g => g.Id == id);
-            if (Group == null) { Error = "Group not found"; return RedirectToPage("Index"); }
+            if (Group == null) { Error = "Domain group not found."; return RedirectToPage("Index"); }
         }
         return Page();
     }
@@ -36,7 +34,8 @@ public class EditModel : PageModel
         string? GdKey = null, string? GdSecret = null, bool GdAllowDynamic = false,
         string? MdUrl = null, string? MdToken = null)
     {
-        if (string.IsNullOrWhiteSpace(Name)) { Error = "Name missing"; return RedirectToPage("Edit"); }
+        if (string.IsNullOrWhiteSpace(Name)) { Error = "Enter a name."; return RedirectToPage("Edit"); }
+        if (InvalidUrl(Kind, DynUrl, MdUrl) is { } badUrl) { Error = badUrl; return RedirectToPage("Edit"); }
 
         var g = new DomainGroup { Name = Name.Trim(), Kind = Kind };
         if (Kind == DomainKind.DynDns)
@@ -53,7 +52,7 @@ public class EditModel : PageModel
             g.Netcup = new NetcupSettings { CustomerNumber = NcCustomer ?? "", ApiKey = NcKey ?? "", ApiPassword = NcPass ?? "", AllowDynamic = NcAllowDynamic };
 
         _config.Mutate(c => c.Domains.Add(g));
-        Notice = "Group created – now add records";
+        Notice = "Created. Add the records below.";
         return RedirectToPage("Edit", new { id = g.Id });
     }
 
@@ -65,6 +64,9 @@ public class EditModel : PageModel
         string? GdKey = null, string? GdSecret = null, bool GdAllowDynamic = false,
         string? MdUrl = null, string? MdToken = null)
     {
+        var storedKind = _config.Read(c => c.Domains.FirstOrDefault(x => x.Id == Id)?.Kind);
+        if (storedKind is { } k && InvalidUrl(k, DynUrl, MdUrl) is { } badUrl) { Error = badUrl; return RedirectToPage("Edit", new { id = Id }); }
+
         _config.Mutate(c =>
         {
             var g = c.Domains.FirstOrDefault(x => x.Id == Id);
@@ -115,6 +117,14 @@ public class EditModel : PageModel
         return RedirectToPage("Edit", new { id = Id });
     }
 
+    // Error message if the address this kind of group calls is not an http(s) URL, otherwise null.
+    private static string? InvalidUrl(DomainKind kind, string? dynUrl, string? mdUrl) => kind switch
+    {
+        DomainKind.DynDns when !InputCheck.IsHttpUrl(dynUrl) => "Enter the update URL, for example https://example.org/nic/update?hostname={hostname}&myip={ipv4}.",
+        DomainKind.Matddns when !InputCheck.IsHttpUrl(mdUrl) => "Enter the address of the peer, for example https://dyndns.example.com.",
+        _ => null
+    };
+
     public IActionResult OnPostDelete(string Id)
     {
         _config.Mutate(c =>
@@ -122,7 +132,7 @@ public class EditModel : PageModel
             c.Domains.RemoveAll(g => g.Id == Id);
             c.Rules.RemoveAll(r => r.DomainGroupId == Id);
         });
-        Notice = "Group removed";
+        Notice = "Domain group deleted.";
         return RedirectToPage("Index");
     }
 
@@ -130,7 +140,7 @@ public class EditModel : PageModel
         string? Hostname, string? RecordName, string? DomainZone)
     {
         var group = _config.Read(c => c.Domains.FirstOrDefault(x => x.Id == Id));
-        if (group == null) { Error = "Group not found"; return RedirectToPage("Index"); }
+        if (group == null) { Error = "Domain group not found."; return RedirectToPage("Index"); }
 
         string fqdn;
         string? rec = null;
@@ -140,15 +150,17 @@ public class EditModel : PageModel
         {
             zone = (DomainZone ?? "").Trim().TrimEnd('.');
             rec = string.IsNullOrWhiteSpace(RecordName) ? "@" : RecordName.Trim().TrimEnd('.');
-            if (string.IsNullOrEmpty(zone)) { Error = "Domain/zone missing (e.g. example.com)"; return RedirectToPage("Edit", new { id = Id }); }
+            if (!InputCheck.IsHostname(zone)) { Error = "Enter the zone, for example example.com."; return RedirectToPage("Edit", new { id = Id }); }
             fqdn = (rec is "@" or "*" or "") ? zone : $"{rec}.{zone}";
         }
         else
         {
             fqdn = (Hostname ?? "").Trim().TrimEnd('.');
-            if (string.IsNullOrEmpty(fqdn)) { Error = "Hostname (FQDN) missing"; return RedirectToPage("Edit", new { id = Id }); }
             if (Type == DnsRecordType.CNAME) Type = DnsRecordType.A; // DynDNS cannot set CNAME
         }
+        if (!InputCheck.IsHostname(fqdn)) { Error = $"'{fqdn}' is not a valid hostname, for example home.example.com."; return RedirectToPage("Edit", new { id = Id }); }
+        if (group.Entries.Any(e => e.Type == Type && e.Hostname.Equals(fqdn, StringComparison.OrdinalIgnoreCase)))
+        { Error = $"{fqdn} ({Type}) is already in this group."; return RedirectToPage("Edit", new { id = Id }); }
 
         _config.Mutate(c =>
         {

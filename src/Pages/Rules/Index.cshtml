@@ -60,6 +60,7 @@
                     }
 
                     var sourceIds = r.SourceEntryIdsInOrder;
+                    var recordType = Model.TargetEntry(r)?.Type.ToString() ?? "A";
                     var triggerText = (r.OnChange, r.IntervalSeconds > 0) switch
                     {
                         (true, true) => $"on change, every {r.IntervalSeconds} s",
@@ -67,8 +68,8 @@
                         (false, true) => $"every {r.IntervalSeconds} s",
                         _ => "manual"
                     };
-                    var activeLabel = !string.IsNullOrEmpty(r.LastUsedSourceId) && Model.SourceLookup.TryGetValue(r.LastUsedSourceId, out var av)
-                        ? av.Entry.Label
+                    var activeLabel = !string.IsNullOrEmpty(r.LastUsedSourceId) && Model.SourceLookup.ContainsKey(r.LastUsedSourceId)
+                        ? Model.SourceLabel(r.LastUsedSourceId)
                         : (sourceIds.Count > 0 ? Model.SourceLabel(sourceIds[0]) : null);
                     <tr class="md-parent @(sourceIds.Count > 0 ? "has-children" : "")">
                         <td data-label="Record"><div class="mat-table__name"><a class="mat-mono" href="/Rules/Edit?id=@r.Id">@Model.RecordText(r)</a><partial name="_ManagedBadge" model="r.ManagedBy" /></div></td>
@@ -88,7 +89,7 @@
                             var sid = sourceIds[i];
                             var resolved = Model.SourceLookup.TryGetValue(sid, out var rv) ? rv : null;
                             var label = resolved?.Entry.Label ?? "(unknown source)";
-                            var sip = resolved?.Entry.CurrentIp ?? resolved?.Entry.CurrentIpv6;
+                            var sip = RecordAddress.For(recordType, resolved?.Entry.CurrentIp, resolved?.Entry.CurrentIpv6);
                             var hasIp = !string.IsNullOrEmpty(sip);
                             var isActive = r.Enabled && sid == r.LastUsedSourceId;
                             var childState = isActive ? "ok" : (hasIp ? "none" : "warn");
@@ -122,6 +123,6 @@
 
     <div class="mat-actions">
         <a href="/Rules/Edit" class="mat-btn mat-btn--primary"><icon name="plus" /><span>New rule</span></a>
-        <a href="/Rules/Dynamic" class="mat-btn mat-btn--secondary"><icon name="plus" /><span>Dynamic rule</span></a>
+        <a href="/Rules/Dynamic" class="mat-btn mat-btn--secondary"><icon name="plus" /><span>New dynamic rule</span></a>
     </div>
 </div>

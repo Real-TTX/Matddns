@@ -49,7 +49,7 @@ public class EditModel : PageModel
         {
             var cfg = _config.Current;
             Group = cfg.Sources.FirstOrDefault(g => g.Id == id);
-            if (Group == null) { Error = "Group not found"; return RedirectToPage("Index"); }
+            if (Group == null) { Error = "Source not found."; return RedirectToPage("Index"); }
             DynamicRule = cfg.Rules.FirstOrDefault(r => r.Dynamic && r.DynamicSourceId == id);
 
             if (Group.Kind == SourceKind.UnifiCloud && !string.IsNullOrWhiteSpace(Group.UnifiCloud?.ApiKey))
@@ -72,7 +72,8 @@ public class EditModel : PageModel
         string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false,
         string? UcKey = null, string? MdUrl = null, string? MdToken = null)
     {
-        if (string.IsNullOrWhiteSpace(Name)) { Error = "Name missing"; return RedirectToPage("Edit"); }
+        if (string.IsNullOrWhiteSpace(Name)) { Error = "Enter a name."; return RedirectToPage("Edit"); }
+        if (InvalidUrl(Kind, UniUrl, FbUrl, MdUrl) is { } badUrl) { Error = badUrl; return RedirectToPage("Edit"); }
 
         var g = new SourceGroup
         {
@@ -155,6 +156,20 @@ public class EditModel : PageModel
         return RedirectToPage("Edit", new { id = g.Id });
     }
 
+    // Error message if the address this kind of source calls is not an http(s) URL, otherwise null (an empty FRITZ!Box address is the default one).
+    private static string? InvalidUrl(SourceKind kind, string? uniUrl, string? fbUrl, string? mdUrl) => kind switch
+    {
+        SourceKind.Unifi when !InputCheck.IsHttpUrl(uniUrl) => "Enter the address of the UniFi console, for example https://192.168.1.1.",
+        SourceKind.Fritzbox when !string.IsNullOrWhiteSpace(fbUrl) && !InputCheck.IsHttpUrl(fbUrl) => "Enter the address of the FRITZ!Box, for example http://fritz.box:49000.",
+        SourceKind.Matddns when !InputCheck.IsHttpUrl(mdUrl) => "Enter the address of the peer, for example https://dyndns.example.com.",
+        _ => null
+    };
+
+    private static void RequireUrl(string url)
+    {
+        if (!InputCheck.IsHttpUrl(url)) throw new InvalidOperationException($"'{url}' is not an http(s) address.");
+    }
+
     // Error message if a non-empty static address isn't a valid IPv4 / IPv6 address, otherwise null.
     private static string? InvalidStaticAddress(string ipv4, string ipv6)
     {
@@ -182,7 +197,9 @@ public class EditModel : PageModel
         string? FbUrl = null, string? FbUser = null, string? FbPass = null, bool FbIgnoreCert = false,
         string? UcKey = null, string? MdUrl = null, string? MdToken = null)
     {
-        if (_config.Read(c => c.Sources.FirstOrDefault(x => x.Id == Id)?.Kind) == SourceKind.Static)
+        var storedKind = _config.Read(c => c.Sources.FirstOrDefault(x => x.Id == Id)?.Kind);
+        if (storedKind is { } k && InvalidUrl(k, UniUrl, FbUrl, MdUrl) is { } badUrl) { Error = badUrl; return RedirectToPage("Edit", new { id = Id }); }
+        if (storedKind == SourceKind.Static)
         {
             var invalid = InvalidStaticAddress((StaticIp ?? "").Trim(), (StaticIpv6 ?? "").Trim());
             if (invalid != null) { Error = invalid; return RedirectToPage("Edit", new { id = Id }); }
@@ -264,31 +281,15 @@ public class EditModel : PageModel
             foreach (var r in c.Rules)
                 r.SourceEntryIdsInOrder.RemoveAll(id => entryIds.Contains(id));
         });
-        Notice = "Source group removed";
+        Notice = "Source deleted.";
         return RedirectToPage("Index");
-    }
-
-    public IActionResult OnPostAddEntry(string Id, string Label, string InterfaceName)
-    {
-        if (string.IsNullOrWhiteSpace(Label) || string.IsNullOrWhiteSpace(InterfaceName))
-        {
-            Error = "Label and interface required";
-            return RedirectToPage("Edit", new { id = Id });
-        }
-        _config.Mutate(c =>
-        {
-            var g = c.Sources.FirstOrDefault(x => x.Id == Id);
-            g?.Entries.Add(new SourceEntry { Label = Label.Trim(), InterfaceName = InterfaceName.Trim() });
-        });
-        Notice = "Entry added";
-        return RedirectToPage("Edit", new { id = Id });
     }
 
     public async Task<IActionResult> OnPostAddGatewayAsync(string Id, string HostId, string? Alias, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(HostId)) { Error = "No gateway selected"; return RedirectToPage("Edit", new { id = Id }); }
+        if (string.IsNullOrWhiteSpace(HostId)) { Error = "Select a gateway."; return RedirectToPage("Edit", new { id = Id }); }
         var g = _config.Current.Sources.FirstOrDefault(x => x.Id == Id);
-        if (g == null) { Error = "Group not found"; return RedirectToPage("Index"); }
+        if (g == null) { Error = "Source not found."; return RedirectToPage("Index"); }
         if (g.Entries.Any(e => e.InterfaceName == HostId)) { Notice = "Gateway already added"; return RedirectToPage("Edit", new { id = Id }); }
 
         // resolve the current name + IP so the entry shows immediately; the updater keeps the IP fresh afterwards
@@ -351,7 +352,7 @@ public class EditModel : PageModel
         string? MdUrl = null, string? MdToken = null)
     {
         var g = _config.Current.Sources.FirstOrDefault(x => x.Id == Id);
-        if (g == null) { Error = "Group not found"; return RedirectToPage("Index"); }
+        if (g == null) { Error = "Source not found."; return RedirectToPage("Index"); }
 
         try
         {
@@ -366,6 +367,7 @@ public class EditModel : PageModel
                     Password = string.IsNullOrEmpty(UniPass) ? (g.Unifi?.Password ?? "") : UniPass,
                     IgnoreCertificate = UniIgnoreCert
                 };
+                RequireUrl(probe.BaseUrl);
                 var wans = await _unifi.GetWansAsync(probe, ct);
                 if (wans.Count == 0)
                 {
@@ -398,6 +400,7 @@ public class EditModel : PageModel
                     Password = string.IsNullOrEmpty(FbPass) ? (g.Fritzbox?.Password ?? "") : FbPass,
                     IgnoreCertificate = FbIgnoreCert
                 };
+                RequireUrl(probe.BaseUrl);
                 var w = await _fritz.GetWanAsync(probe, ct);
                 TestOk = w.Ipv4 != null || w.Ipv6 != null;
                 TestResult = TestOk ? $"OK – WAN {string.Join(" / ", new[] { w.Ipv4, w.Ipv6 }.Where(x => x != null))}" : "Connected, but no WAN IP returned.";
@@ -409,6 +412,7 @@ public class EditModel : PageModel
                     BaseUrl = string.IsNullOrWhiteSpace(MdUrl) ? (g.Matddns?.BaseUrl ?? "") : MdUrl.Trim(),
                     Token = string.IsNullOrWhiteSpace(MdToken) ? (g.Matddns?.Token ?? "") : MdToken.Trim()
                 };
+                RequireUrl(probe.BaseUrl);
                 var remote = await _matddns.PullAsync(probe, ct);
                 TestOk = remote.Count > 0;
                 TestResult = remote.Count == 0

@@ -48,7 +48,7 @@
                 <mat-field label="Provider preset" for-id="dynProvider" full="true">
                     <select id="dynProvider" class="mat-select" data-url-preset="#dynUrlInput">
                         <option value="">Custom / manual</option>
-                        @foreach (var p in DynDnsPresets.All(Model.BaseUrl))
+                        @foreach (var p in DynDnsPresets.All)
                         {
                             <option value="@p.Key" data-url="@p.Url">@p.Label</option>
                         }

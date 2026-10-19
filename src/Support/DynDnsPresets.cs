@@ -5,10 +5,8 @@ public static class DynDnsPresets
 {
     public sealed record Preset(string Key, string Label, string Url);
 
-    /// <param name="baseUrl">The address of this instance, for the preset that lets another Matddns feed it.</param>
-    public static IReadOnlyList<Preset> All(string baseUrl) =>
+    public static IReadOnlyList<Preset> All { get; } =
     [
-        new("matddns", "Matddns (another instance)", $"{baseUrl}/api/update?token={{password}}&ipv4={{ipv4}}&ipv6={{ipv6}}"),
         new("changeip", "ChangeIP", "https://nic.changeip.com/nic/update?hostname={hostname}&myip={ipv4}"),
         new("ddnss", "DDNSS.de", "https://www.ddnss.de/upd.php?key={password}&host={hostname}&ip={ipv4}&ip6={ipv6}"),
         new("desec", "deSEC", "https://update.dedyn.io/?hostname={hostname}&myipv4={ipv4}&myipv6={ipv6}"),

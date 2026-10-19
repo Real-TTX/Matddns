@@ -39,7 +39,8 @@ public class DynamicModel : PageModel
     public IActionResult OnPostCreate(string DynamicSourceId, string DomainGroupId, string DynamicZone, string? DynamicPrefix)
     {
         if (string.IsNullOrWhiteSpace(DynamicSourceId) || string.IsNullOrWhiteSpace(DomainGroupId) || string.IsNullOrWhiteSpace(DynamicZone))
-        { Error = "Receiver, target zone and zone are required"; return RedirectToPage("Dynamic"); }
+        { Error = "Select the receiver and the Netcup account, and enter the zone."; return RedirectToPage("Dynamic"); }
+        if (InvalidNames(DynamicZone, DynamicPrefix) is { } bad) { Error = bad; return RedirectToPage("Dynamic"); }
 
         var rule = new Rule
         {
@@ -56,8 +57,17 @@ public class DynamicModel : PageModel
         return RedirectToPage("Dynamic", new { id = rule.Id });
     }
 
+    // Error message if the zone or the prefix is not a DNS name, otherwise null.
+    private static string? InvalidNames(string? zone, string? prefix)
+    {
+        if (!InputCheck.IsHostname(zone)) return "Enter the zone, for example example.com.";
+        if (!string.IsNullOrWhiteSpace(prefix) && !InputCheck.IsHostname(prefix.Trim('.'))) return "The prefix may only hold letters, digits, '-' and dots.";
+        return null;
+    }
+
     public IActionResult OnPostSave(string Id, bool Enabled, string? DynamicSourceId, string? DomainGroupId, string? DynamicZone, string? DynamicPrefix)
     {
+        if (InvalidNames(DynamicZone, DynamicPrefix) is { } bad) { Error = bad; return RedirectToPage("Dynamic", new { id = Id }); }
         _config.Mutate(c =>
         {
             var r = c.Rules.FirstOrDefault(x => x.Id == Id && x.Dynamic);

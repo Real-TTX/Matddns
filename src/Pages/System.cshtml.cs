@@ -6,11 +6,11 @@ namespace Matddns.Pages;
 
 public class SystemModel : PageModel
 {
-    private readonly ConfigService _config;
+    private readonly SettingsService _settings;
     private readonly LogService _log;
-    public SystemModel(ConfigService config, LogService log)
+    public SystemModel(SettingsService settings, LogService log)
     {
-        _config = config;
+        _settings = settings;
         _log = log;
     }
 
@@ -22,36 +22,33 @@ public class SystemModel : PageModel
     public long LogFileBytes { get; private set; }
 
     [TempData] public string? Notice { get; set; }
+    [TempData] public string? Error { get; set; }
 
     public void OnGet()
     {
-        var (lvl, days, tz, anon) = _config.Read(c => (c.Settings.MinLogLevel, c.Settings.LogRetentionDays, c.Settings.TimeZone, c.Settings.AnonymousDashboard));
-        CurrentLevel = lvl;
-        RetentionDays = days;
-        CurrentTimeZone = tz ?? "";
-        AnonymousDashboard = anon;
+        var s = _settings.Get();
+        CurrentLevel = s.MinLogLevel;
+        RetentionDays = s.LogRetentionDays;
+        CurrentTimeZone = s.TimeZone;
+        AnonymousDashboard = s.AnonymousDashboard;
         Zones = TimeZoneInfo.GetSystemTimeZones().OrderBy(z => z.Id, StringComparer.Ordinal).ToList();
         LogFileBytes = _log.LogFileBytes();
     }
 
+    // The same checks and the same entry in the log as a change through the platform API (/api/configure).
     public IActionResult OnPost(Services.LogLevel MinLogLevel, int LogRetentionDays, string? TimeZone, bool AnonymousDashboard)
     {
-        _config.Mutate(c =>
-        {
-            c.Settings.MinLogLevel = MinLogLevel;
-            c.Settings.LogRetentionDays = LogRetentionDays < 0 ? 0 : LogRetentionDays;
-            c.Settings.TimeZone = (TimeZone ?? "").Trim();
-            c.Settings.AnonymousDashboard = AnonymousDashboard;
-        });
-        _log.ApplyRetention();
-        Notice = "Saved";
+        var problems = _settings.Change(new GeneralSettingsChange(MinLogLevel, LogRetentionDays, TimeZone ?? "", AnonymousDashboard), User.Identity?.Name ?? "?");
+        if (problems.Count > 0) Error = string.Join(" ", problems.Values);
+        else Notice = "Saved.";
         return RedirectToPage();
     }
 
     public IActionResult OnPostClear()
     {
         _log.Clear();
-        Notice = "Log cleared";
+        _log.Log(Services.LogLevel.Info, "settings", $"log cleared by {User.Identity?.Name ?? "?"}");
+        Notice = "Log cleared.";
         return RedirectToPage();
     }
 }

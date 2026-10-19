@@ -62,7 +62,7 @@ public class EditModel : PageModel
     public IActionResult OnPostCreate(bool OnChange, int IntervalSeconds, string DomainEntryRef,
         bool ValidatePing, bool ValidateTcp, int ValidationPort, string[]? SourceEntryIdsInOrder)
     {
-        if (string.IsNullOrWhiteSpace(DomainEntryRef)) { Error = "Domain required"; return RedirectToPage("Edit"); }
+        if (string.IsNullOrWhiteSpace(DomainEntryRef)) { Error = "Select a record."; return RedirectToPage("Edit"); }
         var parts = DomainEntryRef.Split(':', 2);
         if (parts.Length != 2) { Error = "Invalid selection"; return RedirectToPage("Edit"); }
 
@@ -192,7 +192,7 @@ public class EditModel : PageModel
                 r.LastResult = null;
             }
         });
-        Notice = "Run forced";
+        Notice = "The rule runs within 15 seconds.";
         return RedirectToPage("Edit", new { id = Id });
     }
 }

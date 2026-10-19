@@ -264,4 +264,20 @@ public class RuleSourceItem
     public string? Ipv6 { get; set; }
     public bool Active { get; set; }          // the source currently written (failover winner)
     public bool Missing { get; set; }         // the source/entry no longer exists
+
+    /// <summary>The address that counts for a record of <paramref name="type"/> (A, AAAA, CNAME).</summary>
+    public string? AddressFor(string type) => RecordAddress.For(type, Ip, Ipv6);
+}
+
+/// <summary>The address of a source that matters for a record type: IPv4 for A, IPv6 for AAAA, either for CNAME.</summary>
+public static class RecordAddress
+{
+    public static string? For(string type, string? ipv4, string? ipv6) => type switch
+    {
+        "A" => Has(ipv4) ? ipv4 : null,
+        "AAAA" => Has(ipv6) ? ipv6 : null,
+        _ => Has(ipv4) ? ipv4 : Has(ipv6) ? ipv6 : null,
+    };
+
+    private static bool Has(string? s) => !string.IsNullOrEmpty(s);
 }

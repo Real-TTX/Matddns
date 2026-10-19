@@ -1,4 +1,3 @@
-using Matddns.Models;
 using Matddns.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,17 +17,12 @@ public class IndexModel : PageModel
     }
 
     public StatusSnapshot Snapshot { get; private set; } = new();
-    public List<DomainGroup> Domains { get; private set; } = new();
-    public List<Rule> DynamicRules { get; private set; } = new();
 
     public IActionResult OnGet()
     {
         if (User.Identity?.IsAuthenticated != true && !_config.Read(c => c.Settings.AnonymousDashboard))
             return RedirectToPage("/Login");
         Snapshot = _status.Build(15);
-        var cfg = _config.Current;
-        Domains = cfg.Domains;
-        DynamicRules = cfg.Rules.Where(r => r.Dynamic).ToList();
         return Page();
     }
 }

@@ -62,7 +62,7 @@
             <tbody>
             @foreach (var src in s.SourceList)
             {
-                var kindLabel = src.Kind == "Push" ? "DynDNS Server" : src.Kind == "Dns" ? "DNS lookup" : src.Kind == "Fritzbox" ? "FRITZ!Box" : src.Kind == "UnifiCloud" ? "UniFi Cloud" : src.Kind == "Matddns" ? "Matddns peer" : src.Kind;
+                var kindLabel = Enum.TryParse<SourceKind>(src.Kind, out var sk) ? Labels.Source(sk) : src.Kind;
                 var entries = src.Entries;
                 var multi = entries.Count > 1;
                 var first = entries.FirstOrDefault();
@@ -112,55 +112,6 @@
 </section>
 
 <section class="mat-section">
-    <div class="mat-section__head"><div class="mat-row mat-row--between"><h2>Domains</h2><a class="mat-btn mat-btn--ghost mat-btn--sm" href="/Domains">Manage</a></div></div>
-    <div class="mat-table-wrap">
-        <table class="mat-table">
-            <caption class="mat-sr-only">Domain groups and their records</caption>
-            <thead><tr><th scope="col">Group</th><th scope="col" class="mat-hide-sm">Provider</th><th scope="col">Record</th><th scope="col">Type</th></tr></thead>
-            <tbody>
-            @foreach (var g in Model.Domains)
-            {
-                var dkind = g.Kind switch { DomainKind.Netcup => "Netcup API", DomainKind.Cloudflare => "Cloudflare", DomainKind.Hetzner => "Hetzner DNS", DomainKind.GoDaddy => "GoDaddy", DomainKind.Matddns => "Matddns peer", _ => "DynDNS" };
-                var dentries = g.Entries;
-                var dynForZone = Model.DynamicRules.Where(r => r.DomainGroupId == g.Id).ToList();
-                var dchild = dentries.Count + dynForZone.Count;
-                <tr class="md-parent @(dchild > 0 ? "has-children" : "")">
-                    <td data-label="Group"><div class="mat-table__name"><span>@g.Name</span></div></td>
-                    <td data-label="Provider" class="mat-hide-sm"><span class="mat-tag">@dkind</span> @if (dynForZone.Count > 0) { <span class="mat-tag">dynamic</span> }</td>
-                    <td data-label="Record" class="mat-muted">@dentries.Count record@(dentries.Count == 1 ? "" : "s")</td>
-                    <td data-label="Type"></td>
-                </tr>
-                @for (var i = 0; i < dentries.Count; i++)
-                {
-                    var e = dentries[i];
-                    <tr class="md-child @(i == dchild - 1 ? "is-last" : "")">
-                        <td data-label="Group"></td>
-                        <td data-label="Provider" class="mat-hide-sm"></td>
-                        <td data-label="Record" class="mat-mono"><span class="md-child__name">@e.Hostname</span></td>
-                        <td data-label="Type"><span class="mat-tag">@e.Type</span></td>
-                    </tr>
-                }
-                @for (var j = 0; j < dynForZone.Count; j++)
-                {
-                    var dr = dynForZone[j];
-                    <tr class="md-child @(dentries.Count + j == dchild - 1 ? "is-last" : "")">
-                        <td data-label="Group"></td>
-                        <td data-label="Provider" class="mat-hide-sm"></td>
-                        <td data-label="Record" class="mat-mono"><span class="md-child__name">*.@dr.DynamicBaseFqdn</span></td>
-                        <td data-label="Type"><span class="mat-tag">dynamic</span></td>
-                    </tr>
-                }
-            }
-            @if (Model.Domains.Count == 0)
-            {
-                <tr><td colspan="4" class="mat-muted">No domains configured. <a href="/Domains/Edit">Add one</a>.</td></tr>
-            }
-            </tbody>
-        </table>
-    </div>
-</section>
-
-<section class="mat-section">
     <div class="mat-section__head"><div class="mat-row mat-row--between"><h2>Rules</h2><a class="mat-btn mat-btn--ghost mat-btn--sm" href="/Rules">Manage</a></div></div>
     <div class="mat-table-wrap">
         <table class="mat-table">
@@ -181,7 +132,7 @@
                 @for (var i = 0; i < r.Sources.Count; i++)
                 {
                     var src = r.Sources[i];
-                    var sip = src.Ip ?? src.Ipv6;
+                    var sip = src.AddressFor(r.Type);
                     var sstate = src.Missing ? "err" : (src.Active ? "ok" : (string.IsNullOrEmpty(sip) ? "warn" : "none"));
                     <tr class="md-child @(i == r.Sources.Count - 1 ? "is-last" : "")">
                         <td data-label="Source"><span class="md-child__name">#@(i + 1) @src.Name</span></td>

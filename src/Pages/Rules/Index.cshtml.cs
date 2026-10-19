@@ -91,7 +91,7 @@ public class IndexModel : PageModel
         => AllDomains.FirstOrDefault(d => d.Id == r.DomainGroupId)?.Entries.FirstOrDefault(e => e.Id == r.DomainEntryId);
 
     public string SourceLabel(string sourceEntryId)
-        => SourceLookup.TryGetValue(sourceEntryId, out var v) ? v.Entry.Label : "?";
+        => SourceLookup.TryGetValue(sourceEntryId, out var v) ? $"{v.Group.Name} · {v.Entry.Label}" : "(unknown source)";
 
     /// <summary>What a rule is called in the list: its record ("home.example.com (A)") or, for a dynamic rule, its namespace.</summary>
     public string RecordText(Rule r)

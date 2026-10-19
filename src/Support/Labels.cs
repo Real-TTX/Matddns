@@ -7,7 +7,7 @@ public static class Labels
 {
     public static string Source(SourceKind kind) => kind switch
     {
-        SourceKind.Unifi => "Unifi",
+        SourceKind.Unifi => "UniFi",
         SourceKind.UnifiCloud => "UniFi Cloud",
         SourceKind.Static => "Static IP",
         SourceKind.Push => "DynDNS Server",

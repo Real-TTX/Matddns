@@ -180,14 +180,14 @@ public class UpdaterService : BackgroundService
         try { wans = await _unifi.GetWansAsync(settings, ct); }
         catch (Exception ex)
         {
-            _log.Log(LogLevel.Error, $"src:{group.Name}", $"Unifi: {ex.Message}");
+            _log.Log(LogLevel.Error, $"src:{group.Name}", $"UniFi: {ex.Message}");
             MarkEntriesFailed(group.Id, ex.Message);
             return;
         }
 
         WriteWanEntries(group.Id, wans);
         _log.Log(LogLevel.Debug, $"src:{group.Name}",
-            $"Unifi WANs: {string.Join(", ", wans.Select(w => $"{(string.IsNullOrEmpty(w.DisplayName) ? w.Name : w.DisplayName)} [{w.Name}]={(w.Up ? (w.Ip ?? "no-ip") : "down")}"))}");
+            $"UniFi WANs: {string.Join(", ", wans.Select(w => $"{(string.IsNullOrEmpty(w.DisplayName) ? w.Name : w.DisplayName)} [{w.Name}]={(w.Up ? (w.Ip ?? "no-ip") : "down")}"))}");
     }
 
     // Upsert one source entry per WAN (matched by interface group name).
@@ -224,7 +224,7 @@ public class UpdaterService : BackgroundService
         try { hosts = await _unifiCloud.ListHostsAsync(settings.ApiKey, ct); }
         catch (Exception ex)
         {
-            _log.Log(LogLevel.Error, $"src:{group.Name}", $"Unifi cloud: {ex.Message}");
+            _log.Log(LogLevel.Error, $"src:{group.Name}", $"UniFi Cloud: {ex.Message}");
             MarkEntriesFailed(group.Id, ex.Message);
             return;
         }
@@ -249,7 +249,7 @@ public class UpdaterService : BackgroundService
             }
         });
         _log.Log(LogLevel.Debug, $"src:{group.Name}",
-            $"Unifi cloud: {string.Join(", ", group.Entries.Select(e => $"{e.Label}={(byId.TryGetValue(e.InterfaceName ?? "", out var h) ? (h.Ipv4 ?? h.Ipv6 ?? "no-ip") : "missing")}"))}");
+            $"UniFi Cloud: {string.Join(", ", group.Entries.Select(e => $"{e.Label}={(byId.TryGetValue(e.InterfaceName ?? "", out var h) ? (h.Ipv4 ?? h.Ipv6 ?? "no-ip") : "missing")}"))}");
     }
 
     private async Task RefreshMatddnsPeerAsync(SourceGroup group, MatddnsLinkSettings peer, CancellationToken ct)

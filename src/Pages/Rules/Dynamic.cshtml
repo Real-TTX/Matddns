@@ -14,9 +14,12 @@
 {
     <div class="mat-alert mat-alert--danger" role="alert">
         <icon name="x-circle" />
-        <div class="mat-alert__body">A dynamic rule needs at least one DynDNS Server source and one Netcup domain group.</div>
+        <div class="mat-alert__body">A dynamic rule needs a <a href="/Sources/Edit">DynDNS Server source</a> and a <a href="/Domains/Edit">Netcup domain group</a>.</div>
     </div>
+    <div class="mat-actions"><a class="mat-btn mat-btn--secondary" href="/Rules"><icon name="back" /><span>Back</span></a></div>
 }
+else
+{
 
 <form method="post" asp-page-handler="@(isNew ? "Create" : "Save")" class="mat-form" novalidate>
     @if (!isNew) { <input type="hidden" name="Id" value="@r!.Id" /> }
@@ -33,7 +36,7 @@
                         }
                     </select>
                 </mat-field>
-                <mat-field label="Target zone (Netcup)" for-id="DomainGroupId">
+                <mat-field label="Netcup account" for-id="DomainGroupId">
                     <select id="DomainGroupId" name="DomainGroupId" class="mat-select">
                         @foreach (var d in Model.NetcupGroups)
                         {
@@ -85,4 +88,5 @@
             </div>
         </div>
     </section>
+}
 }

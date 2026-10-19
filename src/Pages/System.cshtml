@@ -62,46 +62,24 @@
 
     <div class="mat-tabpanel" role="tabpanel" id="panel-api" aria-labelledby="tab-api" hidden>
         <div class="mat-stack">
-            <p class="mat-muted">Public JSON endpoints for monitoring software (Uptime Kuma, Zabbix, …). They need no sign-in and never show passwords or API keys.</p>
+            <p class="mat-muted">Endpoints without sign-in for monitors, routers and other Matddns instances. None of them shows a password or key.</p>
 
             <div class="mat-table-wrap">
                 <table class="mat-table">
-                    <caption class="mat-sr-only">Public endpoints</caption>
+                    <caption class="mat-sr-only">Endpoints without sign-in</caption>
                     <thead><tr><th scope="col">Endpoint</th><th scope="col">Purpose</th></tr></thead>
                     <tbody>
-                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /healthz</td><td data-label="Purpose">Liveness: returns <code>ok</code> (200) while the app runs.</td></tr>
-                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /api/health</td><td data-label="Purpose">Health summary: <code>ok</code>, <code>degraded</code> or <code>down</code> with its checks, plus source and rule counts and IP-change stats. HTTP <code>200</code> for ok and degraded, <code>503</code> for down; with <code>?strict=1</code> <code>503</code> unless ok.</td></tr>
-                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /api/state</td><td data-label="Purpose">Full state as JSON: the IPs of every source, the status of every rule and the recent IP changes. With a key or a token it is the state of the Mat platform contract instead.</td></tr>
-                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /api/source?token=</td><td data-label="Purpose">Peer pull: this instance's source entries (IPs only, no secrets) for a valid DynDNS Server token. Used by a <strong>Matddns peer</strong> source on another instance.</td></tr>
-                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /api/update</td><td data-label="Purpose">DynDNS <strong>receiver</strong> (JSON): a device or script pushes its IP into a DynDNS Server source. The URL with the token is shown on that source's page.</td></tr>
-                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /nic/update</td><td data-label="Purpose">The same receiver in the legacy <strong>dyndns2</strong> format (plain <code>good</code> / <code>nochg</code>), only needed for routers and FRITZ!Box. Same token.</td></tr>
+                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /healthz</td><td data-label="Purpose">Liveness: <code>ok</code> while the app runs.</td></tr>
+                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /api/health</td><td data-label="Purpose"><code>ok</code>, <code>degraded</code> or <code>down</code> with counts. HTTP 200 unless down; <code>?strict=1</code> answers 503 unless ok.</td></tr>
+                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /api/state</td><td data-label="Purpose">Every source IP, every rule and the recent IP changes.</td></tr>
+                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /api/update</td><td data-label="Purpose">A device pushes its IP into a DynDNS Server source (JSON answer).</td></tr>
+                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /nic/update</td><td data-label="Purpose">The same in the dyndns2 format for routers (<code>good</code>, <code>nochg</code>).</td></tr>
+                        <tr><td data-label="Endpoint" class="mat-mono mat-nowrap">GET /api/source</td><td data-label="Purpose">The source IPs for a Matddns peer source on another instance.</td></tr>
                     </tbody>
                 </table>
             </div>
 
-            <div class="mat-card">
-                <div class="mat-card__head"><icon name="terminal" /><h2 class="mat-card__title">Example: /api/health</h2></div>
-                <div class="mat-card__body mat-stack mat-stack--sm">
-                    <p>Point your monitor at <code>/api/health?strict=1</code> and alert on a status other than 200, for example <code>curl http://&lt;host&gt;:4060/api/health?strict=1</code>.</p>
-                    <pre class="mat-code"><code>{
-  "status": "ok",
-  "app": "matddns",
-  "version": "0.4.120",
-  "time": "2026-06-10T08:00:00+00:00",
-  "checks": [ { "name": "config", "status": "ok" }, { "name": "sources", "status": "ok" }, { "name": "rules", "status": "ok" } ],
-  "sources": { "total": 2, "entries": 3, "ok": 3, "errors": 0 },
-  "rules":   { "total": 2, "ok": 2, "issues": 0, "disabled": 0 },
-  "ipChanges": { "total": 12, "last24h": 1, "last7d": 4, "lastChange": "2026-06-09T23:24:00Z" }
-}</code></pre>
-                </div>
-            </div>
-
-            <div class="mat-card">
-                <div class="mat-card__head"><icon name="key" /><h2 class="mat-card__title">Management API</h2></div>
-                <div class="mat-card__body mat-stack mat-stack--sm">
-                    <p><code>/api/v1</code> (<code>status</code>, <code>sources</code>, <code>domains</code>, <code>rules</code>, <code>run</code>) is used by Mattiverse to provision this instance. It needs the <code>X-Api-Key</code> header and is <strong>disabled</strong> until the <code>MATDDNS_API_KEY</code> environment variable is set. The platform contract (<code>/api</code>, <code>/api/state</code>, <code>/api/configure</code>, <code>/api/actions</code>) takes <code>MAT_API_KEY</code>, or this key when that is not set. See the README.</p>
-                </div>
-            </div>
+            <p class="mat-muted">The token of a DynDNS Server source opens the last three. The management API <code>/api/v1</code> (for Mattiverse) needs the header <code>X-Api-Key</code> with <code>MATDDNS_API_KEY</code> and is off without it.</p>
         </div>
     </div>
 </div>

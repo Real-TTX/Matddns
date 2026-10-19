@@ -45,7 +45,7 @@ else
         <div class="mat-card">
             <div class="mat-card__body mat-stack">
                 <div class="mat-form__grid">
-                    <mat-field label="Domain" for-id="DomainEntryRef" required="true" full="true">
+                    <mat-field label="Record" for-id="DomainEntryRef" required="true" full="true">
                         <select id="DomainEntryRef" name="DomainEntryRef" class="mat-select" required data-msg-required="Please select a record.">
                             @if (isNew) { <option value="">Select a record</option> }
                             @foreach (var d in Model.AllDomains)
@@ -163,7 +163,7 @@ else
                             {
                                 var sid = r.SourceEntryIdsInOrder[i];
                                 var info = Model.SourceLookup.TryGetValue(sid, out var v) ? v : null;
-                                var ip = info?.Entry.CurrentIp;
+                                var ip = RecordAddress.For(de?.Type.ToString() ?? "A", info?.Entry.CurrentIp, info?.Entry.CurrentIpv6);
                                 var status = info == null ? "none" : (string.IsNullOrEmpty(ip) ? "warn" : "ok");
                                 var cname = i < r.CnameTargets.Count ? r.CnameTargets[i] : "";
                                 var name = info != null ? $"{info.Group.Name} · {info.Entry.Label}" : "(unknown source)";
