@@ -197,6 +197,67 @@ public class ConfigService
         }
     }
 
+    /// <summary>
+    /// The configuration as a backup: sources, domain groups, rules and settings with their credentials, in the format of config.json.
+    /// The accounts (password hashes) are left out; an import keeps the accounts of the instance it goes into.
+    /// </summary>
+    public string ExportJson()
+    {
+        lock (_lock)
+        {
+            var copy = CloneFrom(_config);
+            copy.Users = new();
+            copy.Auth = new AuthSection { PasswordHash = "" };
+            return JsonSerializer.Serialize(copy, JsonOpts);
+        }
+    }
+
+    /// <summary>The counts of an import.</summary>
+    public sealed record ImportResult(int Sources, int Domains, int Rules);
+
+    /// <summary>
+    /// Replaces sources, domain groups, rules and settings with those of <paramref name="json"/> (an <see cref="ExportJson"/> or a config.json);
+    /// the accounts stay. An older schema is migrated; the state of the last runs is dropped, so every rule is evaluated again.
+    /// Throws <see cref="FormatException"/> when the text is not such a file; then nothing changes.
+    /// </summary>
+    public ImportResult Import(string json)
+    {
+        AppConfig? incoming;
+        try { incoming = JsonSerializer.Deserialize<AppConfig>(json, JsonOpts); }
+        catch (JsonException ex) { throw new FormatException($"Not a Matddns configuration: {ex.Message}"); }
+        if (incoming == null || incoming.SchemaVersion > CurrentSchemaVersion)
+            throw new FormatException(incoming == null ? "The file is empty." : "The file comes from a newer Matddns; update this one first.");
+        if ((incoming.Sources?.Count ?? 0) + (incoming.Domains?.Count ?? 0) + (incoming.Rules?.Count ?? 0) == 0 && !json.Contains("\"sources\"", StringComparison.Ordinal))
+            throw new FormatException("Not a Matddns configuration: it has no sources, domains or rules.");
+
+        RunMigrations(incoming);
+        incoming.Settings ??= new AppSettings();
+        incoming.Settings.Notifications ??= new NotificationSettings();
+        incoming.Settings.Notifications.Mail ??= new MailSettings();
+        incoming.Settings.Notifications.Webhook ??= new WebhookSettings();
+        incoming.Sources ??= new();
+        incoming.Domains ??= new();
+        incoming.Rules ??= new();
+        foreach (var r in incoming.Rules)
+        {
+            r.LastRun = null;
+            r.LastResult = null;
+            r.LastSourceSignature = null;
+            r.FailCount = 0;
+        }
+        foreach (var e in incoming.Sources.SelectMany(s => s.Entries)) e.LastChecked = null;
+
+        lock (_lock)
+        {
+            _config.Sources = incoming.Sources;
+            _config.Domains = incoming.Domains;
+            _config.Rules = incoming.Rules;
+            _config.Settings = incoming.Settings;
+            SaveInternal();
+        }
+        return new ImportResult(incoming.Sources.Count, incoming.Domains.Count, incoming.Rules.Count);
+    }
+
     public T Read<T>(Func<AppConfig, T> reader)
     {
         lock (_lock) return reader(_config);

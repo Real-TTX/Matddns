@@ -8,7 +8,7 @@ namespace Matddns.Pages;
 public class SystemModel : PageModel
 {
     /// <summary>The tabs of the page: the id (also <c>?tab=</c>, so a form comes back to its tab) and the title.</summary>
-    public static readonly (string Id, string Title)[] Tabs = [("general", "General"), ("notifications", "Notifications"), ("api", "API")];
+    public static readonly (string Id, string Title)[] Tabs = [("general", "General"), ("notifications", "Notifications"), ("backup", "Backup"), ("api", "API")];
 
     private readonly SettingsService _settings;
     private readonly LogService _log;
@@ -67,6 +67,34 @@ public class SystemModel : PageModel
         _log.Log(Services.LogLevel.Info, "settings", $"log cleared by {User.Identity?.Name ?? "?"}");
         Notice = "Log cleared.";
         return RedirectToPage();
+    }
+
+    /// <summary>Downloads the configuration (sources, domains, rules, settings with their credentials; no accounts).</summary>
+    public IActionResult OnGetExport()
+    {
+        _log.Log(Services.LogLevel.Info, "settings", $"configuration exported by {User.Identity?.Name ?? "?"}");
+        var bytes = System.Text.Encoding.UTF8.GetBytes(_config.ExportJson());
+        return File(bytes, "application/json", $"matddns-{DateTime.UtcNow:yyyy-MM-dd}.json");
+    }
+
+    /// <summary>The largest file an import takes.</summary>
+    public const int MaxImportBytes = 5 * 1024 * 1024;
+
+    public async Task<IActionResult> OnPostImportAsync(IFormFile? file, CancellationToken ct)
+    {
+        if (file == null || file.Length == 0) { Error = "Choose a file."; return RedirectToPage(new { tab = "backup" }); }
+        if (file.Length > MaxImportBytes) { Error = "The file is larger than 5 MB."; return RedirectToPage(new { tab = "backup" }); }
+
+        using var reader = new StreamReader(file.OpenReadStream());
+        var json = await reader.ReadToEndAsync(ct);
+        try
+        {
+            var r = _config.Import(json);
+            _log.Log(Services.LogLevel.Info, "settings", $"configuration imported by {User.Identity?.Name ?? "?"}: {r.Sources} sources, {r.Domains} domain groups, {r.Rules} rules");
+            Notice = $"Imported {r.Sources} sources, {r.Domains} domain groups and {r.Rules} rules.";
+        }
+        catch (FormatException ex) { Error = ex.Message; }
+        return RedirectToPage(new { tab = "backup" });
     }
 
     public IActionResult OnPostNotifications(NotificationForm form)

@@ -136,6 +136,37 @@
         </form>
     </div>
 
+    <div class="mat-tabpanel" role="tabpanel" id="panel-backup" aria-labelledby="tab-backup" hidden="@(Model.Tab != "backup")">
+        <div class="mat-stack">
+            <div class="mat-card">
+                <div class="mat-card__head"><icon name="download" /><h2 class="mat-card__title">Export</h2></div>
+                <div class="mat-card__body mat-stack mat-stack--sm">
+                    <p>Sources, domain groups, rules and settings as one JSON file, <strong>with the provider credentials</strong>: keep it safe. Accounts are not in it.</p>
+                    <div><a class="mat-btn mat-btn--secondary" href="/System?handler=Export" download><icon name="download" /><span>Download the configuration</span></a></div>
+                </div>
+            </div>
+
+            <form method="post" asp-page-handler="Import" enctype="multipart/form-data" class="mat-form" novalidate>
+                <div class="mat-card">
+                    <div class="mat-card__head"><icon name="upload" /><h2 class="mat-card__title">Import</h2></div>
+                    <div class="mat-card__body mat-stack mat-stack--sm">
+                        <p>Replaces all sources, domain groups, rules and settings with those of an export or a <code>config.json</code>. The accounts stay.</p>
+                        <div class="mat-field">
+                            <label class="mat-label" for="ImportFile">File</label>
+                            <div class="mat-upload mat-upload--compact" data-upload data-max-files="1" data-max-size="5MB">
+                                <input class="mat-upload__input" type="file" id="ImportFile" name="file" accept=".json,application/json" required data-msg-required="Please choose a file." />
+                            </div>
+                            <span class="mat-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mat-btn-row">
+                    <button type="submit" class="mat-btn mat-btn--danger" data-confirm="Replace all sources, domain groups, rules and settings with the file?" data-confirm-ok="Import"><icon name="upload" /><span>Import</span></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="mat-tabpanel" role="tabpanel" id="panel-api" aria-labelledby="tab-api" hidden="@(Model.Tab != "api")">
         <div class="mat-stack">
             <p class="mat-muted">Endpoints without sign-in for monitors, routers and other Matddns instances. None of them shows a password or key.</p>

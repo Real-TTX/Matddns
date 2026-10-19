@@ -208,6 +208,10 @@ the `users` list in `data/config.json`, and start it again: `admin` is re-create
 `config.json` is written atomically and fsync'd; if it ever becomes unreadable it is preserved
 as `config.json.corrupt-<timestamp>` instead of being overwritten.
 
+**Backup:** *System → Backup* downloads sources, domain groups, rules and settings as one JSON file, with the provider
+credentials (keep it safe) and without the accounts. *Import* replaces all of them with such a file or an older `config.json`
+(migrated on the way); the accounts stay and every rule is evaluated again.
+
 ## How it works
 
 There are three building blocks.
