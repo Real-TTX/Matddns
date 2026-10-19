@@ -140,6 +140,7 @@ public class SystemModel : PageModel
         var change = new NotificationSettingsChange(
             OnChange: f.OnChange,
             OnFailure: f.OnFailure,
+            OnSource: f.OnSource,
             MailEnabled: f.MailEnabled,
             MailHost: server ? f.MailHost ?? "" : null,
             MailPort: server ? f.MailPort : null,
@@ -159,6 +160,7 @@ public class SystemModel : PageModel
     {
         public bool OnChange { get; set; }
         public bool OnFailure { get; set; }
+        public bool OnSource { get; set; }
         public bool MailEnabled { get; set; }
         public string? MailHost { get; set; }
         public int MailPort { get; set; } = 587;

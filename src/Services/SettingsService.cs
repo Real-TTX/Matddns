@@ -16,6 +16,7 @@ public sealed record GeneralSettingsChange(LogLevel? MinLogLevel = null, int? Lo
 public sealed record NotificationSettingsChange(
     bool? OnChange = null,
     bool? OnFailure = null,
+    bool? OnSource = null,
     bool? MailEnabled = null,
     string? MailHost = null,
     int? MailPort = null,
@@ -164,6 +165,7 @@ public class SettingsService
         {
             OnChange = change.OnChange ?? current.OnChange,
             OnFailure = change.OnFailure ?? current.OnFailure,
+            OnSource = change.OnSource ?? current.OnSource,
             Mail = mail,
             Webhook = hook,
         };
@@ -187,6 +189,7 @@ public class SettingsService
     {
         OnChange = n.OnChange,
         OnFailure = n.OnFailure,
+        OnSource = n.OnSource,
         Mail = new MailSettings
         {
             Enabled = n.Mail.Enabled,

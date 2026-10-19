@@ -293,13 +293,14 @@ A failed update is retried with a growing wait: 30 s after the first failure, th
 ## Notifications
 
 *System → Notifications* tells you when a record gets a new IP, when it cannot be updated (once, at the first failure; Matddns keeps
-trying with its back-off) and when it works again. Each kind can be switched off.
+trying with its back-off) and when it works again, and when a source entry fails (a WAN is down, a router or a peer does not answer;
+once, at the first failure) and when it works again. Each kind can be switched off.
 
 - **E-mail** over SMTP: server, port, STARTTLS / TLS / none, user, password, sender and one or more recipients.
 - **Mail through MatSMTP:** when the `MATSMTP_*` variables are set (Mattiverse does that when MatSMTP is installed), all mail goes through
   MatSMTP. The page then says where the mail goes and shows server, port, security, user and sender as fixed (the password never);
   nothing is saved for them, and what was stored before counts again when the variables are gone. On/off and the recipients stay editable.
-- **Webhook**: `JSON` (`{"app":"matddns","event":"change|failure|recovery|test","title","message","record","type","value","previous","source","time"}`),
+- **Webhook**: `JSON` (`{"app":"matddns","event":"change|failure|recovery|source-failure|source-recovery|test","title","message","record","type","value","previous","source","time"}`),
   `ntfy` (plain text with a `Title` header to a topic URL) or `Gotify` (`{"title","message","priority"}` to `/message?token=…`).
 
 *Save and send a test* checks the setup right away. The SMTP password and the webhook URL (it can carry a token) are never shown again

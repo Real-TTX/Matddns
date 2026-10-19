@@ -59,7 +59,7 @@ public sealed class MatddnsPlatform(
             MatSection.Form(T("Protokoll", "Log"), "minLogLevel", "logRetentionDays"),
             MatSection.Actions("openSystem"));
         o.Page("notifications", T("Benachrichtigungen", "Notifications"), "bell",
-            MatSection.Form(T("Wann", "When"), "notifyOnChange", "notifyOnFailure"),
+            MatSection.Form(T("Wann", "When"), "notifyOnChange", "notifyOnFailure", "notifyOnSource"),
             MatSection.Form(T("E-Mail", "E-mail"), "mailEnabled", "mailHost", "mailPort", "mailTls", "mailUsername", "mailPassword", "mailFrom", "mailTo"),
             MatSection.Form("Webhook", "webhookEnabled", "webhookFormat", "webhookUrl"),
             MatSection.Actions("openNotifications"));
@@ -114,6 +114,10 @@ public sealed class MatddnsPlatform(
         o.Field(new MatField("notifyOnFailure", T("Fehler und Erholung", "Failures and recoveries"), "bool")
         {
             Hint = T("Ein Eintrag lässt sich nicht aktualisieren oder klappt wieder.", "A record cannot be updated, or works again."),
+        });
+        o.Field(new MatField("notifyOnSource", T("Fehler und Erholung einer Quelle", "Source failures and recoveries"), "bool")
+        {
+            Hint = T("Eine Quelle (ein WAN, ein Router) fällt aus oder klappt wieder.", "A source (a WAN, a router) fails, or works again."),
         });
         o.Field(new MatField("mailEnabled", T("E-Mails senden", "Send e-mails"), "bool"));
         Field(new MatField("mailHost", T("SMTP-Server", "SMTP server"), "text") { Max = 255, Placeholder = "smtp.example.com", ShowIf = mailOn });
@@ -214,6 +218,7 @@ public sealed class MatddnsPlatform(
             ["logRetentionDays"] = s.LogRetentionDays,
             ["notifyOnChange"] = n.OnChange,
             ["notifyOnFailure"] = n.OnFailure,
+            ["notifyOnSource"] = n.OnSource,
             ["mailEnabled"] = mail.Enabled,
             ["mailHost"] = mail.Host,
             ["mailPort"] = mail.Port,
@@ -294,6 +299,7 @@ public sealed class MatddnsPlatform(
         var change = new NotificationSettingsChange(
             OnChange: Bool("notifyOnChange"),
             OnFailure: Bool("notifyOnFailure"),
+            OnSource: Bool("notifyOnSource"),
             MailEnabled: Bool("mailEnabled"),
             MailHost: Text("mailHost"),
             MailPort: port,

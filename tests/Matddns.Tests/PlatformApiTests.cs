@@ -87,7 +87,7 @@ public sealed class PlatformDefinitionTests(MatddnsFactory site) : IClassFixture
     internal static readonly string[] ConfigureKeys =
     [
         "timeZone", "anonymousDashboard", "minLogLevel", "logRetentionDays",
-        "notifyOnChange", "notifyOnFailure", "mailEnabled", "mailHost", "mailPort", "mailTls", "mailUsername", "mailPassword", "mailFrom", "mailTo",
+        "notifyOnChange", "notifyOnFailure", "notifyOnSource", "mailEnabled", "mailHost", "mailPort", "mailTls", "mailUsername", "mailPassword", "mailFrom", "mailTo",
         "webhookEnabled", "webhookFormat", "webhookUrl",
     ];
 

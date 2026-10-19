@@ -42,6 +42,7 @@ public class NotificationSettings
 {
     public bool OnChange { get; set; } = true;     // a record was written with a new value
     public bool OnFailure { get; set; } = true;    // a record cannot be updated (once, at the first failure) and when it works again
+    public bool OnSource { get; set; } = true;     // a source entry (a WAN, a router, a peer) fails (once) and when it works again
     public MailSettings Mail { get; set; } = new();
     public WebhookSettings Webhook { get; set; } = new();
 }

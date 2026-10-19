@@ -116,6 +116,46 @@ public class NotificationTests : IDisposable
     }
 
     [Fact]
+    public async Task A_source_that_fails_is_told_once_and_again_when_it_works()
+    {
+        Configure(n => { n.OnChange = false; n.OnFailure = false; n.Webhook = new WebhookSettings { Enabled = true, Url = "https://hooks.example.com/x" }; });
+        var notify = Service();
+        await notify.StartAsync(CancellationToken.None);
+        var updater = TestUpdater.Create(_env, new StubHandler(_ => new HttpResponseMessage { Content = new StringContent("good") }), notify);
+        var (sourceId, _) = TestUpdater.StaticToDynDns(_env, "203.0.113.10");
+        void Static(string ip) => _env.Config.Mutate(c =>
+        {
+            var s = c.Sources.Single(x => x.Id == sourceId);
+            s.Static!.Ip = ip;
+            s.Entries[0].LastChecked = null; // due now
+        });
+
+        Static("");
+        await updater.RunNowAsync(CancellationToken.None);                       // the source fails
+        Static("");
+        await updater.RunNowAsync(CancellationToken.None);                       // still failing: nothing new
+        Static("203.0.113.11");
+        await updater.RunNowAsync(CancellationToken.None);                       // works again
+        Static("203.0.113.11");
+        await updater.RunNowAsync(CancellationToken.None);                       // still fine: nothing new
+
+        var events = await EventsAsync(2);
+        Assert.Equal(["source-failure", "source-recovery"], events);
+        var failure = JsonDocument.Parse(_hook.Calls[0].Body).RootElement;
+        Assert.Equal("Office · Static IP", failure.GetProperty("source").GetString());
+        Assert.Contains("no IP configured", failure.GetProperty("message").GetString());
+        Assert.Equal("203.0.113.11", JsonDocument.Parse(_hook.Calls[1].Body).RootElement.GetProperty("value").GetString());
+
+        // switched off: nothing
+        Configure(n => n.OnSource = false);
+        notify.Notify(new Notification(NotificationKind.SourceFailure, "x", "y"));
+        Assert.Equal(2, (await EventsAsync(3)).Count);
+        notify.Notify(new Notification(NotificationKind.Test, "x", "y"));
+        Assert.Equal("test", (await EventsAsync(3))[2]); // the loop still runs: the switched-off kind was dropped, not delayed
+        await notify.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Nothing_is_sent_for_a_kind_that_is_switched_off()
     {
         Configure(n => { n.OnChange = false; n.Webhook = new WebhookSettings { Enabled = true, Url = "https://hooks.example.com/x" }; });
@@ -150,7 +190,7 @@ public class NotificationFormTests
         var admin = await _app.AdminAsync();
         (string, string)[] form =
         [
-            ("OnChange", "true"), ("OnFailure", "true"), ("MailEnabled", "true"), ("MailHost", "smtp.example.com"), ("MailPort", "465"), ("MailTls", "Tls"),
+            ("OnChange", "true"), ("OnFailure", "true"), ("OnSource", "true"), ("MailEnabled", "true"), ("MailHost", "smtp.example.com"), ("MailPort", "465"), ("MailTls", "Tls"),
             ("MailUsername", "relay"), ("MailPassword", "mail-secret-1"), ("MailFrom", "matddns@example.com"), ("MailTo", "ops@example.com"),
             ("WebhookEnabled", "true"), ("WebhookUrl", "https://gotify.example.com/message?token=gotify-secret"), ("WebhookFormat", "Gotify"),
         ];
@@ -164,6 +204,7 @@ public class NotificationFormTests
 
         var n = config.Read(c => c.Settings.Notifications);
         Assert.Equal(("mail-secret-1", 465, MailTls.Tls), (n.Mail.Password, n.Mail.Port, n.Mail.Tls));
+        Assert.True(n.OnSource);
         Assert.Equal(("https://gotify.example.com/message?token=gotify-secret", WebhookFormat.Gotify), (n.Webhook.Url, n.Webhook.Format));
 
         var page = await (await admin.GetAsync("/System?tab=notifications")).Content.ReadAsStringAsync();

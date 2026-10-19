@@ -8,15 +8,27 @@ using MimeKit;
 
 namespace Matddns.Services;
 
-public enum NotificationKind { Change, Failure, Recovery, Test }
+/// <summary>What happened: a record got a new value, failed or works again; a source entry (a WAN, a router) fails or works again; a test.</summary>
+public enum NotificationKind { Change, Failure, Recovery, Test, SourceFailure, SourceRecovery }
 
 /// <summary>One message: what happened to which record. <see cref="Title"/> is the subject or the title, <see cref="Text"/> the body.</summary>
 public sealed record Notification(NotificationKind Kind, string Title, string Text, string? Record = null, string? Type = null, string? Value = null, string? Previous = null, string? Source = null)
 {
     public DateTime Time { get; init; } = DateTime.UtcNow;
 
-    /// <summary>The name of <see cref="Kind"/> in the JSON of a webhook: change, failure, recovery, test.</summary>
-    public string Event => Kind.ToString().ToLowerInvariant();
+    /// <summary>The name of <see cref="Kind"/> in the JSON of a webhook: change, failure, recovery, test, source-failure, source-recovery.</summary>
+    public string Event => Kind switch
+    {
+        NotificationKind.SourceFailure => "source-failure",
+        NotificationKind.SourceRecovery => "source-recovery",
+        _ => Kind.ToString().ToLowerInvariant(),
+    };
+
+    /// <summary>Something stopped working (a record or a source).</summary>
+    public bool IsFailure => Kind is NotificationKind.Failure or NotificationKind.SourceFailure;
+
+    /// <summary>Something works again (a record or a source).</summary>
+    public bool IsRecovery => Kind is NotificationKind.Recovery or NotificationKind.SourceRecovery;
 }
 
 /// <summary>Sends one mail; the default is MailKit, the tests put in their own.</summary>
@@ -50,7 +62,7 @@ public sealed class MailKitSender : IMailSender
 }
 
 /// <summary>
-/// Tells the configured receivers (mail, a webhook in JSON, ntfy or Gotify form) when a record gets a new value, fails or works again.
+/// Tells the configured receivers (mail, a webhook in JSON, ntfy or Gotify form) when a record gets a new value, fails or works again, and when a source entry fails or works again.
 /// <see cref="Notify"/> only queues; the background loop sends, so a slow mail server never holds up the updater. A failed delivery is logged
 /// (without the password or the URL, which may carry a token) and dropped.
 /// </summary>
@@ -86,6 +98,7 @@ public class NotificationService : BackgroundService
         {
             NotificationKind.Change => s.OnChange,
             NotificationKind.Failure or NotificationKind.Recovery => s.OnFailure,
+            NotificationKind.SourceFailure or NotificationKind.SourceRecovery => s.OnSource,
             _ => true,
         };
         if (wanted && (s.Mail.Enabled || s.Webhook.Enabled)) _queue.Writer.TryWrite(n);
@@ -183,11 +196,11 @@ public class NotificationService : BackgroundService
             case WebhookFormat.Ntfy:
                 request.Content = new StringContent(n.Text);
                 request.Headers.TryAddWithoutValidation("Title", $"Matddns: {n.Title}");
-                request.Headers.TryAddWithoutValidation("Tags", n.Kind is NotificationKind.Failure ? "warning" : n.Kind is NotificationKind.Recovery ? "white_check_mark" : "globe_with_meridians");
-                if (n.Kind == NotificationKind.Failure) request.Headers.TryAddWithoutValidation("Priority", "high");
+                request.Headers.TryAddWithoutValidation("Tags", n.IsFailure ? "warning" : n.IsRecovery ? "white_check_mark" : "globe_with_meridians");
+                if (n.IsFailure) request.Headers.TryAddWithoutValidation("Priority", "high");
                 break;
             case WebhookFormat.Gotify:
-                request.Content = JsonContent.Create(new { title = $"Matddns: {n.Title}", message = n.Text, priority = n.Kind == NotificationKind.Failure ? 8 : 5 });
+                request.Content = JsonContent.Create(new { title = $"Matddns: {n.Title}", message = n.Text, priority = n.IsFailure ? 8 : 5 });
                 break;
             default:
                 request.Content = JsonContent.Create(new

@@ -110,6 +110,8 @@ public class UpdaterService : BackgroundService
                       group.Entries.Any(e => e.LastChecked == null || (now - e.LastChecked.Value).TotalSeconds >= interval);
             if (!due) continue;
 
+            var before = group.Entries.ToDictionary(e => e.Id, e => e.LastError);
+
             // Push sources are not polled: their IP arrives via PushReceiver.
             switch (group.Kind)
             {
@@ -120,6 +122,33 @@ public class UpdaterService : BackgroundService
                 case SourceKind.Static: RefreshStatic(group); break;
                 case SourceKind.Dns: await RefreshDnsAsync(group, ct); break;
                 case SourceKind.Fritzbox when group.Fritzbox is { } fritz: await RefreshFritzboxAsync(group, fritz, ct); break;
+            }
+            if (group.Kind != SourceKind.Push) NotifySourceChanges(group, before);
+        }
+    }
+
+    /// <summary>
+    /// Tells about the entries of <paramref name="group"/> that started to fail or work again since <paramref name="before"/> (their errors before the
+    /// refresh): once at the first failure (a changed error text is no new failure) and once on the recovery, so a WAN that stays down sends one message.
+    /// </summary>
+    private void NotifySourceChanges(SourceGroup group, IReadOnlyDictionary<string, string?> before)
+    {
+        var entries = _config.Read(c => c.Sources.FirstOrDefault(g => g.Id == group.Id)?.Entries
+            .Select(e => (e.Id, e.Label, e.LastError, e.CurrentIp, e.CurrentIpv6)).ToList());
+        if (entries is null) return;
+
+        foreach (var e in entries)
+        {
+            var was = before.GetValueOrDefault(e.Id);
+            var name = string.IsNullOrWhiteSpace(e.Label) ? group.Name : $"{group.Name} · {e.Label}";
+            if (was is null && e.LastError is not null)
+                _notify.Notify(new Notification(NotificationKind.SourceFailure, $"Source {name} fails",
+                    $"The source {name} fails: {e.LastError}. Rules that use it fall back to their next source; Matddns keeps asking it.", Source: name));
+            else if (was is not null && e.LastError is null)
+            {
+                var addresses = string.Join(", ", new[] { e.CurrentIp, e.CurrentIpv6 }.Where(a => !string.IsNullOrEmpty(a)));
+                _notify.Notify(new Notification(NotificationKind.SourceRecovery, $"Source {name} works again",
+                    $"The source {name} works again{(addresses.Length > 0 ? $": {addresses}" : "")}.", Value: addresses.Length > 0 ? addresses : null, Source: name));
             }
         }
     }
