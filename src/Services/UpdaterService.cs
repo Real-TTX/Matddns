@@ -20,6 +20,7 @@ public class UpdaterService : BackgroundService
     private readonly SourceResolver _resolver;
     private readonly ReachabilityChecker _reach;
     private readonly HistoryService _history;
+    private readonly NotificationService _notify;
 
     // one evaluation pass at a time: the periodic loop and an on-demand run (management API) never overlap
     private readonly SemaphoreSlim _pass = new(1, 1);
@@ -40,7 +41,8 @@ public class UpdaterService : BackgroundService
         MatddnsClient matddns,
         SourceResolver resolver,
         ReachabilityChecker reach,
-        HistoryService history)
+        HistoryService history,
+        NotificationService notify)
     {
         _config = config;
         _log = log;
@@ -58,6 +60,7 @@ public class UpdaterService : BackgroundService
         _resolver = resolver;
         _reach = reach;
         _history = history;
+        _notify = notify;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -356,6 +359,8 @@ public class UpdaterService : BackgroundService
                 // leave LastSourceSignature untouched so the failed evaluation is retried next cycle
                 _log.Log(LogLevel.Error, $"rule:{RuleDesc(rule, cfg)}", ex.Message);
                 MutateRule(rule.Id, r => { r.LastRun = DateTime.UtcNow; r.LastResult = "error: " + ex.Message; r.FailCount++; });
+                if (rule.FailCount == 0)
+                    _notify.Notify(new Notification(NotificationKind.Failure, $"{RuleDesc(rule, cfg)} could not be updated", $"{RuleDesc(rule, cfg)}: {ex.Message}. Matddns keeps trying."));
             }
         }
     }
@@ -391,7 +396,13 @@ public class UpdaterService : BackgroundService
         {
             // only log on state change (otherwise spam with OnChange every 15s)
             if (rule.LastResult != "no source")
+            {
                 _log.Log(LogLevel.Warn, $"rule:{RuleDesc(rule, cfg)}", "no reachable source");
+                if (rule.LastRun != null) // not on the very first evaluation after a start, while the sources are still being read
+                    _notify.Notify(new Notification(NotificationKind.Failure, $"{dentry.Hostname} ({dentry.Type}) has no source",
+                        $"No source of the rule for {dentry.Hostname} ({dentry.Type}) has a usable address; the record keeps {rule.LastValue ?? "its value"}.",
+                        dentry.Hostname, dentry.Type.ToString(), rule.LastValue));
+            }
             MutateRule(rule.Id, r => { r.LastRun = DateTime.UtcNow; r.LastResult = "no source"; r.LastSourceSignature = signature; });
             return;
         }
@@ -424,10 +435,23 @@ public class UpdaterService : BackgroundService
             r.LastUsedSourceId = chosenSourceId;
         });
 
+        var record = $"{dentry.Hostname} ({dentry.Type})";
+        var source = _resolver.Find(cfg, chosenSourceId) is { } s ? $"{s.Group.Name} · {s.Entry.Label}" : null;
+        var wasFailing = rule.LastResult is "no source" || (rule.LastResult?.StartsWith("err", StringComparison.OrdinalIgnoreCase) ?? false);
         if (ok)
         {
-            var source = _resolver.Find(cfg, chosenSourceId) is { } s ? $"{s.Group.Name} · {s.Entry.Label}" : null;
-            _history.Record(rule.Id, dentry.Hostname, dentry.Type.ToString(), chosenValue, source);
+            if (_history.Record(rule.Id, dentry.Hostname, dentry.Type.ToString(), chosenValue, source) is { } change)
+                _notify.Notify(new Notification(NotificationKind.Change, $"{record} is now {chosenValue}",
+                    $"{record} is now {StatusService.Describe(change)}.", dentry.Hostname, dentry.Type.ToString(), chosenValue, change.Previous, source));
+            if (wasFailing)
+                _notify.Notify(new Notification(NotificationKind.Recovery, $"{record} works again",
+                    $"{record} was written again: {chosenValue}.", dentry.Hostname, dentry.Type.ToString(), chosenValue, null, source));
+        }
+        else if (rule.FailCount == 0)
+        {
+            // once, at the first failure in a row; the back-off keeps trying and the recovery is told too
+            _notify.Notify(new Notification(NotificationKind.Failure, $"{record} could not be updated",
+                $"{record} could not be set to {chosenValue}: {msg}. Matddns keeps trying.", dentry.Hostname, dentry.Type.ToString(), chosenValue, null, source));
         }
     }
 

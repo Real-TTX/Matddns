@@ -7,12 +7,12 @@ namespace Matddns.Tests;
 /// <summary>An updater over a test environment whose HTTP calls go to <paramref name="http"/> (no background loop; the tests call <c>RunNowAsync</c>).</summary>
 internal static class TestUpdater
 {
-    public static UpdaterService Create(TestEnvironment env, HttpMessageHandler http)
+    public static UpdaterService Create(TestEnvironment env, HttpMessageHandler http, NotificationService? notifications = null)
     {
         var f = new StubHttpClientFactory(http);
         return new UpdaterService(env.Config, env.Log, new PublicIpClient(f), new DnsLookupClient(), new FritzboxClient(), new UnifiClient(),
             new UnifiCloudClient(f), new DynDnsClient(f), new NetcupClient(f), new CloudflareClient(f), new HetznerClient(f), new GoDaddyClient(f),
-            new MatddnsClient(f), new SourceResolver(), new ReachabilityChecker(), env.History);
+            new MatddnsClient(f), new SourceResolver(), new ReachabilityChecker(), env.History, notifications ?? new NotificationService(env.Config, env.Log, f));
     }
 
     /// <summary>A static source and a DynDNS group with one A record bound by a rule; returns the ids.</summary>

@@ -4,15 +4,21 @@
     ViewData["Title"] = "System";
     ViewData["Crumbs"] = Crumbs.Of(("System", null));
     var lvl = Model.CurrentLevel;
+    var n = Model.Notifications;
+    var keep = "Leave empty to keep the current one";
+    string Selected(string tab) => Model.Tab == tab ? "true" : "false";
+    string? TabIndex(string tab) => Model.Tab == tab ? null : "-1";
 }
 
 <div data-tabs>
     <div class="mat-tabs" role="tablist" aria-label="System">
-        <button type="button" class="mat-tab" role="tab" id="tab-general" aria-controls="panel-general" aria-selected="true">General</button>
-        <button type="button" class="mat-tab" role="tab" id="tab-api" aria-controls="panel-api" aria-selected="false" tabindex="-1">API</button>
+        @foreach (var (id, title) in SystemModel.Tabs)
+        {
+            <button type="button" class="mat-tab" role="tab" id="tab-@id" aria-controls="panel-@id" aria-selected="@Selected(id)" tabindex="@TabIndex(id)">@title</button>
+        }
     </div>
 
-    <div class="mat-tabpanel" role="tabpanel" id="panel-general" aria-labelledby="tab-general">
+    <div class="mat-tabpanel" role="tabpanel" id="panel-general" aria-labelledby="tab-general" hidden="@(Model.Tab != "general")">
         <form method="post" class="mat-form" novalidate>
             <div class="mat-card">
                 <div class="mat-card__head"><icon name="settings" /><h2 class="mat-card__title">Settings</h2></div>
@@ -60,7 +66,77 @@
         </form>
     </div>
 
-    <div class="mat-tabpanel" role="tabpanel" id="panel-api" aria-labelledby="tab-api" hidden>
+    <div class="mat-tabpanel" role="tabpanel" id="panel-notifications" aria-labelledby="tab-notifications" hidden="@(Model.Tab != "notifications")">
+        <form method="post" asp-page-handler="Notifications" class="mat-form" novalidate>
+            <div class="mat-card">
+                <div class="mat-card__head"><icon name="bell" /><h2 class="mat-card__title">When</h2></div>
+                <div class="mat-card__body mat-stack">
+                    <label class="mat-check"><input type="checkbox" name="OnChange" value="true" checked="@n.OnChange" /><span class="mat-check__text">A record gets a new IP</span></label>
+                    <label class="mat-check"><input type="checkbox" name="OnFailure" value="true" checked="@n.OnFailure" /><span class="mat-check__text">A record cannot be updated, and when it works again</span></label>
+                </div>
+            </div>
+
+            <div class="mat-card">
+                <div class="mat-card__head"><icon name="mail" /><h2 class="mat-card__title">E-mail</h2></div>
+                <div class="mat-card__body mat-stack">
+                    <label class="mat-check"><input type="checkbox" id="MailEnabled" name="MailEnabled" value="true" checked="@n.Mail.Enabled" /><span class="mat-check__text">Send e-mails</span></label>
+                    <div class="mat-form__grid" data-show-if="#MailEnabled" data-show-value="true" hidden="@(!n.Mail.Enabled)">
+                        <mat-field label="SMTP server" for-id="MailHost">
+                            <input type="text" id="MailHost" name="MailHost" value="@n.Mail.Host" class="mat-input mat-mono" placeholder="smtp.example.com" autocapitalize="none" spellcheck="false" />
+                        </mat-field>
+                        <mat-field label="Port" for-id="MailPort">
+                            <input type="number" id="MailPort" name="MailPort" value="@n.Mail.Port" min="1" max="65535" class="mat-input mat-mono" inputmode="numeric" data-msg-range="Please enter a port from 1 to 65535." />
+                        </mat-field>
+                        <mat-field label="Security" for-id="MailTls">
+                            <select id="MailTls" name="MailTls" class="mat-select">
+                                <option value="StartTls" selected="@(n.Mail.Tls == MailTls.StartTls)">STARTTLS (port 587)</option>
+                                <option value="Tls" selected="@(n.Mail.Tls == MailTls.Tls)">TLS (port 465)</option>
+                                <option value="None" selected="@(n.Mail.Tls == MailTls.None)">None</option>
+                            </select>
+                        </mat-field>
+                        <mat-field label="Username" for-id="MailUsername">
+                            <input type="text" id="MailUsername" name="MailUsername" value="@n.Mail.Username" class="mat-input" autocomplete="off" autocapitalize="none" />
+                        </mat-field>
+                        <mat-field label="Password" for-id="MailPassword">
+                            <input type="password" id="MailPassword" name="MailPassword" class="mat-input" placeholder="@(string.IsNullOrEmpty(n.Mail.Password) ? "" : keep)" autocomplete="new-password" />
+                        </mat-field>
+                        <mat-field label="From" for-id="MailFrom">
+                            <input type="email" id="MailFrom" name="MailFrom" value="@n.Mail.From" class="mat-input" placeholder="matddns@example.com" autocomplete="off" autocapitalize="none" data-msg-type="Please enter an e-mail address." />
+                        </mat-field>
+                        <mat-field label="To" for-id="MailTo" full="true">
+                            <input type="text" id="MailTo" name="MailTo" value="@n.Mail.To" class="mat-input" placeholder="admin@example.com, ops@example.com" autocomplete="off" autocapitalize="none" spellcheck="false" />
+                        </mat-field>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mat-card">
+                <div class="mat-card__head"><icon name="plug" /><h2 class="mat-card__title">Webhook</h2></div>
+                <div class="mat-card__body mat-stack">
+                    <label class="mat-check"><input type="checkbox" id="WebhookEnabled" name="WebhookEnabled" value="true" checked="@n.Webhook.Enabled" /><span class="mat-check__text">Call a webhook</span></label>
+                    <div class="mat-form__grid" data-show-if="#WebhookEnabled" data-show-value="true" hidden="@(!n.Webhook.Enabled)">
+                        <mat-field label="Format" for-id="WebhookFormat">
+                            <select id="WebhookFormat" name="WebhookFormat" class="mat-select">
+                                <option value="Json" selected="@(n.Webhook.Format == WebhookFormat.Json)">JSON</option>
+                                <option value="Ntfy" selected="@(n.Webhook.Format == WebhookFormat.Ntfy)">ntfy</option>
+                                <option value="Gotify" selected="@(n.Webhook.Format == WebhookFormat.Gotify)">Gotify</option>
+                            </select>
+                        </mat-field>
+                        <mat-field label="URL" for-id="WebhookUrl" full="true">
+                            <input type="password" id="WebhookUrl" name="WebhookUrl" class="mat-input mat-mono" placeholder="@(string.IsNullOrEmpty(n.Webhook.Url) ? "https://ntfy.sh/my-topic or https://gotify.example.com/message?token=…" : $"{SystemModel.UrlHint(n.Webhook.Url)} – {keep.ToLowerInvariant()}")" autocomplete="new-password" autocapitalize="none" spellcheck="false" />
+                        </mat-field>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mat-btn-row">
+                <button type="submit" class="mat-btn mat-btn--primary"><icon name="save" /><span>Save</span></button>
+                <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="TestNotifications"><icon name="bell" /><span>Save and send a test</span></button>
+            </div>
+        </form>
+    </div>
+
+    <div class="mat-tabpanel" role="tabpanel" id="panel-api" aria-labelledby="tab-api" hidden="@(Model.Tab != "api")">
         <div class="mat-stack">
             <p class="mat-muted">Endpoints without sign-in for monitors, routers and other Matddns instances. None of them shows a password or key.</p>
 

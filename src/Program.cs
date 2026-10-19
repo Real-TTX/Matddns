@@ -58,6 +58,9 @@ builder.Services.AddSingleton<Matddns.Support.Toolkit>();
 builder.Services.AddSingleton<PushReceiver>();
 builder.Services.AddSingleton<UpdaterService>(); // also injected by the management API (POST /api/v1/run)
 builder.Services.AddHostedService(sp => sp.GetRequiredService<UpdaterService>());
+builder.Services.AddSingleton<IMailSender, MailKitSender>();
+builder.Services.AddSingleton<NotificationService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<NotificationService>());
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<UserService>();
 

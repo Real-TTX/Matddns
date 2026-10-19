@@ -13,6 +13,10 @@
     <!-- For the copy of MatPlatform (folder MatPlatform/, from MatDesign): the sign-in through MatIdentity and its tokens on /api. -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.13" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.13" />
+    <!-- Notification mail over SMTP (STARTTLS and TLS from the first byte, which System.Net.Mail cannot do). -->
+    <PackageReference Include="MailKit" Version="4.18.1" />
+    <!-- MimeKit brings Pkcs 10.0.0, which has a known vulnerability (GHSA-846f-f764-76mx): take the patched one. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup>

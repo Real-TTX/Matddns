@@ -269,6 +269,19 @@ A source counts as reachable only when its current IP passes the rule's validati
 
 A failed update is retried with a growing wait: 30 s after the first failure, then doubled each time up to 30 minutes (the rule page shows the next try). Saving the rule or its domain group, *Run now* and `POST /api/v1/run` start again at once or at the shortest wait.
 
+## Notifications
+
+*System → Notifications* tells you when a record gets a new IP, when it cannot be updated (once, at the first failure; Matddns keeps
+trying with its back-off) and when it works again. Each kind can be switched off.
+
+- **E-mail** over SMTP: server, port, STARTTLS / TLS / none, user, password, sender and one or more recipients. The fields are those of
+  the `MATSMTP_*` variables of the Mat platform (host, port, username, password, from, tls), so mail through MatSMTP can take their place.
+- **Webhook**: `JSON` (`{"app":"matddns","event":"change|failure|recovery|test","title","message","record","type","value","previous","source","time"}`),
+  `ntfy` (plain text with a `Title` header to a topic URL) or `Gotify` (`{"title","message","priority"}` to `/message?token=…`).
+
+*Save and send a test* checks the setup right away. The SMTP password and the webhook URL (it can carry a token) are never shown again
+or written to the log; a failed delivery is logged as a warning and dropped.
+
 ## DynDNS server (incoming)
 
 A DynDNS-server source lets a device report its IP to a token-protected URL (shown on the

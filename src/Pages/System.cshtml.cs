@@ -1,3 +1,4 @@
+using Matddns.Models;
 using Matddns.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -6,26 +7,37 @@ namespace Matddns.Pages;
 
 public class SystemModel : PageModel
 {
+    /// <summary>The tabs of the page: the id (also <c>?tab=</c>, so a form comes back to its tab) and the title.</summary>
+    public static readonly (string Id, string Title)[] Tabs = [("general", "General"), ("notifications", "Notifications"), ("api", "API")];
+
     private readonly SettingsService _settings;
     private readonly LogService _log;
-    public SystemModel(SettingsService settings, LogService log)
+    private readonly ConfigService _config;
+    private readonly NotificationService _notify;
+
+    public SystemModel(SettingsService settings, LogService log, ConfigService config, NotificationService notify)
     {
         _settings = settings;
         _log = log;
+        _config = config;
+        _notify = notify;
     }
 
+    public string Tab { get; private set; } = "general";
     public Services.LogLevel CurrentLevel { get; private set; }
     public int RetentionDays { get; private set; }
     public string CurrentTimeZone { get; private set; } = "";
     public bool AnonymousDashboard { get; private set; }
     public List<TimeZoneInfo> Zones { get; private set; } = new();
     public long LogFileBytes { get; private set; }
+    public NotificationSettings Notifications { get; private set; } = new();
 
     [TempData] public string? Notice { get; set; }
     [TempData] public string? Error { get; set; }
 
-    public void OnGet()
+    public void OnGet(string? tab)
     {
+        Tab = Tabs.Any(t => t.Id == tab) ? tab! : "general";
         var s = _settings.Get();
         CurrentLevel = s.MinLogLevel;
         RetentionDays = s.LogRetentionDays;
@@ -33,7 +45,12 @@ public class SystemModel : PageModel
         AnonymousDashboard = s.AnonymousDashboard;
         Zones = TimeZoneInfo.GetSystemTimeZones().OrderBy(z => z.Id, StringComparer.Ordinal).ToList();
         LogFileBytes = _log.LogFileBytes();
+        Notifications = _config.Read(c => c.Settings.Notifications);
     }
+
+    /// <summary>Only the scheme and the host of a URL that may carry a token (<c>https://ntfy.sh/…</c>).</summary>
+    public static string UrlHint(string url)
+        => Uri.TryCreate(url, UriKind.Absolute, out var u) ? $"{u.Scheme}://{u.Host}/…" : "set";
 
     // The same checks and the same entry in the log as a change through the platform API (/api/configure).
     public IActionResult OnPost(Services.LogLevel MinLogLevel, int LogRetentionDays, string? TimeZone, bool AnonymousDashboard)
@@ -50,5 +67,72 @@ public class SystemModel : PageModel
         _log.Log(Services.LogLevel.Info, "settings", $"log cleared by {User.Identity?.Name ?? "?"}");
         Notice = "Log cleared.";
         return RedirectToPage();
+    }
+
+    public IActionResult OnPostNotifications(NotificationForm form)
+    {
+        if (SaveNotifications(form) is { } problem) Error = problem;
+        else Notice = "Saved.";
+        return RedirectToPage(new { tab = "notifications" });
+    }
+
+    public async Task<IActionResult> OnPostTestNotificationsAsync(NotificationForm form, CancellationToken ct)
+    {
+        if (SaveNotifications(form) is { } problem) { Error = problem; return RedirectToPage(new { tab = "notifications" }); }
+        if (!form.MailEnabled && !form.WebhookEnabled) { Error = "Switch on e-mail or the webhook first."; return RedirectToPage(new { tab = "notifications" }); }
+
+        var failed = await _notify.SendAsync(new Notification(NotificationKind.Test, "test message",
+            $"This is a test of the notifications of Matddns, sent by {User.Identity?.Name ?? "?"}."), ct);
+        if (failed.Count > 0) Error = "Saved, but the test failed. " + string.Join(" ", failed);
+        else Notice = "Saved. The test message was sent.";
+        return RedirectToPage(new { tab = "notifications" });
+    }
+
+    /// <summary>Checks and saves the form; answers the problem (nothing saved) or null. An empty password or URL keeps the stored one.</summary>
+    private string? SaveNotifications(NotificationForm f)
+    {
+        var current = _config.Read(c => c.Settings.Notifications);
+        var mail = new MailSettings
+        {
+            Enabled = f.MailEnabled,
+            Host = (f.MailHost ?? "").Trim(),
+            Port = f.MailPort,
+            Tls = f.MailTls,
+            Username = (f.MailUsername ?? "").Trim(),
+            Password = string.IsNullOrEmpty(f.MailPassword) ? current.Mail.Password : f.MailPassword,
+            From = (f.MailFrom ?? "").Trim(),
+            To = (f.MailTo ?? "").Trim(),
+        };
+        var url = string.IsNullOrWhiteSpace(f.WebhookUrl) ? current.Webhook.Url : f.WebhookUrl.Trim();
+
+        if (mail.Enabled && NotificationService.MailProblem(mail) is { } mailProblem) return $"E-mail: {mailProblem}.";
+        if (f.WebhookEnabled && !InputCheck.IsHttpUrl(url)) return "Webhook: enter an http(s) URL.";
+
+        _config.Mutate(c => c.Settings.Notifications = new NotificationSettings
+        {
+            OnChange = f.OnChange,
+            OnFailure = f.OnFailure,
+            Mail = mail,
+            Webhook = new WebhookSettings { Enabled = f.WebhookEnabled, Url = url, Format = f.WebhookFormat },
+        });
+        _log.Log(Services.LogLevel.Info, "settings", $"notifications changed by {User.Identity?.Name ?? "?"}: e-mail {(mail.Enabled ? "on" : "off")}, webhook {(f.WebhookEnabled ? f.WebhookFormat.ToString() : "off")}");
+        return null;
+    }
+
+    public sealed class NotificationForm
+    {
+        public bool OnChange { get; set; }
+        public bool OnFailure { get; set; }
+        public bool MailEnabled { get; set; }
+        public string? MailHost { get; set; }
+        public int MailPort { get; set; } = 587;
+        public MailTls MailTls { get; set; } = MailTls.StartTls;
+        public string? MailUsername { get; set; }
+        public string? MailPassword { get; set; }
+        public string? MailFrom { get; set; }
+        public string? MailTo { get; set; }
+        public bool WebhookEnabled { get; set; }
+        public string? WebhookUrl { get; set; }
+        public WebhookFormat WebhookFormat { get; set; } = WebhookFormat.Json;
     }
 }
