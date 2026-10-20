@@ -115,8 +115,10 @@ Ready-made images are published to the GitHub Container Registry:
 
 | Tag | Built from | Use it for |
 |---|---|---|
-| `ghcr.io/real-ttx/matddns:latest` | `main` | releases |
-| `ghcr.io/real-ttx/matddns:0.4.<n>` | `main` | pin a specific build |
+| `ghcr.io/real-ttx/matddns:latest` | `main` | releases (amd64) |
+| `ghcr.io/real-ttx/matddns:0.4.<n>` | `main` | pin a specific build (amd64) |
+| `ghcr.io/real-ttx/matddns:latest-arm64` | `main` | releases on ARM64 (Raspberry Pi etc.) |
+| `ghcr.io/real-ttx/matddns:0.4.<n>-arm64` | `main` | pin a specific ARM64 build |
 
 ### 1. Just run it
 
