@@ -115,13 +115,15 @@ public class LoginModel : PageModel
 
             // A pending link counts only for exactly the account that matched; it is deleted either way.
             string? idToken = null;
+            string? sessionId = null;
             if (MatIdentityPendingLink.TakeFor(HttpContext, user.Username) is { } pending
                 && _users.LinkExternal(user.Username, new ExternalIdentity(pending.Subject, pending.Email, pending.Name, pending.PreferredUserName), out _))
             {
                 idToken = pending.IdToken;
+                sessionId = pending.SessionId;
             }
 
-            await MatddnsSession.StartAsync(HttpContext, user, idToken);
+            await MatddnsSession.StartAsync(HttpContext, user, idToken, sessionId);
             _log.Log(Services.LogLevel.Info, "auth", $"login ok: {Username}");
             return SafeRedirect(returnUrl);
         }

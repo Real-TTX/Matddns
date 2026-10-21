@@ -92,22 +92,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         opt.LogoutPath = "/Logout";
         opt.ExpireTimeSpan = TimeSpan.FromDays(30);
         opt.SlidingExpiration = true;
-        // End a session as soon as its account is deleted or its password changed (the cookie itself stays valid for 30 days).
-        opt.Events.OnValidatePrincipal = async ctx =>
-        {
-            var name = ctx.Principal?.Identity?.Name;
-            var stamp = ctx.Principal?.FindFirst(AuthService.SecurityStampClaim)?.Value;
-            var config = ctx.HttpContext.RequestServices.GetRequiredService<ConfigService>();
-            var currentStamp = config.Read(c =>
-                c.Users.FirstOrDefault(u => u.Username.Equals(name, StringComparison.OrdinalIgnoreCase)) is { } user
-                    ? AuthService.SecurityStamp(user)
-                    : null);
-            if (currentStamp == null || stamp != currentStamp)
-            {
-                ctx.RejectPrincipal();
-                await ctx.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            }
-        };
+        // End a session as soon as its account is deleted, its password changed or MatIdentity signed it out (the cookie itself stays valid for 30 days).
+        opt.Events.OnValidatePrincipal = MatddnsSession.ValidateAsync;
     })
     // Sign-in through MatIdentity, only with MATIDENTITY_AUTHORITY (nothing changes without it); the local form stays at /Login?local=1.
     .AddMatIdentitySignIn<MatddnsIdentityUsers>(platform, o =>

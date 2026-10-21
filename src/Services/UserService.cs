@@ -98,6 +98,62 @@ public class UserService
         return problem == null;
     }
 
+    /// <summary>How long an ended <c>sid</c> is remembered: as long as a session cookie can live after its last request (30 days), and a day more.</summary>
+    public static readonly TimeSpan EndedSessionLifetime = TimeSpan.FromDays(31);
+
+    /// <summary>
+    /// MatIdentity says a person signed out (back-channel logout). <paramref name="sessionId"/> set: the sessions that started with this <c>sid</c> end
+    /// (remembered on the account linked with <paramref name="subject"/>, or on every linked account when the token names no subject, since a session of
+    /// MatIdentity only ever belongs to a linked account). <paramref name="subject"/> alone: every session of the account linked with it ends
+    /// (<see cref="UserAccount.SignedOutAt"/>). An unknown subject is nothing to end. Written to the log.
+    /// </summary>
+    public void EndSessions(string? subject, string? sessionId)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var ended = _config.Transact(c =>
+        {
+            var accounts = !string.IsNullOrEmpty(subject)
+                ? c.Users.Where(u => u.ExternalSubject == subject).ToList()
+                : c.Users.Where(u => u.ExternalSubject != null).ToList();
+            foreach (var user in accounts)
+            {
+                if (string.IsNullOrEmpty(sessionId))
+                {
+                    user.SignedOutAt = now;
+                    continue;
+                }
+
+                var list = user.EndedSessions ?? new List<EndedSession>();
+                list.RemoveAll(e => e.At < now - EndedSessionLifetime || e.Sid == sessionId);
+                list.Add(new EndedSession { Sid = sessionId, At = now });
+                user.EndedSessions = list;
+            }
+
+            return accounts.Select(u => u.Username).ToList();
+        });
+
+        var what = string.IsNullOrEmpty(sessionId) ? "every session" : "the session";
+        if (!string.IsNullOrEmpty(subject))
+        {
+            if (ended.Count == 0) _log.Log(LogLevel.Info, "auth", "MatIdentity signed out a person who has no account here: nothing to end");
+            else _log.Log(LogLevel.Info, "auth", $"MatIdentity signed out '{ended[0]}': {what} of MatIdentity ended");
+        }
+        else
+        {
+            _log.Log(LogLevel.Info, "auth", "MatIdentity ended a session: its session here ends");
+        }
+    }
+
+    /// <summary>
+    /// Whether a session of <paramref name="user"/> that started at <paramref name="startedAt"/> (null: before Matddns kept the time) with the
+    /// MatIdentity session <paramref name="sessionId"/> (null: none) was ended by MatIdentity (<see cref="EndSessions"/>).
+    /// </summary>
+    public static bool IsSessionEnded(UserAccount user, string? sessionId, DateTimeOffset? startedAt)
+    {
+        if (user.SignedOutAt is { } signedOut && (startedAt is not { } started || started < signedOut)) return true;
+        return !string.IsNullOrEmpty(sessionId) && user.EndedSessions?.Any(e => e.Sid == sessionId) == true;
+    }
+
     private static string BaseName(ExternalIdentity person)
     {
         var name = person.PreferredUserName;

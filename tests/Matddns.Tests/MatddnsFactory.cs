@@ -16,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 
@@ -32,6 +33,9 @@ public class MatddnsFactory : WebApplicationFactory<Program>
     public const string PlatformKey = "platform-key-0123456789";
     public const string EngineKey = "engine-key-9876543210";
     public const string SessionCookie = "matddns.auth";
+
+    /// <summary>The key MatIdentity signs with in the tests (made here, no network): it is in the keys of the fixed OpenID configuration (logout tokens).</summary>
+    public static readonly SigningCredentials Credentials = new(new RsaSecurityKey(System.Security.Cryptography.RSA.Create(2048)) { KeyId = "test-key" }, SecurityAlgorithms.RsaSha256);
 
     private readonly string _data = Path.Combine(Path.GetTempPath(), "matddns-tests-" + Guid.NewGuid().ToString("N"));
     private readonly bool _platformKey;
@@ -101,6 +105,7 @@ public class MatddnsFactory : WebApplicationFactory<Program>
                     TokenEndpoint = _authority + "/connect/token",
                     EndSessionEndpoint = _authority + "/connect/logout",
                 };
+                configuration.SigningKeys.Add(Credentials.Key);
 
                 services.PostConfigure<OpenIdConnectOptions>(MatIdentitySignIn.Scheme, options =>
                 {

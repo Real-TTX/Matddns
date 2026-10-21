@@ -19,6 +19,27 @@ public class UserAccount
     /// <summary>The claim <c>sub</c> of the person in MatIdentity this account is linked with; null = not linked (then not written to config.json).</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? ExternalSubject { get; set; }
+
+    /// <summary>
+    /// When MatIdentity signed the person out everywhere (back-channel logout with <c>sub</c> alone): every session of this account that started
+    /// before is ended. Null = never (then not written to config.json).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public DateTimeOffset? SignedOutAt { get; set; }
+
+    /// <summary>
+    /// The sessions of MatIdentity (claim <c>sid</c>) that MatIdentity ended (back-channel logout with a <c>sid</c>): a session of this account that
+    /// started with one of them is ended. Kept as long as a session cookie can live; null = none (then not written to config.json).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public List<EndedSession>? EndedSessions { get; set; }
+}
+
+/// <summary>A session of MatIdentity (its <c>sid</c>) that was ended at <see cref="At"/>.</summary>
+public class EndedSession
+{
+    public string Sid { get; set; } = "";
+    public DateTimeOffset At { get; set; }
 }
 
 public class AppSettings

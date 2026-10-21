@@ -557,12 +557,18 @@ Optional, on only when `MATIDENTITY_AUTHORITY` is set; without it Matddns signs 
 
 - A visit to the sign-in page goes straight to MatIdentity (OpenID Connect, authorization code with PKCE) and comes back signed in.
   The local form stays at **`/Login?local=1`** (the way in when MatIdentity is down). In MatIdentity, the client of Matddns needs
-  the redirect address **`/signin-oidc`** and the signed-out address **`/signout-callback-oidc`**.
+  the redirect address **`/signin-oidc`**, the signed-out address **`/signout-callback-oidc`** and the back-channel logout
+  **`/signout-backchannel`** (Mattiverse registers it).
 - The first sign-in of a person creates an account (named after `preferred_username`, else the e-mail address) without a password,
   linked by the claim `sub`. An **existing account is never linked by its name alone**: when its name equals the person's user name or
   e-mail address, Matddns asks for that account's password once (`/Login?local=1&link=1`, ten minutes) and links it only when exactly
   that account signs in; another account links nothing, *Cancel* drops it. Several matches, or a match linked to another person, are refused.
 - The sign-out ends the session at MatIdentity too.
+- A sign-out at MatIdentity (or an administrator ending the sessions there) ends the session in Matddns too: MatIdentity posts a signed
+  logout token to **`POST /signout-backchannel`** (MatPlatform 1.4.0; not there without `MATIDENTITY_AUTHORITY`). With a `sid` the session
+  that started with it ends, with `sub` alone every session of the linked account (also one signed in with its password); the cookie is
+  signed out at its next request. The ended sessions are kept with the account in `config.json` (`signedOutAt`, `endedSessions`, a `sid`
+  for 31 days) and written to the log.
 - The peer endpoints (`/api/update`, `/api/source`, `/nic/update`, `/update`) keep their tokens and the engine API its key;
   MatIdentity changes none of them.
 
