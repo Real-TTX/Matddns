@@ -473,6 +473,7 @@ public static class ManagementApi
         // credentials are accepted but never returned: a credentialsSet flag says whether they are stored
         Strip(o, "cloudflare", "apiToken");
         Strip(o, "netcup", "customerNumber", "apiKey", "apiPassword");
+        Strip(o, "netcupCloud", "apiKey");
         Strip(o, "hetzner", "apiToken");
         Strip(o, "goDaddy", "apiKey", "apiSecret");
         Strip(o, "dynDns", "updateUrl", "username", "password");
@@ -481,6 +482,7 @@ public static class ManagementApi
         {
             DomainKind.Cloudflare => Has(g.Cloudflare?.ApiToken),
             DomainKind.Netcup => Has(g.Netcup?.CustomerNumber) && Has(g.Netcup?.ApiKey) && Has(g.Netcup?.ApiPassword),
+            DomainKind.NetcupCloud => Has(g.NetcupCloud?.ApiKey),
             DomainKind.Hetzner => Has(g.Hetzner?.ApiToken),
             DomainKind.GoDaddy => Has(g.GoDaddy?.ApiKey) && Has(g.GoDaddy?.ApiSecret),
             DomainKind.DynDns => Has(g.DynDns?.UpdateUrl),
@@ -566,7 +568,15 @@ public static class ManagementApi
                 if (m.BaseUrl.Length > 0) RequireUrl(m.BaseUrl, "matddns.baseUrl");
                 break;
             }
-            default: // Netcup
+            case DomainKind.NetcupCloud:
+            {
+                var s = b.Obj("netcupCloud");
+                var ncl = g.NetcupCloud ??= new NetcupCloudSettings();
+                if (Secret(s, "apiKey") is { } key) ncl.ApiKey = key;
+                if (s?.Bool("allowDynamic") is { } ad) ncl.AllowDynamic = ad;
+                break;
+            }
+            default: // Netcup (legacy)
             {
                 var s = b.Obj("netcup");
                 var nc = g.Netcup ??= new NetcupSettings();

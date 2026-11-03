@@ -15,7 +15,7 @@ internal static class TestUpdater
     }
 
     public static RecordWriter Writer(IHttpClientFactory f)
-        => new(new DynDnsClient(f), new NetcupClient(f), new CloudflareClient(f), new HetznerClient(f), new GoDaddyClient(f), new MatddnsClient(f));
+        => new(new DynDnsClient(f), new NetcupClient(f), new NetcupCloudClient(f), new CloudflareClient(f), new HetznerClient(f), new GoDaddyClient(f), new MatddnsClient(f));
 
     /// <summary>A static source and a DynDNS group with one A record bound by a rule; returns the ids.</summary>
     public static (string SourceId, string RuleId) StaticToDynDns(TestEnvironment env, string ip)

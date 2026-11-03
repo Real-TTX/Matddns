@@ -32,7 +32,8 @@ public class EditModel : PageModel
         string? CfToken = null, bool CfAllowDynamic = false,
         string? HzToken = null, bool HzAllowDynamic = false,
         string? GdKey = null, string? GdSecret = null, bool GdAllowDynamic = false,
-        string? MdUrl = null, string? MdToken = null)
+        string? MdUrl = null, string? MdToken = null,
+        string? NcloudKey = null, bool NcloudAllowDynamic = false)
     {
         if (string.IsNullOrWhiteSpace(Name)) { Error = "Enter a name."; return RedirectToPage("Edit"); }
         if (InvalidUrl(Kind, DynUrl, MdUrl) is { } badUrl) { Error = badUrl; return RedirectToPage("Edit"); }
@@ -40,6 +41,8 @@ public class EditModel : PageModel
         var g = new DomainGroup { Name = Name.Trim(), Kind = Kind };
         if (Kind == DomainKind.DynDns)
             g.DynDns = new DynDnsSettings { UpdateUrl = DynUrl ?? "", Username = DynUser ?? "", Password = DynPass ?? "" };
+        else if (Kind == DomainKind.NetcupCloud)
+            g.NetcupCloud = new NetcupCloudSettings { ApiKey = (NcloudKey ?? "").Trim(), AllowDynamic = NcloudAllowDynamic };
         else if (Kind == DomainKind.Cloudflare)
             g.Cloudflare = new CloudflareSettings { ApiToken = (CfToken ?? "").Trim(), AllowDynamic = CfAllowDynamic };
         else if (Kind == DomainKind.Hetzner)
@@ -62,7 +65,8 @@ public class EditModel : PageModel
         string? CfToken = null, bool CfAllowDynamic = false,
         string? HzToken = null, bool HzAllowDynamic = false,
         string? GdKey = null, string? GdSecret = null, bool GdAllowDynamic = false,
-        string? MdUrl = null, string? MdToken = null)
+        string? MdUrl = null, string? MdToken = null,
+        string? NcloudKey = null, bool NcloudAllowDynamic = false)
     {
         var storedKind = _config.Read(c => c.Domains.FirstOrDefault(x => x.Id == Id)?.Kind);
         if (storedKind is { } k && InvalidUrl(k, DynUrl, MdUrl) is { } badUrl) { Error = badUrl; return RedirectToPage("Edit", new { id = Id }); }
@@ -79,6 +83,12 @@ public class EditModel : PageModel
                 g.DynDns.UpdateUrl = DynUrl ?? "";
                 g.DynDns.Username = DynUser ?? "";
                 if (!string.IsNullOrEmpty(DynPass)) g.DynDns.Password = DynPass; // empty = unchanged
+            }
+            else if (g.Kind == DomainKind.NetcupCloud)
+            {
+                g.NetcupCloud ??= new NetcupCloudSettings();
+                if (!string.IsNullOrEmpty(NcloudKey)) g.NetcupCloud.ApiKey = NcloudKey.Trim(); // empty = unchanged
+                g.NetcupCloud.AllowDynamic = NcloudAllowDynamic;
             }
             else if (g.Kind == DomainKind.Cloudflare)
             {

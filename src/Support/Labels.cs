@@ -19,7 +19,8 @@ public static class Labels
 
     public static string Domain(DomainKind kind) => kind switch
     {
-        DomainKind.Netcup => "Netcup API",
+        DomainKind.NetcupCloud => "Netcup",
+        DomainKind.Netcup => "Netcup legacy",
         DomainKind.Cloudflare => "Cloudflare",
         DomainKind.Hetzner => "Hetzner DNS",
         DomainKind.GoDaddy => "GoDaddy",

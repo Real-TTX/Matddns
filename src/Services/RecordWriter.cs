@@ -7,15 +7,17 @@ public class RecordWriter
 {
     private readonly DynDnsClient _dyndns;
     private readonly NetcupClient _netcup;
+    private readonly NetcupCloudClient _netcupCloud;
     private readonly CloudflareClient _cloudflare;
     private readonly HetznerClient _hetzner;
     private readonly GoDaddyClient _godaddy;
     private readonly MatddnsClient _matddns;
 
-    public RecordWriter(DynDnsClient dyndns, NetcupClient netcup, CloudflareClient cloudflare, HetznerClient hetzner, GoDaddyClient godaddy, MatddnsClient matddns)
+    public RecordWriter(DynDnsClient dyndns, NetcupClient netcup, NetcupCloudClient netcupCloud, CloudflareClient cloudflare, HetznerClient hetzner, GoDaddyClient godaddy, MatddnsClient matddns)
     {
         _dyndns = dyndns;
         _netcup = netcup;
+        _netcupCloud = netcupCloud;
         _cloudflare = cloudflare;
         _hetzner = hetzner;
         _godaddy = godaddy;
@@ -23,12 +25,13 @@ public class RecordWriter
     }
 
     /// <summary>Whether a dynamic receiver can create records in a group of <paramref name="kind"/>: the zone-based APIs.</summary>
-    public static bool CanCreate(DomainKind kind) => kind is DomainKind.Netcup or DomainKind.Cloudflare or DomainKind.Hetzner or DomainKind.GoDaddy;
+    public static bool CanCreate(DomainKind kind) => kind is DomainKind.Netcup or DomainKind.NetcupCloud or DomainKind.Cloudflare or DomainKind.Hetzner or DomainKind.GoDaddy;
 
     /// <summary>Whether the group lets Matddns create records that do not exist yet (its "allow dynamic records" switch).</summary>
     public static bool AllowsCreate(DomainGroup g) => g.Kind switch
     {
         DomainKind.Netcup => g.Netcup?.AllowDynamic == true,
+        DomainKind.NetcupCloud => g.NetcupCloud?.AllowDynamic == true,
         DomainKind.Cloudflare => g.Cloudflare?.AllowDynamic == true,
         DomainKind.Hetzner => g.Hetzner?.AllowDynamic == true,
         DomainKind.GoDaddy => g.GoDaddy?.AllowDynamic == true,
@@ -50,6 +53,12 @@ public class RecordWriter
             {
                 var (zone, host) = ZoneAndHost(entry);
                 return await _netcup.UpdateRecordAsync(netcup, zone, host, recordType, value, netcup.AllowDynamic, ct);
+            }
+
+            case DomainKind.NetcupCloud when group.NetcupCloud is { } netcupCloud:
+            {
+                var (zone, host) = ZoneAndHost(entry);
+                return await _netcupCloud.UpdateRecordAsync(netcupCloud, zone, host, recordType, value, netcupCloud.AllowDynamic, ct);
             }
 
             case DomainKind.Cloudflare when group.Cloudflare is { } cloudflare:

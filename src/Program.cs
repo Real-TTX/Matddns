@@ -45,6 +45,7 @@ builder.Services.AddSingleton<FritzboxClient>();
 builder.Services.AddSingleton<UnifiClient>();
 builder.Services.AddSingleton<UnifiCloudClient>();
 builder.Services.AddSingleton<NetcupClient>();
+builder.Services.AddSingleton<NetcupCloudClient>();
 builder.Services.AddSingleton<CloudflareClient>();
 builder.Services.AddSingleton<HetznerClient>();
 builder.Services.AddSingleton<GoDaddyClient>();

@@ -3,11 +3,12 @@ namespace Matddns.Models;
 public enum DomainKind
 {
     DynDns,
-    Netcup,
+    Netcup,       // legacy CCP API (ccp.netcup.net; customer number + API key + API password) - shown as "Netcup legacy"
     Cloudflare,
     Hetzner,
     GoDaddy,
-    Matddns
+    Matddns,
+    NetcupCloud   // new CloudDNS REST API (api.netcup.com/v1; single Bearer key) - shown as "Netcup"
 }
 
 public enum DnsRecordType
@@ -24,6 +25,7 @@ public class DomainGroup
     public DomainKind Kind { get; set; } = DomainKind.DynDns;
     public DynDnsSettings? DynDns { get; set; }
     public NetcupSettings? Netcup { get; set; }
+    public NetcupCloudSettings? NetcupCloud { get; set; }
     public CloudflareSettings? Cloudflare { get; set; }
     public HetznerSettings? Hetzner { get; set; }
     public GoDaddySettings? GoDaddy { get; set; }
@@ -36,7 +38,7 @@ public class DomainGroup
 
     /// <summary>Zone-based API providers use a record-name + zone (like Netcup); DynDNS just uses the full FQDN.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool IsZoneBased => Kind is DomainKind.Netcup or DomainKind.Cloudflare or DomainKind.Hetzner or DomainKind.GoDaddy;
+    public bool IsZoneBased => Kind is DomainKind.Netcup or DomainKind.NetcupCloud or DomainKind.Cloudflare or DomainKind.Hetzner or DomainKind.GoDaddy;
 }
 
 public class CloudflareSettings
@@ -72,6 +74,14 @@ public class NetcupSettings
     public string CustomerNumber { get; set; } = "";
     public string ApiKey { get; set; } = "";
     public string ApiPassword { get; set; } = "";
+
+    /// <summary>Opt-in: allow Matddns to create records that don't exist yet (needed for dynamic hosts). Off = update existing only.</summary>
+    public bool AllowDynamic { get; set; }
+}
+
+public class NetcupCloudSettings
+{
+    public string ApiKey { get; set; } = "";   // CloudDNS Bearer key from the CCP: Master Data → API → "API Keys" (64 chars; not the legacy one)
 
     /// <summary>Opt-in: allow Matddns to create records that don't exist yet (needed for dynamic hosts). Off = update existing only.</summary>
     public bool AllowDynamic { get; set; }

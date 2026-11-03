@@ -8,7 +8,7 @@
     ViewData["Crumbs"] = Crumbs.Of(("Domains", "/Domains"), (isNew ? "New domain group" : g!.Name, null));
     ViewData["ActiveHref"] = "/Domains";
     var kind = g?.Kind ?? DomainKind.DynDns;
-    var zoneBased = kind is DomainKind.Netcup or DomainKind.Cloudflare or DomainKind.Hetzner or DomainKind.GoDaddy;   // record-name + zone, like Netcup
+    var zoneBased = kind is DomainKind.Netcup or DomainKind.NetcupCloud or DomainKind.Cloudflare or DomainKind.Hetzner or DomainKind.GoDaddy;   // record-name + zone, like Netcup
     var keep = isNew ? "" : "Leave empty to keep the current one";
 }
 
@@ -63,6 +63,15 @@
                 <mat-field label="Password or token" for-id="DynPass">
                     <input type="password" id="DynPass" name="DynPass" class="mat-input" placeholder="@keep" autocomplete="new-password" />
                 </mat-field>
+            </div>
+
+            <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="NetcupCloud" hidden="@(kind != DomainKind.NetcupCloud)">
+                <mat-field label="API key" for-id="NcloudKey" full="true">
+                    <input type="password" id="NcloudKey" name="NcloudKey" class="mat-input" placeholder="@(isNew ? "CloudDNS API key (not the legacy one)" : keep)" autocomplete="new-password" />
+                </mat-field>
+                <div class="mat-field mat-field--full">
+                    <label class="mat-check"><input type="checkbox" id="NcloudAllowDynamic" name="NcloudAllowDynamic" value="true" checked="@(g?.NetcupCloud?.AllowDynamic == true)" /><span class="mat-check__text">Allow dynamic records (create them on demand)</span></label>
+                </div>
             </div>
 
             <div class="mat-form__grid" data-show-if="#kindSelect" data-show-value="Netcup" hidden="@(kind != DomainKind.Netcup)">

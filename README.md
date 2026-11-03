@@ -41,8 +41,8 @@ its IP into Matddns just like it would to any DynDNS provider.
 - Another **Matddns peer** (pull over its JSON API)
 
 **Targets – where an IP is written**
-- The **Cloudflare**, **Netcup**, **Hetzner DNS** and **GoDaddy** APIs (record + zone,
-  A/AAAA/CNAME, optional create-on-demand)
+- The **Cloudflare**, **Netcup** (new CloudDNS REST API; **Netcup legacy** keeps the old CCP API),
+  **Hetzner DNS** and **GoDaddy** APIs (record + zone, A/AAAA/CNAME, optional create-on-demand)
 - Another **Matddns peer** (push over its JSON API)
 - Generic **DynDNS update URLs** with presets for 29 providers (DuckDNS, No-IP, Dynu, Namecheap, OVH,
   DynDNS.org, Strato, deSEC, DynV6, …)
@@ -270,7 +270,8 @@ is never pushed to DNS.
 | Kind | Target |
 |------|--------|
 | DynDNS | any provider via an update URL with `{ipv4}`, `{ipv6}`, `{hostname}` (or `{host}` and `{domain}` apart), `{user}`, `{password}` placeholders (empty ones are dropped, so one URL covers A and AAAA); presets prefill the URL |
-| Netcup | the Netcup DNS API (record + zone) |
+| Netcup | the new netcup CloudDNS REST API (`api.netcup.com/v1`; a single Bearer key from the CCP: Master Data → API → API Keys) |
+| Netcup legacy | the old netcup CCP API (`ccp.netcup.net`; customer number + API key + API password) for zones still on the legacy backend |
 | Cloudflare | the Cloudflare API (API token with Zone.DNS edit) |
 | Hetzner DNS | the DNS API of the Hetzner Cloud: a Cloud API token (read & write) of the project that holds the zone; tokens of the retired DNS Console do not work. A record set must hold exactly one record, the TTL is set to 60 s |
 | GoDaddy | the GoDaddy DNS API (API key + secret) |
@@ -329,7 +330,7 @@ source's page, with copy-ready FRITZ!Box and UniFi examples). Both URLs take sep
 `ipv4`/`ipv6` parameters; send either or both, and the other family is left untouched. Tokens
 are compared in constant time, and the endpoints are rate-limited.
 
-A **dynamic receiver** (a dynamic rule binding a DynDNS-server source to a Netcup, Cloudflare, Hetzner or GoDaddy zone) lets one
+A **dynamic receiver** (a dynamic rule binding a DynDNS-server source to a zone-based provider: Netcup, Netcup legacy, Cloudflare, Hetzner or GoDaddy) lets one
 token manage many records under a namespace: the device sends `&hostname=<name>.<zone>` and that
 record is created/updated on the fly (creating is opt-in per domain group: *Allow dynamic records*).
 
@@ -437,9 +438,10 @@ stored value; send it to change it. Unknown properties are ignored, so an object
 
 **Domain groups** (`name`, `kind`, the kind's settings object, `entries`, `managedBy`):
 
-- `kind` is `DynDns`, `Netcup`, `Cloudflare`, `Hetzner`, `GoDaddy` or `Matddns` (peer); the settings object is `dynDns`, `netcup`,
-  `cloudflare`, `hetzner`, `goDaddy` or `matddns`, e.g. `{"cloudflare": {"apiToken": "...", "allowDynamic": true}}`.
-- **Credentials are never returned** (Cloudflare/Hetzner token, Netcup customer number/key/password, GoDaddy key/secret, DynDNS
+- `kind` is `DynDns`, `NetcupCloud` (new; shown as "Netcup"), `Netcup` (legacy; shown as "Netcup legacy"), `Cloudflare`, `Hetzner`,
+  `GoDaddy` or `Matddns` (peer); the settings object is `dynDns`, `netcupCloud`, `netcup`, `cloudflare`, `hetzner`, `goDaddy` or
+  `matddns`, e.g. `{"netcupCloud": {"apiKey": "...", "allowDynamic": true}}` or `{"cloudflare": {"apiToken": "...", "allowDynamic": true}}`.
+- **Credentials are never returned** (Cloudflare/Hetzner token, Netcup CloudDNS key, Netcup-legacy customer number/key/password, GoDaddy key/secret, DynDNS
   URL/user/password, peer token); the answer has `"credentialsSet": true|false`. When a later upsert leaves the credentials out
   (or empty), the stored ones are kept.
 - **`entries` is the complete list of the group's records:** `[{id?, hostname, type: "A"|"AAAA"|"CNAME", recordName?, domain?}]`.
@@ -448,7 +450,7 @@ stored value; send it to change it. Unknown properties are ignored, so an object
 - **Removing a record that a rule still uses is refused with `409`** (the message names the rule), and nothing is changed. The API
   never deletes a rule as a side effect: delete the rule first, then send the shorter list. (The UI, in contrast, deletes the rules
   together with the record.) Likewise `DELETE /domains/{id}` is `409` while rules use the group.
-- Records follow the UI: `hostname` is a valid FQDN; Netcup, Cloudflare, Hetzner and GoDaddy are zone-based and also store the zone
+- Records follow the UI: `hostname` is a valid FQDN; Netcup (both), Cloudflare, Hetzner and GoDaddy are zone-based and also store the zone
   (`domain`) and record name (`recordName`), derived from the hostname unless you send them (send `domain` for zones such as
   `example.co.uk`); DynDNS and Matddns-peer groups store just the FQDN and cannot have `CNAME` records.
 
